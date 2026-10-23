@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "plugins": {
+    "caveman@caveman": [
+      {
+        "scope": "user",
+        "installPath": "/home/maksim/proj/hackrnd26_shrek/.claude/plugins/cache/caveman/caveman/4.0.1",
+        "version": "4.0.1",
+        "installedAt": "2026-10-23T16:17:59.613Z",
+        "lastUpdated": "2026-10-23T16:17:59.613Z",
+        "gitCommitSha": "b4531dfc05a3ef0ba93b57e8bfa5f48564a4b4d6"
+      }
+    ]
+  }
+}

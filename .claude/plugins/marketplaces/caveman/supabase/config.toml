@@ -1,0 +1,10 @@
+# Remote project: xvfgtprkhzlvegvmeefq. Unset keys take Supabase CLI defaults.
+project_id = "caveman"
+
+# The CLI posts anonymously; the function validates and rate-limits instead.
+[functions.cli-telemetry]
+verify_jwt = false
+
+# caveman-blocks posts anonymously through curl; same validation and rate limits.
+[functions.blocks-telemetry]
+verify_jwt = false

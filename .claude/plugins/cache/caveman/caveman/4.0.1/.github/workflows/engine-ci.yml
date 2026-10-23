@@ -1,0 +1,305 @@
+name: engine-ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One live run per PR (or per branch on push); a newer push supersedes it.
+concurrency:
+  group: engine-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v5
+        with:
+          go-version-file: go.mod
+      - run: go build ./...
+      - run: go vet ./...
+      - run: go test ./...
+
+  # Every other Go job builds with the runner's default toolchain, which has
+  # cgo. The release binaries are built by scripts/build-release-binaries.mjs
+  # instead, and while that script used CGO_ENABLED=0 the shipped code
+  # compressor parsed Go only, with every test here green (#1020). This lane
+  # builds the linux/amd64 release set with the script's own flags (cgo through
+  # the pinned zig, static musl), runs the release-shape tests compiled the same
+  # way, runs the built engine's embedded evals, and checks the binaries are
+  # static. After merge it also cross-builds all six targets, so a Go or zig bump
+  # that breaks the darwin or windows link fails here, not at release time.
+  release-shape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      # Same pin as release-binaries.yml.
+      - name: Install pinned zig
+        run: |
+          set -euo pipefail
+          curl -fsSL -o "$RUNNER_TEMP/zig.tar.xz" https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz
+          echo "70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00  $RUNNER_TEMP/zig.tar.xz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/zig"
+          tar -xJf "$RUNNER_TEMP/zig.tar.xz" -C "$RUNNER_TEMP/zig" --strip-components=1
+          echo "ZIG=$RUNNER_TEMP/zig/zig" >> "$GITHUB_ENV"
+      - name: Build, test and smoke the linux/amd64 release set
+        run: node scripts/build-release-binaries.mjs --test --out "$RUNNER_TEMP/release"
+      - name: Linux cgo binaries are static
+        run: |
+          set -euo pipefail
+          for f in "$RUNNER_TEMP"/release/caveman-{proxy,engine}_linux_amd64; do
+            file "$f" | grep -q 'statically linked' || { file "$f"; echo "$f is not static" >&2; exit 1; }
+          done
+      - name: Cross-build all six release targets
+        if: github.event_name != 'pull_request'
+        run: node scripts/build-release-binaries.mjs --out "$RUNNER_TEMP/release-all"
+
+  # The middleware store suite on both backends, and the multi-replica runtime
+  # tests, against a real Postgres. Locally they skip unless
+  # CAVEMAN_TEST_POSTGRES_URL is set.
+  middleware-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+        env:
+          POSTGRES_USER: caveman
+          POSTGRES_PASSWORD: caveman
+          POSTGRES_DB: caveman_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U caveman -d caveman_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v5
+        with:
+          go-version-file: go.mod
+      - run: go test -count=1 -race ./proxy/internal/store/... ./proxy/internal/middleware/...
+        env:
+          CAVEMAN_TEST_POSTGRES_URL: postgres://caveman:caveman@localhost:5432/caveman_test?sslmode=disable
+
+  typescript:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v5
+        with:
+          go-version-file: go.mod
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+      # Ubuntu 23.10+ runners restrict unprivileged user namespaces via
+      # AppArmor; the agent sandbox tests exercise the real userns sandbox.
+      - name: Allow unprivileged user namespaces for sandbox tests
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      # The CLI conformance suite needs the real proxy; building it here with
+      # the cached Go toolchain keeps the test inside its 90s budget.
+      - name: Prebuild caveman-proxy for conformance tests
+        run: go build -o "$RUNNER_TEMP/caveman-proxy" ./proxy/cmd/caveman-proxy
+      - run: pnpm install --frozen-lockfile
+      # The build regenerates the CLI's compiled-in device-auth copy, so check
+      # the committed one against packages/device-auth before it does.
+      - name: CLI device-auth copy matches packages/device-auth
+        run: node packages/cli/scripts/gen-device-auth.mjs --check
+      - run: pnpm -r build
+      # The SDK and middleware suites run in middleware-typescript below, so a
+      # failure elsewhere in the workspace cannot skip them.
+      - run: pnpm -r --filter "!@caveman-ai/sdk" --filter "!@caveman-ai/middleware" test
+        env:
+          CAVEMAN_TEST_PROXY_BIN: ${{ runner.temp }}/caveman-proxy
+          CAVEMAN_REQUIRE_FRAMEWORKS: "1"
+
+  # The CLI's fast suite on macOS, where most of its users are. test:fast builds
+  # the CLI from source and stubs every Go binary, so no Go toolchain, proxy
+  # prebuild or workspace build is needed here.
+  cli-macos:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @caveman-ai/cli run test:fast
+
+  # Its own job: `pnpm -r test` stops at the first failing package, so a red
+  # suite elsewhere in the workspace must not keep these from running.
+  middleware-typescript:
+    name: middleware-typescript / node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @caveman-ai/sdk test
+      - run: pnpm --filter @caveman-ai/middleware test
+        env:
+          CAVEMAN_REQUIRE_FRAMEWORKS: "1"
+      - run: pnpm --dir packages/middleware/typescript test:consumer
+
+  root-surfaces:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # Read by the windows job below; job-level `if` cannot see changed paths.
+    outputs:
+      windows: ${{ steps.windows-scope.outputs.windows }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      # On a PR, HEAD is GitHub's merge commit and HEAD^1 the base branch tip.
+      # Every path counts as relevant unless it is one Windows cannot break
+      # (docs, benchmarks, deploy config, prose); so does an unreadable diff.
+      # --no-renames lists a rename's source too, not only where it went.
+      - name: Does this PR touch Windows-relevant code?
+        id: windows-scope
+        if: github.event_name == 'pull_request'
+        run: |
+          if ! changed="$(git diff --no-renames --name-only HEAD^1 HEAD)" \
+            || grep -qvE '^(docs|benchmarks|evals|deploy|supabase)/|^[^/]+\.md$|(^|/)(README|CHANGELOG)\.md$' <<<"$changed"; then
+            echo "windows=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - run: python -m pip install pytest==9.0.3
+      - run: npm test
+      - run: node --test --test-force-exit tests/*.js
+      - run: python -m unittest discover -s tests -p 'test_*.py'
+        env:
+          XDG_DATA_HOME: ${{ runner.temp }}/caveman-xdg
+      - run: python -m pytest -q tests
+        working-directory: mem/py
+      - run: python tests/verify_repo.py
+
+  extension:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: extension
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run package
+
+  # ~15 min per run, the whole suite again on Windows. It runs after merge, on
+  # manual dispatch, and on PRs that touch Windows-relevant code (root-surfaces
+  # decides which), not on every PR push: ci.yml's windows-powershell job keeps
+  # the Windows-only hook contract on every PR in under a minute.
+  windows:
+    needs: root-surfaces
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.root-surfaces.outputs.windows == 'true') }}
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v5
+        with:
+          go-version-file: go.mod
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - run: pnpm install --frozen-lockfile
+      - run: python -m pip install pytest==9.0.3
+      - run: go test ./...
+      - run: npm test
+      - run: node --test --test-force-exit tests/*.js
+      - run: python -m unittest discover -s tests -p 'test_*.py'
+        env:
+          LOCALAPPDATA: ${{ runner.temp }}\caveman-data
+      - run: python -m pytest -q tests
+        working-directory: mem/py
+      - run: python -m pytest -q
+        working-directory: packages/sdk/python
+      - run: python -m pip install --no-deps -e packages/sdk/python
+      - run: python -m pip install -c packages/middleware/python/constraints/latest.txt "./packages/middleware/python[langchain,openai]"
+      - run: python -m pytest -q
+        working-directory: packages/middleware/python
+        env:
+          CAVEMAN_REQUIRED_ADAPTERS: langchain,openai
+      - run: python tests/verify_repo.py
+      - run: npm --prefix extension ci
+      - run: npm --prefix extension test
+      - run: npm run test:windows
+      # The workspace suites run last: a hang in one of them (the job timeout
+      # cut a run off there) must not skip the suites above.
+      - name: Prebuild caveman-proxy for conformance tests
+        run: go build -o "$env:RUNNER_TEMP\caveman-proxy.exe" ./proxy/cmd/caveman-proxy
+      - run: pnpm -r build
+      # @caveman-ai/cli's POSIX-harnessed suite has never executed on Windows
+      # and is excluded until its harness is ported, not because coverage is
+      # unwanted (149 failures — shebang-script stub agent binaries; Windows
+      # contracts run in the curated `npm run test:windows` gate above via
+      # windows-platform/portable-command/delegate-windows). Every other
+      # workspace suite passes on Windows and stays in.
+      - run: pnpm -r --filter "!@caveman-ai/cli" test
+        env:
+          CAVEMAN_TEST_PROXY_BIN: ${{ runner.temp }}\caveman-proxy.exe
+          CAVEMAN_REQUIRE_FRAMEWORKS: "1"
+      - run: pnpm --dir packages/middleware/typescript test:consumer

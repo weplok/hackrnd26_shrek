@@ -1,0 +1,411 @@
+#!/usr/bin/env node
+// Tests for src/hooks/cavecrew-model-overrides.js
+// Run: node tests/test_cavecrew_model_overrides.js
+
+'use strict';
+
+const fs   = require('fs');
+const path = require('path');
+const os   = require('os');
+const assert = require('assert');
+
+const { patchFrontmatterModel, resolvePluginRoot, applyOverrides, insideGitWorkTree, AGENT_ENV_MAP } =
+  require('../src/hooks/cavecrew-model-overrides');
+
+let passed = 0;
+let failed = 0;
+
+function test(name, fn) {
+  try {
+    fn();
+    passed++;
+    console.log('  ✓ ' + name);
+  } catch (e) {
+    failed++;
+    console.error('  ✗ ' + name);
+    console.error('    ' + e.message);
+  }
+}
+
+// ── patchFrontmatterModel ──────────────────────────────────────────────────
+
+console.log('\npatchFrontmatterModel\n');
+
+const REVIEWER_FM = [
+  '---',
+  'name: cavecrew-reviewer',
+  'description: >',
+  '  Reviewer subagent.',
+  'tools: [Read, Grep, Bash]',
+  'model: haiku',
+  '---',
+  '',
+  'Body text.',
+].join('\n');
+
+test('replaces existing model: haiku with sonnet in reviewer', () => {
+  const out = patchFrontmatterModel(REVIEWER_FM, 'sonnet');
+  assert.ok(out.includes('model: sonnet'), 'new model line missing');
+  assert.ok(!out.includes('model: haiku'), 'old model line still present');
+  assert.ok(out.includes('Body text.'), 'body missing');
+});
+
+test('preserves all other frontmatter lines', () => {
+  const out = patchFrontmatterModel(REVIEWER_FM, 'opus');
+  assert.ok(out.includes('name: cavecrew-reviewer'), 'name line lost');
+  assert.ok(out.includes('tools: [Read, Grep, Bash]'), 'tools line lost');
+  assert.ok(out.includes('description: >'), 'description block lost');
+});
+
+const INVESTIGATOR_FM = [
+  '---',
+  'name: cavecrew-investigator',
+  'tools: [Read, Grep, Glob, Bash]',
+  'model: haiku',
+  '---',
+  '',
+  'Investigator body.',
+].join('\n');
+
+test('replaces existing model: haiku with opus in investigator', () => {
+  const out = patchFrontmatterModel(INVESTIGATOR_FM, 'opus');
+  assert.ok(out.includes('model: opus'), 'new model missing');
+  assert.ok(!out.includes('model: haiku'), 'old model still present');
+  assert.ok(out.includes('Investigator body.'), 'body lost');
+});
+
+const BUILDER_FM = [
+  '---',
+  'name: cavecrew-builder',
+  'description: >',
+  '  Builder subagent.',
+  'tools: [Read, Edit, Write, Grep, Glob]',
+  '---',
+  '',
+  'Builder body.',
+].join('\n');
+
+test('inserts model: after tools: when no model line exists (builder)', () => {
+  const out = patchFrontmatterModel(BUILDER_FM, 'sonnet');
+  assert.ok(out.includes('model: sonnet'), 'model line not inserted');
+  // Must be inside frontmatter (before body)
+  const fmClose = out.indexOf('\n---', 3);
+  const modelPos = out.indexOf('model: sonnet');
+  assert.ok(modelPos < fmClose, 'model line is outside frontmatter');
+  // Inserted right after tools: line
+  const toolsPos = out.indexOf('tools:');
+  const toolsEnd = out.indexOf('\n', toolsPos);
+  assert.strictEqual(out.slice(toolsEnd + 1, toolsEnd + 1 + 'model: sonnet'.length), 'model: sonnet',
+    'model not inserted immediately after tools: line');
+  assert.ok(out.includes('Builder body.'), 'body lost');
+});
+
+test('no-op when content has no frontmatter', () => {
+  const plain = 'Just some text\nno frontmatter\n';
+  const out = patchFrontmatterModel(plain, 'sonnet');
+  assert.strictEqual(out, plain);
+});
+
+test('empty model value is no-op (defense-in-depth guard)', () => {
+  const out = patchFrontmatterModel(REVIEWER_FM, '');
+  assert.strictEqual(out, REVIEWER_FM, 'empty value should leave file unchanged');
+});
+
+test('ignores model value with newline', () => {
+  const out = patchFrontmatterModel(REVIEWER_FM, 'so\nnnet');
+  assert.strictEqual(out, REVIEWER_FM, 'should return original unchanged');
+});
+
+test('ignores model value with control character', () => {
+  const out = patchFrontmatterModel(REVIEWER_FM, 'so\x01nnet');
+  assert.strictEqual(out, REVIEWER_FM, 'should return original unchanged');
+});
+
+test('model line already identical → content unchanged', () => {
+  const out = patchFrontmatterModel(REVIEWER_FM, 'haiku');
+  assert.strictEqual(out, REVIEWER_FM, 'should be byte-identical when value unchanged');
+});
+
+test('no model line and no tools line → inserts before closing ---', () => {
+  const fm = '---\nname: test\n---\n\nbody\n';
+  const out = patchFrontmatterModel(fm, 'sonnet');
+  assert.ok(out.includes('model: sonnet'), 'model line missing');
+  const fmClose = out.indexOf('\n---', 3);
+  const modelPos = out.indexOf('model: sonnet');
+  assert.ok(modelPos < fmClose, 'model line outside frontmatter');
+});
+
+test('CRLF files: inserted model line uses CRLF, no mixed endings', () => {
+  const crlf = REVIEWER_FM.replace(/\n/g, '\r\n');
+  const out = patchFrontmatterModel(crlf, 'sonnet');
+  assert.ok(out.includes('model: sonnet'), 'model line missing in CRLF file');
+  // No bare LF should appear outside CRLF sequences
+  const strippedCR = out.replace(/\r\n/g, '');
+  assert.ok(!strippedCR.includes('\n'), 'mixed line endings detected after patch');
+});
+
+test('CRLF builder (no model line): inserted model line uses CRLF', () => {
+  const crlf = BUILDER_FM.replace(/\n/g, '\r\n');
+  const out = patchFrontmatterModel(crlf, 'sonnet');
+  assert.ok(out.includes('model: sonnet'), 'model line missing in CRLF builder file');
+  const strippedCR = out.replace(/\r\n/g, '');
+  assert.ok(!strippedCR.includes('\n'), 'mixed line endings in CRLF builder patch');
+});
+
+// ── resolvePluginRoot ──────────────────────────────────────────────────────
+
+console.log('\nresolvePluginRoot\n');
+
+test('resolves to parent of hooks dir', () => {
+  const hooksDir = path.join(os.tmpdir(), 'fake-plugin', 'hooks');
+  const root = resolvePluginRoot(hooksDir);
+  assert.strictEqual(path.basename(root), 'fake-plugin');
+});
+
+// ── applyOverrides ─────────────────────────────────────────────────────────
+
+console.log('\napplyOverrides\n');
+
+function withTmpPlugin(fn) {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'caveman-override-test-'));
+  const agentsDir = path.join(tmp, 'agents');
+  fs.mkdirSync(agentsDir);
+  try {
+    fn(tmp, agentsDir);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+test('replaces reviewer model when CAVECREW_REVIEWER_MODEL set', () => {
+  withTmpPlugin((root, agentsDir) => {
+    fs.writeFileSync(path.join(agentsDir, 'cavecrew-reviewer.md'), REVIEWER_FM, 'utf8');
+    applyOverrides(root, { CAVECREW_REVIEWER_MODEL: 'sonnet' });
+    const out = fs.readFileSync(path.join(agentsDir, 'cavecrew-reviewer.md'), 'utf8');
+    assert.ok(out.includes('model: sonnet'), 'reviewer model not patched');
+  });
+});
+
+test('replaces investigator model when CAVECREW_INVESTIGATOR_MODEL set', () => {
+  withTmpPlugin((root, agentsDir) => {
+    fs.writeFileSync(path.join(agentsDir, 'cavecrew-investigator.md'), INVESTIGATOR_FM, 'utf8');
+    applyOverrides(root, { CAVECREW_INVESTIGATOR_MODEL: 'opus' });
+    const out = fs.readFileSync(path.join(agentsDir, 'cavecrew-investigator.md'), 'utf8');
+    assert.ok(out.includes('model: opus'), 'investigator model not patched');
+  });
+});
+
+test('inserts builder model when CAVECREW_BUILDER_MODEL set and no model line', () => {
+  withTmpPlugin((root, agentsDir) => {
+    fs.writeFileSync(path.join(agentsDir, 'cavecrew-builder.md'), BUILDER_FM, 'utf8');
+    applyOverrides(root, { CAVECREW_BUILDER_MODEL: 'sonnet' });
+    const out = fs.readFileSync(path.join(agentsDir, 'cavecrew-builder.md'), 'utf8');
+    assert.ok(out.includes('model: sonnet'), 'builder model not inserted');
+  });
+});
+
+test('blank env var is no-op', () => {
+  withTmpPlugin((root, agentsDir) => {
+    fs.writeFileSync(path.join(agentsDir, 'cavecrew-reviewer.md'), REVIEWER_FM, 'utf8');
+    applyOverrides(root, { CAVECREW_REVIEWER_MODEL: '' });
+    const out = fs.readFileSync(path.join(agentsDir, 'cavecrew-reviewer.md'), 'utf8');
+    assert.strictEqual(out, REVIEWER_FM, 'blank env var should be no-op');
+  });
+});
+
+test('whitespace-only env var is no-op', () => {
+  withTmpPlugin((root, agentsDir) => {
+    fs.writeFileSync(path.join(agentsDir, 'cavecrew-reviewer.md'), REVIEWER_FM, 'utf8');
+    applyOverrides(root, { CAVECREW_REVIEWER_MODEL: '   ' });
+    const out = fs.readFileSync(path.join(agentsDir, 'cavecrew-reviewer.md'), 'utf8');
+    assert.strictEqual(out, REVIEWER_FM, 'whitespace env var should be no-op');
+  });
+});
+
+test('env var with newline in value is ignored', () => {
+  withTmpPlugin((root, agentsDir) => {
+    fs.writeFileSync(path.join(agentsDir, 'cavecrew-reviewer.md'), REVIEWER_FM, 'utf8');
+    applyOverrides(root, { CAVECREW_REVIEWER_MODEL: 'so\nnnet' });
+    const out = fs.readFileSync(path.join(agentsDir, 'cavecrew-reviewer.md'), 'utf8');
+    assert.strictEqual(out, REVIEWER_FM, 'newline in value should be ignored');
+  });
+});
+
+test('env var with control character in value is ignored', () => {
+  withTmpPlugin((root, agentsDir) => {
+    fs.writeFileSync(path.join(agentsDir, 'cavecrew-reviewer.md'), REVIEWER_FM, 'utf8');
+    applyOverrides(root, { CAVECREW_REVIEWER_MODEL: 'son\x00net' });
+    const out = fs.readFileSync(path.join(agentsDir, 'cavecrew-reviewer.md'), 'utf8');
+    assert.strictEqual(out, REVIEWER_FM, 'control char in value should be ignored');
+  });
+});
+
+test('missing agent file is silent no-op', () => {
+  withTmpPlugin((root) => {
+    // agents dir exists but reviewer file does not
+    assert.doesNotThrow(() => {
+      applyOverrides(root, { CAVECREW_REVIEWER_MODEL: 'sonnet' });
+    });
+  });
+});
+
+test('missing agents dir (non-plugin layout) is silent no-op', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'caveman-nolayout-'));
+  try {
+    assert.doesNotThrow(() => {
+      applyOverrides(tmp, { CAVECREW_REVIEWER_MODEL: 'sonnet' });
+    });
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('unset env vars → files untouched', () => {
+  withTmpPlugin((root, agentsDir) => {
+    fs.writeFileSync(path.join(agentsDir, 'cavecrew-reviewer.md'), REVIEWER_FM, 'utf8');
+    applyOverrides(root, {});
+    const out = fs.readFileSync(path.join(agentsDir, 'cavecrew-reviewer.md'), 'utf8');
+    assert.strictEqual(out, REVIEWER_FM, 'file should be unchanged when env unset');
+  });
+});
+
+test('body content preserved after model patch', () => {
+  withTmpPlugin((root, agentsDir) => {
+    const content = REVIEWER_FM + '\n\n## Extra\n\nExtra section body.\n';
+    fs.writeFileSync(path.join(agentsDir, 'cavecrew-reviewer.md'), content, 'utf8');
+    applyOverrides(root, { CAVECREW_REVIEWER_MODEL: 'sonnet' });
+    const out = fs.readFileSync(path.join(agentsDir, 'cavecrew-reviewer.md'), 'utf8');
+    assert.ok(out.includes('## Extra'), 'extra body section lost');
+    assert.ok(out.includes('Extra section body.'), 'body text lost');
+  });
+});
+
+// ── Summary ────────────────────────────────────────────────────────────────
+
+
+// ── source checkout guard ──────────────────────────────────────────────────
+// resolvePluginRoot returns the REPO ROOT when this hook runs from a clone, so
+// every SessionStart used to rewrite tracked agents/*.md and dirty the working
+// tree just from opening the repo.
+console.log('\nsource checkout guard');
+
+test('a plugin root inside a git work tree is left untouched', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cavecrew-git-'));
+  fs.mkdirSync(path.join(root, '.git'));
+  fs.mkdirSync(path.join(root, 'agents'));
+  const file = AGENT_ENV_MAP[0].file;
+  const target = path.join(root, file);
+  const before = '---\nname: x\nmodel: haiku\n---\nbody\n';
+  fs.writeFileSync(target, before);
+
+  applyOverrides(root, { [AGENT_ENV_MAP[0].envVar]: 'opus' });
+
+  assert.strictEqual(fs.readFileSync(target, 'utf8'), before,
+    'overrides rewrote tracked source in a git checkout');
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('a plugin root with no git above it still gets overrides', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cavecrew-nogit-'));
+  fs.mkdirSync(path.join(root, 'agents'));
+  const file = AGENT_ENV_MAP[0].file;
+  const target = path.join(root, file);
+  fs.writeFileSync(target, '---\nname: x\nmodel: haiku\n---\nbody\n');
+
+  applyOverrides(root, { [AGENT_ENV_MAP[0].envVar]: 'opus' });
+
+  assert.ok(/^model: opus$/m.test(fs.readFileSync(target, 'utf8')),
+    'override did not apply outside a git work tree');
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('insideGitWorkTree walks up to an ancestor .git', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cavecrew-ancestor-'));
+  fs.mkdirSync(path.join(root, '.git'));
+  const nested = path.join(root, 'a', 'b', 'c');
+  fs.mkdirSync(nested, { recursive: true });
+  assert.strictEqual(insideGitWorkTree(nested), true);
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+// ── Unicode line-break rejection in patchFrontmatterModel ─────────────────
+
+console.log('\nUnicode line-break rejection\n');
+
+test('U+2028 LINE SEPARATOR in model value is rejected', () => {
+  const out = patchFrontmatterModel(REVIEWER_FM, 'son net');
+  assert.strictEqual(out, REVIEWER_FM, 'U+2028 in value should leave file unchanged');
+});
+
+test('U+2029 PARAGRAPH SEPARATOR in model value is rejected', () => {
+  const out = patchFrontmatterModel(REVIEWER_FM, 'son net');
+  assert.strictEqual(out, REVIEWER_FM, 'U+2029 in value should leave file unchanged');
+});
+
+test('U+0085 NEL in model value is rejected', () => {
+  const out = patchFrontmatterModel(REVIEWER_FM, 'son\u0085net');
+  assert.strictEqual(out, REVIEWER_FM, 'U+0085 in value should leave file unchanged');
+});
+
+// ── symlink refusal in applyOverrides ─────────────────────────────────────
+
+console.log('\nsymlink refusal\n');
+
+test('applyOverrides does not write through a symlinked agent file', () => {
+  if (process.platform === 'win32') { passed++; console.log('  ✓ (skipped on Windows)'); return; }
+  withTmpPlugin((root, agentsDir) => {
+    const real = path.join(agentsDir, 'real-reviewer.md');
+    const link = path.join(agentsDir, 'cavecrew-reviewer.md');
+    fs.writeFileSync(real, REVIEWER_FM, 'utf8');
+    fs.symlinkSync(real, link);
+    applyOverrides(root, { CAVECREW_REVIEWER_MODEL: 'sonnet' });
+    // The real file must be untouched; the symlink still points there.
+    assert.strictEqual(fs.readFileSync(real, 'utf8'), REVIEWER_FM,
+      'symlink target was overwritten');
+  });
+});
+
+// ── atomic write leaves no temp file on success ───────────────────────────
+
+console.log('\natomic write\n');
+
+test('applyOverrides leaves no .caveman-tmp-* file after a successful write', () => {
+  withTmpPlugin((root, agentsDir) => {
+    fs.writeFileSync(path.join(agentsDir, 'cavecrew-reviewer.md'), REVIEWER_FM, 'utf8');
+    applyOverrides(root, { CAVECREW_REVIEWER_MODEL: 'sonnet' });
+    const leftovers = fs.readdirSync(agentsDir).filter((f) => f.includes('.caveman-tmp-'));
+    assert.deepEqual(leftovers, [], 'temp file not cleaned up: ' + leftovers.join(', '));
+  });
+});
+
+test('applyOverrides removes the staged temp file when the rename fails', () => {
+  withTmpPlugin((root, agentsDir) => {
+    const agentPath = path.join(agentsDir, 'cavecrew-reviewer.md');
+    fs.writeFileSync(agentPath, REVIEWER_FM, 'utf8');
+    // A rename can fail for reasons the hook cannot control: on Windows an
+    // open handle on the target gives EPERM, and a read-only parent gives
+    // EACCES. applyOverrides swallows it (it must never block session start),
+    // so the staged file has to be cleaned up on the way out or it
+    // accumulates one copy per pid in the user's plugin directory.
+    const realRename = fs.renameSync;
+    fs.renameSync = () => { const e = new Error('EPERM: operation not permitted'); e.code = 'EPERM'; throw e; };
+    try {
+      applyOverrides(root, { CAVECREW_REVIEWER_MODEL: 'sonnet' });
+    } finally {
+      fs.renameSync = realRename;
+    }
+    const leftovers = fs.readdirSync(agentsDir).filter((f) => f.includes('.caveman-tmp-'));
+    assert.deepEqual(leftovers, [], 'staged temp file left behind: ' + leftovers.join(', '));
+    assert.strictEqual(fs.readFileSync(agentPath, 'utf8'), REVIEWER_FM,
+      'original agent file must survive a failed rename unchanged');
+  });
+});
+
+console.log('');
+if (failed === 0) {
+  console.log('All ' + (passed + failed) + ' tests passed.');
+  process.exit(0);
+} else {
+  console.error(failed + ' test(s) failed.');
+  process.exit(1);
+}

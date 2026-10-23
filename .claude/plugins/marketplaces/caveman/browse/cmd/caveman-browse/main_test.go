@@ -1,0 +1,246 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"io"
+	"log/slog"
+	"net"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"syscall"
+	"testing"
+	"time"
+
+	"github.com/JuliusBrussee/caveman/browse"
+	"github.com/JuliusBrussee/caveman/mcp"
+)
+
+func TestOpenRecoveryStoreCreatesFreshCavemanHome(t *testing.T) {
+	home := filepath.Join(t.TempDir(), "new", "caveman-home")
+	t.Setenv("CAVEMAN_HOME", home)
+	t.Setenv("CAVEMAN_CCR_DB", "")
+	t.Setenv("CAVEMAN_BROWSE_EPHEMERAL", "")
+	store, err := openRecoveryStore()
+	if err != nil {
+		t.Fatalf("fresh home must open recovery store: %v", err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(home, "ccr.db")); err != nil {
+		t.Fatalf("recovery DB missing in fresh home: %v", err)
+	}
+}
+
+func TestSaveDirectStateIsPrivateAndComplete(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("CAVEMAN_HOME", home)
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	want := directState{
+		Endpoint: "http://127.0.0.1:9444",
+		TargetID: "target-1",
+		Targets:  map[string]browse.Target{"ua": {BackendDOMNodeID: 10}},
+		Owned:    true,
+	}
+	saveDirectState(logger, want)
+	info, err := os.Stat(statePath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	// POSIX permission bits are synthetic on Windows; NTFS ACLs govern there.
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
+		t.Fatalf("state mode=%o want 600", info.Mode().Perm())
+	}
+	b, err := os.ReadFile(statePath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got directState
+	if err := json.Unmarshal(b, &got); err != nil {
+		t.Fatalf("state file is not complete JSON: %v", err)
+	}
+	if got.Endpoint != want.Endpoint || got.TargetID != want.TargetID || got.Targets["ua"].BackendDOMNodeID != 10 || !got.Owned {
+		t.Fatalf("state drifted: %+v", got)
+	}
+	if !directStateOwnsEndpoint(want.Endpoint) {
+		t.Fatal("owned endpoint was not recognized from private state")
+	}
+}
+
+func TestSaveDirectStateKeepsZeroTargetSessionCloseable(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("CAVEMAN_HOME", home)
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	saveDirectState(logger, directState{
+		Endpoint: "http://127.0.0.1:9555",
+		TargetID: "target-empty",
+		Targets:  map[string]browse.Target{},
+		Owned:    true,
+	})
+	b, err := os.ReadFile(statePath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got directState
+	if err := json.Unmarshal(b, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.TargetID != "target-empty" || got.Targets == nil || len(got.Targets) != 0 || !got.Owned {
+		t.Fatalf("zero-target session state was dropped: %+v", got)
+	}
+}
+
+func TestDefaultChromeCandidatesPreserveMacPaths(t *testing.T) {
+	got := defaultChromeCandidates("darwin", func(string) string { return "" })
+	want := []string{
+		"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+		"/Applications/Chromium.app/Contents/MacOS/Chromium",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("candidates=%v want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("candidate[%d]=%q want %q", i, got[i], want[i])
+		}
+	}
+}
+
+// TestRunUntilSignalReturnsOnContextDoneWithoutWaitingForServe pins issue #1016:
+// srv.Serve(in, out) blocks reading in until EOF, so a bare call cannot be
+// interrupted by ctx being done, and main would never reach its deferred Close
+// calls on a terminating signal. in is an unclosed io.Pipe reader, so it blocks
+// forever exactly like stdin blocks on an MCP host that has not sent EOF; the
+// only way out is the ctx.Done() branch.
+func TestRunUntilSignalReturnsOnContextDoneWithoutWaitingForServe(t *testing.T) {
+	srv := mcp.NewServer("test", nil, nil)
+	in, _ := io.Pipe() // never written to, never closed
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // simulates a signal having already arrived
+
+	done := make(chan error, 1)
+	go func() { done <- runUntilSignal(ctx, srv, in, io.Discard) }()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("runUntilSignal returned an error on ctx.Done(): %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("runUntilSignal did not return after ctx was done; it is still blocked on Serve reading a stalled input, so a terminating signal would never let main's deferred Close calls run")
+	}
+}
+
+// TestRunUntilSignalReturnsServeError confirms the ordinary EOF path is
+// unchanged: when in reaches EOF before ctx is done, runUntilSignal reports
+// Serve's own result rather than a signal-shaped nil.
+func TestRunUntilSignalReturnsServeError(t *testing.T) {
+	srv := mcp.NewServer("test", nil, nil)
+	in, w := io.Pipe()
+	_ = w.Close() // immediate EOF
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() { done <- runUntilSignal(ctx, srv, in, io.Discard) }()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("runUntilSignal returned an unexpected error on EOF: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("runUntilSignal did not return on Serve's own EOF completion")
+	}
+}
+
+func TestDefaultChromeCandidatesIncludeWindowsInstallRoots(t *testing.T) {
+	env := map[string]string{
+		"LOCALAPPDATA":      `C:\Users\cave\AppData\Local`,
+		"PROGRAMFILES":      `C:\Program Files`,
+		"PROGRAMFILES(X86)": `C:\Program Files (x86)`,
+	}
+	got := defaultChromeCandidates("windows", func(key string) string { return env[key] })
+	joined := strings.Join(got, "\n")
+	for _, want := range []string{
+		filepath.Join(env["LOCALAPPDATA"], "Google", "Chrome", "Application", "chrome.exe"),
+		filepath.Join(env["PROGRAMFILES"], "Google", "Chrome", "Application", "chrome.exe"),
+		filepath.Join(env["PROGRAMFILES(X86)"], "Chromium", "Application", "chrome.exe"),
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("Windows Chrome candidate %q missing from %v", want, got)
+		}
+	}
+}
+
+// TestMainHelper runs main() in a subprocess for TestSignalDuringBrowserStartup.
+func TestMainHelper(t *testing.T) {
+	if os.Getenv("CAVEMAN_BROWSE_MAIN_HELPER") != "1" {
+		return
+	}
+	os.Args = os.Args[:1] // any argument switches main to direct-command mode
+	main()
+	os.Exit(0)
+}
+
+// TestSignalDuringBrowserStartup pins the startup half of #1016: a SIGTERM that
+// lands while NewCDPDriver is still bringing the browser up must not take the
+// default action, or a launched Chrome is orphaned with its temp profile. The
+// fake CDP endpoint accepts the driver's /json/version request and never
+// answers, holding main inside NewCDPDriver; closing it then fails startup.
+// An unguarded process dies by the signal; a guarded one exits on its error.
+func TestSignalDuringBrowserStartup(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX signal delivery")
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	accepted := make(chan net.Conn, 1)
+	go func() {
+		if conn, err := ln.Accept(); err == nil {
+			accepted <- conn
+		}
+	}()
+
+	cmd := exec.Command(os.Args[0], "-test.run=^TestMainHelper$")
+	cmd.Env = append(os.Environ(), "CAVEMAN_BROWSE_MAIN_HELPER=1", "CAVEMAN_BROWSE_EPHEMERAL=1", "CAVEMAN_BROWSE_CDP=http://"+ln.Addr().String())
+	stdin, err := cmd.StdinPipe() // held open, so stdin EOF never ends the run
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stdin.Close()
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan struct{})
+	go func() { _ = cmd.Wait(); close(done) }()
+
+	var conn net.Conn
+	select {
+	case conn = <-accepted:
+	case <-time.After(10 * time.Second):
+		_ = cmd.Process.Kill()
+		t.Fatal("main never dialed the CDP endpoint")
+	}
+	if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-done: // killed by the signal's default action
+	case <-time.After(time.Second):
+		_ = conn.Close()
+		<-done
+	}
+	if status := cmd.ProcessState.Sys().(syscall.WaitStatus); status.Signaled() {
+		t.Fatalf("SIGTERM during browser startup killed the process (%v) before its deferred Close calls could run", status.Signal())
+	}
+}

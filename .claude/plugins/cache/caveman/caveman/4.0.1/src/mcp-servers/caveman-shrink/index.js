@@ -1,0 +1,234 @@
+#!/usr/bin/env node
+// caveman-shrink — MCP middleware that proxies an upstream MCP server and
+// compresses prose fields so the model sees fewer tokens.
+//
+// Usage:
+//   caveman-shrink <upstream-command> [...args]
+//
+// Example wrapping the filesystem MCP server:
+//   "mcpServers": {
+//     "fs-shrunk": {
+//       "command": "npx",
+//       "args": ["caveman-shrink", "npx", "@modelcontextprotocol/server-filesystem", "/some/path"]
+//     }
+//   }
+//
+// Compression is applied to:
+//   - "description" fields in tools/list, prompts/list, resources/list responses
+//   - same boundaries as caveman-compress: code, URLs, paths, identifiers preserved
+//
+// What we deliberately DON'T touch in v1:
+//   - tools/call response content (high risk of breaking downstream parsing)
+//   - request payloads going TO the upstream server
+//
+// Configuration (env vars):
+//   CAVEMAN_SHRINK_FIELDS   comma-separated extra field names to compress
+//                           (default: description)
+//   CAVEMAN_SHRINK_DEBUG=1  log compression deltas to stderr
+
+const { spawn } = require('child_process');
+const { StringDecoder } = require('string_decoder');
+const { compressDescriptionsInPlace, compress } = require('./compress');
+const { createShutdown } = require('./shutdown');
+
+const args = process.argv.slice(2);
+if (args.length === 0) {
+  process.stderr.write('caveman-shrink: missing upstream command.\n');
+  process.stderr.write('Usage: caveman-shrink <upstream-command> [...args]\n');
+  process.exit(2);
+}
+
+const debug = process.env.CAVEMAN_SHRINK_DEBUG === '1';
+const fields = (process.env.CAVEMAN_SHRINK_FIELDS || 'description')
+  .split(',').map(s => s.trim()).filter(Boolean);
+
+const { getSpawnInvocation, getSpawnOptions } = require('./spawn-options');
+
+let invocation;
+try {
+  invocation = getSpawnInvocation(args[0], args.slice(1));
+} catch (error) {
+  process.stderr.write(`caveman-shrink: failed to resolve upstream safely: ${error.message}\n`);
+  process.exit(1);
+}
+const upstream = spawn(invocation.command, invocation.args, getSpawnOptions());
+
+let spawnFailed = false;
+upstream.on('error', err => {
+  spawnFailed = true;
+  process.stderr.write(`caveman-shrink: failed to spawn upstream: ${err.message}\n`);
+});
+
+const shutdown = createShutdown({
+  child: upstream,
+  spawnFailed: () => spawnFailed,
+  endUpstreamInput: endInput,
+  detachInput: () => {
+    process.stdin.pause();
+    process.stdin.removeListener('data', forwardInput);
+    process.stdin.removeListener('end', handleClientEof);
+  },
+});
+
+// `exit` can fire while stdout still has unread data and while our own stdout
+// is backpressured. Wait for child `close`, stop accepting client input, then
+// let Node exit naturally so every transformed byte drains.
+upstream.on('close', (code, signal) => {
+  process.exitCode = shutdown.onClose(code, signal);
+});
+
+// Registering a handler here suppresses Node's default terminate-on-signal
+// behavior, so we must forward the signal to the child ourselves — otherwise
+// the wrapper would catch SIGTERM/SIGINT and never pass it on, leaving the
+// upstream process running, reparented to PID 1. Node keeps the process
+// alive only as long as something needs it to, so once `close` fires above
+// and removes the stdin listeners, the event loop drains and we exit with
+// the code/signal set there.
+// SIGHUP is forwarded for the same reason and is not hypothetical: it is what
+// a closing terminal or a disconnecting supervisor sends, and Node's default
+// disposition for it is also terminate — so leaving it unregistered orphaned
+// the upstream on exactly the teardown a user is most likely to trigger by
+// hand. Registering it here keeps that on the one code path the other two use.
+//
+// Forwarding alone is not enough for a server that traps the signal and
+// declines to exit: nothing would ever fire `close`, and the wrapper would sit
+// there as long as the upstream did. `shutdown.forward` escalates to SIGKILL
+// after a grace period so teardown terminates anyway.
+//
+// That escalation reaches the DIRECT child only. getSpawnOptions() sets no
+// `detached`, so there is no process group to signal, and an upstream that is
+// really a launcher (`npx <server>`, a shell wrapper) can leave the actual
+// server running as a descendant holding the inherited stdout pipe — which
+// also keeps `close` from firing. Measured, with a descendant that traps
+// SIGTERM: the wrapper hangs and the descendant is orphaned, identically
+// before and after this escalation existed. Closing that gap means owning the
+// whole process tree (`detached` + `process.kill(-pid)` on POSIX, `taskkill
+// /T` on Windows), which changes how tty signals reach the child and is a
+// larger change than this one — deliberately not attempted here.
+//
+// SIGKILL is deliberately absent from the list below: it cannot be trapped, and
+// on that path the upstream is orphaned by the OS with nothing this process can
+// do about it. Windows has no real signals — process.kill() there terminates
+// the target without running handlers — so teardown on that platform goes
+// through the stdin EOF handled at the bottom of this file, which runs the same
+// escalation from its first step rather than relying on a signal arriving.
+for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP']) {
+  process.on(signal, () => shutdown.forward(signal));
+}
+
+// JSON-RPC framing over stdio: messages are separated by newlines (the
+// MCP stdio transport uses LSP-like content but most servers emit one JSON
+// object per line). We line-buffer in both directions and parse opportunistically.
+function makeLineBuffer(onLine) {
+  let buf = '';
+  const decoder = new StringDecoder('utf8');
+  const flushLines = () => {
+    let nl;
+    while ((nl = buf.indexOf('\n')) !== -1) {
+      const line = buf.slice(0, nl);
+      buf = buf.slice(nl + 1);
+      if (line.trim()) onLine(line);
+    }
+  };
+  return {
+    push(chunk) {
+      buf += decoder.write(chunk);
+      flushLines();
+    },
+    end() {
+      buf += decoder.end();
+      if (buf.trim()) onLine(buf);
+      buf = '';
+    },
+  };
+}
+
+function transformResponse(msg) {
+  // Compress description fields on list-style responses. Match by method
+  // shape — we don't always know the original request's method, so we
+  // detect by the presence of a tools/prompts/resources array.
+  if (!msg || !msg.result || typeof msg.result !== 'object') return msg;
+  const r = msg.result;
+  let compressedSomething = false;
+
+  for (const arrayName of ['tools', 'prompts', 'resources', 'resourceTemplates']) {
+    if (Array.isArray(r[arrayName])) {
+      for (const item of r[arrayName]) {
+        for (const field of fields) {
+          if (typeof item[field] === 'string') {
+            const before = item[field];
+            const out = compress(before).compressed;
+            if (out !== before) {
+              item[field] = out;
+              compressedSomething = true;
+              if (debug) {
+                process.stderr.write(
+                  `[caveman-shrink] ${arrayName}.${item.name || '?'}.${field}: ` +
+                  `${before.length}→${out.length} bytes\n`
+                );
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Walk nested inputSchema descriptions (e.g. tool parameter descriptions).
+  // Always run — top-level compression does not cover nested schemas.
+  for (const arrayName of ['tools', 'prompts', 'resources', 'resourceTemplates']) {
+    if (Array.isArray(r[arrayName])) {
+      for (const item of r[arrayName]) {
+        if (item.inputSchema) compressDescriptionsInPlace(item.inputSchema, fields);
+      }
+    }
+  }
+
+  return msg;
+}
+
+function writeClient(value) {
+  if (process.stdout.write(value)) return;
+  upstream.stdout.pause();
+  process.stdout.once('drain', () => upstream.stdout.resume());
+}
+
+// Upstream → us → client (model). Transform here.
+const responses = makeLineBuffer(line => {
+  let msg;
+  try { msg = JSON.parse(line); } catch {
+    // Pass through unparseable lines unchanged.
+    writeClient(line + '\n');
+    return;
+  }
+  const out = transformResponse(msg);
+  writeClient(JSON.stringify(out) + '\n');
+});
+upstream.stdout.on('data', chunk => responses.push(chunk));
+upstream.stdout.on('end', () => responses.end());
+
+// Client → us → upstream. Pass through unchanged for v1.
+function forwardInput(chunk) {
+  if (!upstream.stdin.writable || upstream.stdin.destroyed) return;
+  if (!upstream.stdin.write(chunk)) {
+    process.stdin.pause();
+    upstream.stdin.once('drain', () => process.stdin.resume());
+  }
+}
+function endInput() {
+  if (upstream.stdin.writable && !upstream.stdin.destroyed) upstream.stdin.end();
+}
+upstream.stdin.on('error', err => {
+  if (err.code !== 'EPIPE' && !spawnFailed) {
+    process.stderr.write(`caveman-shrink: upstream stdin failed: ${err.message}\n`);
+    process.exitCode = 1;
+  }
+});
+// Our client closing our stdin is how a host initiates shutdown over the MCP
+// stdio transport, so hand that EOF on to the upstream and let `shutdown` see
+// the teardown through if the upstream declines to act on it.
+function handleClientEof() {
+  shutdown.closeInput();
+}
+process.stdin.on('data', forwardInput);
+process.stdin.on('end', handleClientEof);

@@ -1,0 +1,97 @@
+# Changelog
+
+## 2.1.0 — 2026-10-06
+
+- `route-ask-v1` (additive): optional, strict `request` (`endpoint`, `labels`
+  of eleven allowlisted headers, each value at most 256 bytes or 16 KiB for
+  `x-codex-turn-metadata` and never cut, `tool_names`, `effort` and
+  `thinking` from fixed value sets, `per_message_off`), `last` (the session's previous request: `model`,
+  `effort` from the same set, `age_s`, `input_tokens`, `cache_read_tokens`,
+  `cache_write_tokens`, `compacted`), and opaque `state` / `parent_state`
+  (at most 4096 bytes). The runtime now asks for every routable request:
+  `ask` goes only on a turn's first ask and is left out for compaction and
+  side requests, which are answered per request. The description names the
+  answer's new fields: `effort`, `effort_mode` (`message` | `top` | `""`),
+  `default_effort` (optional, the asked model's catalog default effort) and
+  `state`; `model` may cost more than the asked one.
+- `route-ask-v1` (additive): optional, strict `ask`
+  object next to `signals` — `text` (required, non-blank, at most 131072 bytes),
+  `prev_text` and `reply_tail` (at most 16384 bytes each) and `turn`
+  (0..1000000). Every field keeps its end. The description now says the ask
+  carries raw conversation text.
+- `route-ask-v1` (additive, hub route-ask-v2): optional, strict `pool` next to
+  `models`, at most 64 entries of `{ id, model, host, via: "local" }`: the
+  harness's own models (`harness/<model>`) then every provider login the
+  person added (`caveman providers add|login`) times the catalog models its
+  host serves. Left out when no login adds an entry. The answer may carry
+  `pool_id` and `via` (`local` | `cloud`; Cloud may add `via: "cloud"`
+  entries on its side, which the runtime sends to the Cloud gateway with
+  `x-caveman-route: <pool_id>`, pool_id `cloud:<provider>:<model>`, on the
+  project gateway key only). A Cloud whose 400 names `pool` is asked once
+  more without it.
+- `route-ask-v1` (additive): optional `request.cache_ttl` (`5m` | `30m` |
+  `1h` | `24h`), the TTL the request writes its provider cache entries at,
+  read from the body: the longest Anthropic `cache_control` ttl (none is
+  `5m`), else OpenAI `prompt_cache_options.ttl` or `prompt_cache_retention`
+  (`24h`; `in_memory` is `5m`). A Cloud that refuses it with a 400 (by name
+  or with its generic `cave_router_request_invalid`) is asked again without
+  it, and the same now holds for `pool`. `effort_mode` `message` also covers
+  GPT-6 on OpenAI Responses, applied as a `configuration_update` input item.
+- Schema `$id`s name `contracts-v2.1.0`.
+
+## 2.0.0 — 2026-09-24
+
+- **Breaking (license):** relicensed from MIT to Apache-2.0, along with the rest of
+  the repository in Caveman 3.0.0. Releases before this one keep the MIT license.
+- **Breaking (package):** renamed `@caveman/contracts` → `@caveman-ai/contracts`.
+  `package.json` had stayed at 1.0.0 after the 1.1.0 entry below; this release
+  realigns them.
+- **Breaking (schema IDs):** every `$id` is now
+  `https://raw.githubusercontent.com/JuliusBrussee/caveman/contracts-v2.0.0/packages/shared/contracts/schemas/<file>`,
+  pinned to this release's immutable tag (previously `https://caveman.so/schemas/…`
+  and `https://caveman.cloud/schemas/…`, which did not resolve). Every
+  cross-schema `$ref` is relative (`middleware-common.schema.json#/$defs/token`),
+  so tools that load the schemas or the OpenAPI document from the package
+  directory resolve them locally, with no network access. Each release moves
+  the tag in every `$id`; `scripts/validate-schemas.mjs` fails when an `$id`
+  does not embed the `package.json` version or a `$ref` is absolute. No wire
+  shape changed because of this.
+- Middleware protocol 1.1 (additive; `schema_version` stays 1), specified in
+  `docs/technical/middleware-protocol.md`:
+  - `middleware-capabilities`: optional `protocol {min,max}`, `features`,
+    `max_retention_seconds`; optional `limits` keys `retrieve_deadline_ms`,
+    `queue_depth`, `retrieve_queue_depth`, `max_segments`,
+    `max_manifest_items`, `receipt_bytes`, `quota_requests_per_minute`.
+    Any other `limits` key must be a positive safe integer (protocol 1.0
+    clients reject anything else).
+  - New: `middleware-error`, `middleware-session-delete`,
+    `middleware-session-delete-response`, `middleware-receipt-response`,
+    `middleware-decision-event`; `middleware-common` gains `feature`,
+    `reason`, `positive_limit`.
+  - New `openapi/middleware.openapi.json` (OpenAPI 3.1) covering
+    `capabilities`, `optimize`, `retrieve`, `receipts`, `sessions/delete`.
+  - The response schemas are closed (`additionalProperties: false`) on
+    purpose: they describe exactly what a 1.1 server emits and are what the
+    conformance kit checks servers against. Clients must not validate
+    responses against them (spec §4, §16); each schema's `description` says so.
+- `build` / `lint` / `test` run both `scripts/validate-schemas.mjs` and
+  `scripts/validate.mjs`. The former now also checks `$id` against the file
+  name, the protocol 1.1 fixture examples, and every OpenAPI `$ref`.
+
+## 1.1.0 — 2026-07-26
+
+- Added `schemas/grader-registry.json`: one entry per eval grader type (29,
+  including the two legacy Python-only graders) with category, one-sentence
+  description, an options JSON Schema, `scored` / `deterministic` /
+  `judge_calls`, and the pinned judge prompt templates.
+- Added `schemas/grader-registry.schema.json` describing that file.
+- `build` / `lint` / `test` now run `scripts/validate.mjs`, which parses every
+  file in `schemas/` and validates each data file against its sibling schema
+  (previously only `policy.schema.json` was parse-checked).
+- Additive only; no existing schema changed.
+
+## 1.0.0 — 2026-07-26
+
+- Recorded stable JSON Schema wire-contract baseline.
+- Added major-version gate for removed properties, new required fields, narrowed
+  enums, removed schemas, and changed schema IDs.

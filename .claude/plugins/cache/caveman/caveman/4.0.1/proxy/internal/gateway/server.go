@@ -1,0 +1,822 @@
+// Package gateway is the byte-safe request lifecycle of the public standalone
+// proxy: match → authenticate → inspect → byte-safe transform → upstream →
+// meter. It is the same shape as the managed gateway loop but with the
+// multi-tenant control plane replaced by three injected seams, so the loop
+// carries no cloud coupling:
+//
+//   - Authenticator    accepts a request and returns its RuntimeMode + optimizer policy
+//   - CredentialResolver resolves the upstream provider key (BYOK env or passthrough)
+//   - TelemetrySink     records one truthful per-request spend row
+//
+// record mode is always a pass-through; on any transform problem the original
+// bytes are forwarded unchanged. Standalone never claims `verified` savings — the
+// sink labels every row `inferred`.
+package gateway
+
+import (
+	"cmp"
+	"context"
+	"crypto/subtle"
+	"io"
+	"log/slog"
+	"net"
+	"net/http"
+	"net/url"
+	"os"
+	"strings"
+	"sync/atomic"
+	"time"
+
+	"github.com/JuliusBrussee/caveman/proxy/internal/identity"
+	"github.com/JuliusBrussee/caveman/proxy/providers"
+	"github.com/JuliusBrussee/caveman/shared/platform/cacheguard"
+	"github.com/JuliusBrussee/caveman/shared/platform/env"
+	"github.com/JuliusBrussee/caveman/shared/platform/httpx"
+)
+
+// RequestContext is the per-request policy the lifecycle needs. It is the slim,
+// single-operator analog of the managed control plane's ProjectContext.
+type RequestContext struct {
+	// Label tags telemetry rows (e.g. the agent/workflow name); "local" by default.
+	Label string
+	// AgentSlug attributes the row to the wrapped agent that produced it (from the
+	// inbound x-cave-agent header; "unlabeled-agent" when absent). It mirrors the
+	// managed gateway's field so the two proxies share one attribution axis. It is a
+	// telemetry tag, not policy — the lifecycle sets it after Authenticate.
+	AgentSlug string
+	// RuntimeMode gates transforms. "record" is always a pass-through.
+	RuntimeMode string
+	// Optimizers gates which provider-native optimizers may run, keyed by id.
+	Optimizers map[string]bool
+	// EvalGates records which behavioral optimizers have cleared their eval gate.
+	EvalGates map[string]bool
+	// ProviderBillingTiers is trusted local config (not a request header). The
+	// Gemini Developer API is list-priced only when explicitly set to "paid".
+	ProviderBillingTiers map[string]string
+}
+
+// Authenticator accepts or rejects an inbound request and returns its context.
+// Standalone returns a static single-operator context; a connected build would
+// consult its key cache. One that refuses every request (the listener serves
+// only the middleware) should also implement RefusesAll() bool returning true,
+// so /health/ready fails when the middleware store does.
+type Authenticator interface {
+	Authenticate(ctx context.Context, r *http.Request) (RequestContext, error)
+}
+
+// CredentialResolver resolves the upstream provider credential for a request.
+// Standalone resolves a BYOK env key by provider, falling back to the inbound
+// auth header; the managed gateway reads its ephemeral upstream-key header.
+type CredentialResolver interface {
+	Resolve(provider string, r *http.Request) providers.Credential
+}
+
+// TelemetrySink records one truthful per-request spend row. Standalone writes to
+// a local SQLite store; every row's Basis is "inferred".
+type TelemetrySink interface {
+	Record(RequestRecord)
+}
+
+// PayloadSink optionally records raw local trial payloads. It is deliberately
+// separate from TelemetrySink so ordinary embedders do not see request bodies.
+type PayloadSink interface {
+	RecordPayload(label, requestID, traceID string, body []byte)
+}
+
+// Compressor is the optional S4 content-compression seam. CompressSegment runs the
+// engine on one extracted live-zone content block (byte-safe: returns the original
+// bytes with a zero delta on any problem); StoreOriginal records that exact
+// original block for CCR recovery and returns its deterministic content-addressed
+// handle. Pixel mode still uses StoreOriginal for its full-request recovery record.
+// It is defined in primitive terms so the gateway core carries no engine import. A
+// nil Compressor means compress mode falls back to a record-mode pass-through —
+// embedders wire the real engine or a cloud-backed equivalent.
+type Compressor interface {
+	CompressSegment(segment []byte) (out []byte, tokensBefore, tokensAfter int)
+	StoreOriginal(body []byte) (handle string, err error)
+}
+
+// TypedCompressor executes an immutable Cave Build's exact engine transform.
+// Locked wrappers must not auto-detect a different compressor than evals approved.
+type TypedCompressor interface {
+	CompressSegmentType(segment []byte, contentType string) (out []byte, tokensBefore, tokensAfter int)
+}
+
+// QueryAwareCompressor is an optional Compressor capability. The gateway passes
+// the latest human query from the provider request so structural compressors can
+// retain query-relevant rows instead of selecting only by position/statistics.
+// Tool results are never used as the query. Implementations remain pure and
+// deterministic; empty query must match CompressSegment behavior.
+type QueryAwareCompressor interface {
+	CompressSegmentQuery(segment []byte, query string) (out []byte, tokensBefore, tokensAfter int)
+}
+
+// ToolSchemaStripper is the optional Compressor capability that removes the
+// documentation-only JSON-Schema annotation keywords
+// ($schema/title/examples/deprecated) from inside a serialized tool catalog's
+// schemas. It is a pure byte transform: same input bytes always produce the same
+// output bytes, and ok=false means the caller forwards the catalog unchanged. A
+// Compressor that does not implement it leaves the tool-schema strip closed no
+// matter what the operator configured.
+type ToolSchemaStripper interface {
+	StripToolSchema(tools []byte) (out []byte, ok bool)
+}
+
+// Estimator is the optional observe-only half of Compressor. It measures the
+// token reduction a real CompressSegment would achieve WITHOUT storing any CCR
+// recovery original (it runs the engine's network-free Simulate path). Record-mode
+// observe-estimate uses it so the forwarded bytes stay byte-identical and no
+// recovery row is ever written — the estimate is a pure measurement of what
+// compression would have cut, recorded as `inferred` and never booked as a saving.
+type Estimator interface {
+	EstimateSegment(segment []byte) (tokensBefore, tokensAfter int)
+}
+
+// QueryAwareEstimator keeps observe-only estimates aligned with live compression.
+// Without it, an Estimator retains historical query-agnostic behavior.
+type QueryAwareEstimator interface {
+	EstimateSegmentQuery(segment []byte, query string) (tokensBefore, tokensAfter int)
+}
+
+// Retriever is the optional recovery half of Compressor. Standalone uses it to
+// resolve caveman_retrieve calls server-side after S4 compression. Embedders that
+// cannot retrieve simply omit it; the proxy then does not advertise its internal
+// retrieve tool to the model.
+//
+// query is the model's optional, plain-language description of the detail it
+// needs. handle comes from a <<ccr:...>> marker inside compressed content. When
+// query is empty, RetrieveOriginal returns the byte-exact original block. When set,
+// the implementation may return only the elided sections most relevant to the
+// query (a cheaper, targeted recovery) — but must fall back to the full original
+// rather than ever lose detail it cannot rank.
+type Retriever interface {
+	RetrieveOriginal(handle, query string) ([]byte, error)
+}
+
+// PrefixCache is the durable original→replacement map that keeps the upstream
+// cache prefix BYTE-STABLE across turns. Live-zone compression rewrites the newest
+// message; on the next turn the agent re-sends that same message as its ORIGINAL
+// bytes, now below the provider cache floor. Forwarding the original there would
+// flip the prefix back to a form the provider never cached and miss the entry the
+// previous turn paid to create — at ~60% compression the caller pays more than the
+// row claims to have saved. Substituting the stored replacement byte-identically
+// removes that divergence entirely.
+//
+// It is keyed by the content hash of the original block, so it is deterministic
+// (same input → same output bytes) and survives process restarts. Every method
+// fails OPEN: a miss, an unavailable store, or a write error means the original
+// bytes are forwarded and no new replacement is created — the proxy never emits a
+// rewrite it could not reproduce on the next turn.
+//
+// It records the FIRST forwarding decision for a block, raw included: a block
+// that went out raw is remembered as an empty replacement under
+// RawDecisionHandle, so a later compression of the same bytes in any
+// conversation can never put them on the wire replaced.
+type PrefixCache interface {
+	// LookupReplacement returns the exact replacement bytes previously emitted for
+	// these original bytes plus the CCR handle they disclose, or (nil,
+	// RawDecisionHandle, true) for a block that went out raw. An evicted or absent
+	// entry is a plain miss.
+	LookupReplacement(scope string, original []byte) (replacement []byte, handle string, ok bool)
+	// RememberReplacement durably records original→replacement (nil under
+	// RawDecisionHandle records raw) and returns the AUTHORITATIVE bytes for that
+	// original — nil when raw won. The caller must forward what comes back, not
+	// what it passed in. Storage is first-write-wins so two requests that saw the
+	// same block can never put two different prefixes on the wire.
+	RememberReplacement(scope string, original, replacement []byte, handle string) (stored []byte, err error)
+}
+
+// RawDecisionHandle is the PrefixCache handle of a block forwarded raw.
+const RawDecisionHandle = "raw"
+
+// PrefixStabilizer is the optional adapter capability that exposes the frozen
+// (already-cached) blocks alongside the live zone, so the proxy can substitute a
+// replacement it previously emitted for them. Anthropic, OpenAI (and the
+// Azure/OpenAI-compatible adapters that reuse its grammar) and Gemini implement it;
+// bedrock and vertex do not extract compressible content at all, so they have
+// nothing to stabilize and keep the byte-identical passthrough.
+type PrefixStabilizer interface {
+	ExtractStabilizable(body []byte, meta providers.RequestMetadata) ([]providers.RewritableBlock, func([][]byte) ([]byte, error), bool)
+}
+
+// CachedPrefixInspector splits a request into the components the provider's
+// prompt cache keys on (cache markers stripped) and reports how many of them
+// this request caches. Adapters without it are treated as caching the whole
+// prompt (see cachedPrefix).
+type CachedPrefixInspector interface {
+	CachedPrefixComponents(body []byte, meta providers.RequestMetadata) ([][]byte, int, bool)
+}
+
+// PrefixEvidenceInspector returns ordered exact provider-wire JSON components
+// that form frozen prefix. Gateway stores only component hashes and aggregate
+// hash. Ordered component hashes prove append-only extension without content.
+type PrefixEvidenceInspector interface {
+	FrozenPrefixComponents(body []byte, meta providers.RequestMetadata) ([][]byte, bool)
+}
+
+// RequestRecord is one proxied call's truthful spend + byte-safety audit row.
+type RequestRecord struct {
+	Timestamp string
+	RequestID string
+	TraceID   string
+	Label     string
+	// Agent framework evidence is caller-supplied content-blind metadata. Gateway
+	// validates shape and bounds before recording; local store validates again.
+	// These fields join a provider request to one strict Cave Build but never make
+	// standalone evidence verified.
+	SessionID                    string
+	SessionCorrelationBasis      string
+	AgentBuildSHA256             string
+	EfficiencyPlanSHA256         string
+	ContextBill                  string
+	TransformTrace               string
+	TransformLocation            string
+	CacheEpoch                   string
+	CachePrefixSHA256            string
+	ProviderCachePrefixSHA256    string
+	ProviderCacheComponentSHA256 string
+	CacheBoundaryKnown           bool
+	// CacheBust is set by the observe-only cache tripwire when this request did
+	// not extend the prefix its session cached (see prefix_monitor.go), and
+	// CacheBustCause says who changed the bytes: "client", "caveman",
+	// "raw_retry", "stream_switch" or "lever_freeze". Diagnostic only — it never
+	// blocks or modifies traffic and never affects any savings figure.
+	CacheBust      bool
+	CacheBustCause string
+	// CompressionEligible marks that this request reached the compression path as a
+	// candidate (compress mode, recovery-reachable, cache-epoch allowed) regardless
+	// of whether any bytes were ultimately saved. It is the denominator behind the
+	// requests_eligible_for_compression stats field.
+	CompressionEligible bool
+	// AgentSlug is the wrapped agent that produced the call (from x-cave-agent;
+	// "unlabeled-agent" when absent) — the per-agent attribution dimension.
+	AgentSlug string
+	Provider  string
+	Model     string
+	RouteFrom string
+	RouteTo   string
+	// The route stage's outcome for the runtime/v1 sender (see route.go); the
+	// reason is stored too. Empty when no route stage ran.
+	RouteOutcome    string
+	RouteReason     string
+	RouteDecisionID string
+	// RoutePoolID is the pool entry the route stage sent the request to (on
+	// a fallback row too, with RouteReason saying why it failed);
+	// UpstreamResponseID the pool host's own id for its answer (OpenRouter's
+	// gen-…), to look the call up there: on a fallback row it is the failed
+	// pool host's id, not the harness's. Stored, with RouteReason.
+	RoutePoolID        string
+	UpstreamResponseID string
+	// ProviderOriginKnown: the request went to the provider's own API, so its
+	// model ids are catalog names rather than local paths. Not stored.
+	ProviderOriginKnown      bool
+	Endpoint                 string
+	Stream                   bool
+	StatusCode               int
+	ErrorCode                string
+	LatencyMS                int64
+	TTFBMS                   int64
+	RequestBytes             int
+	ResponseBytes            int64
+	InputTokens              int
+	OutputTokens             int
+	CachedInputTokens        int
+	CacheCreationInputTokens int
+	CacheCreation1hTokens    int
+	ReasoningTokens          int
+	TotalCostUSD             float64
+	SavingsUSD               float64
+	// Basis is the savings provenance. Standalone is single-tenant and self-proving,
+	// so it is always "inferred" — never "verified" (which the cloud's eval-gated
+	// active-mode rollout alone may claim).
+	Basis string
+	// TokenUsageBasis is independent of savings provenance: provider_complete,
+	// provider_partial, provider_malformed, or unavailable.
+	TokenUsageBasis          string
+	AuthMode                 string
+	RuntimeMode              string
+	OptimizationIDs          []string
+	CacheStatus              string
+	RawRequestSHA256         string
+	TransformedRequestSHA256 string
+	// RequestHashComplete is true only when both hashes cover the complete body
+	// accepted by the upstream transport. Streaming transport failures can leave
+	// only a prefix; those rows keep hashes empty and mark this false.
+	RequestHashComplete bool
+	// Compression fields are populated only when compress mode actually shrank the
+	// request (zero/empty otherwise). RecoveryHandle contains the CCR block handle
+	// list disclosed in in-block <<ccr:...>> markers; CompressionRatio is the
+	// inferred live-zone token-reduction fraction (0..1).
+	CompressionRatio           float64
+	CompressionTokensBefore    int
+	CompressionTokensAfter     int
+	CompressionTokenCountBasis string
+	RecoveryHandle             string
+	// WouldSaveTokens is the observe-only estimate: the engine-counted tokens
+	// (o200k) that compression WOULD have removed from this request in record mode.
+	// It is populated only when observe-estimate is on; it is a measurement, never a
+	// booked saving, and never affects SavingsUSD. WouldSaveUSD is the inferred
+	// dollar value of those tokens at the model's input rate, non-nil only when the
+	// row is list-price eligible (nil otherwise — never a guessed price).
+	WouldSaveTokens int
+	WouldSaveUSD    *float64
+	// Request measurements count the complete original and accepted normalized JSON
+	// with the same offline tokenizer. They include recovery markers, injected
+	// tools and repeated cached replacements. They are not provider token counts
+	// or a counterfactual for unobserved agent work outside this request.
+	RequestTokensBefore           int
+	RequestTokensAfter            int
+	RequestTokenBasis             string
+	RequestMeasurementStatus      string
+	RequestEstimatedInputDeltaUSD *float64
+	RequestSavingsBasis           string
+	// Price snapshots are the exact catalog model and effective observed tier at
+	// request time. Subscription/OAuth uses these only as API equivalents; these
+	// fields never turn subscription traffic into actual billed dollars.
+	PricingProvider             string
+	PricingModel                string
+	PricingCatalogVersion       string
+	PricingKnown                bool
+	PriceInputPerMillion        float64
+	PriceOutputPerMillion       float64
+	PriceCacheReadPerMillion    float64
+	PriceCacheWritePerMillion   float64
+	PriceCacheWrite1hPerMillion float64
+	PriceReasoningPerMillion    float64
+}
+
+// Server is the standalone proxy lifecycle.
+type Server struct {
+	adapters   []providers.Adapter
+	auth       Authenticator
+	creds      CredentialResolver
+	sink       TelemetrySink
+	compressor Compressor
+	// prefixCache keeps a compressed message byte-stable on every later turn (see
+	// PrefixCache). A nil cache means the proxy cannot maintain a rewrite across
+	// turns, which is what the non-PAYG live-zone paths fail closed on.
+	prefixCache PrefixCache
+	// unpersistedRaw remembers blocks that went out raw while prefixCache could
+	// not record it (see rawMemory).
+	unpersistedRaw rawMemory
+	// rawPins are conversations the provider accepted only raw, and lineages
+	// the cached prefixes that went out replaced (see raw_pin.go).
+	rawPins    rawPins
+	lineages   lineages
+	cacheGuard *cacheguard.Guard
+	// prefixMonitor is the observe-only cache tripwire (see prefix_monitor.go). It
+	// flags cache_bust when a request does not extend what its session cached,
+	// and says whether the client or caveman changed the bytes. prefixSeq orders
+	// sends and acceptances for it.
+	prefixMonitor *prefixMonitor
+	prefixSeq     atomic.Uint64
+	// recoveryViaMCP records that the wrapped agent fulfills caveman_retrieve itself
+	// (via the caveman MCP server, sharing the CCR store) — set by `caveman wrap`
+	// when it installed that tool. When true, compress mode reshapes streaming and
+	// non-streaming requests alike, embeds the recovery handle as a content marker
+	// instead of injecting (and never running) the server-side retrieve loop, and
+	// claims no savings (retrieves happen off-proxy, so it cannot prove none did).
+	recoveryViaMCP bool
+	// observeEstimate runs record mode as an observe-only would-have-saved measurement:
+	// each live-zone segment is compressed on a COPY to count the tokens compression
+	// would remove, the forwarded request stays byte-identical, and no saving is booked.
+	observeEstimate bool
+	// chatGPTUpstream is the Codex subscription target (test-injectable;
+	// DefaultChatGPTUpstream in production). Eligible /responses calls may take
+	// live-zone compression before forwarding.
+	chatGPTUpstream      string
+	subscriptionCompress string
+	// toolSchemaStrip selects the tool-schema annotation strip. Only "annotations"
+	// enables it; every other value (including the empty default) is off.
+	toolSchemaStrip string
+	// breakpointPlan selects the cache-breakpoint planner. Only "frontier" enables
+	// it; every other value (including the empty default) is off.
+	breakpointPlan string
+	// ledger is the per-session token account the harm tripwire reasons over, and
+	// the freeze registry every lever consults through LeverAllowed. Sessions are
+	// identified by the caller's x-cave-session value; a request without one gets
+	// no entry and the whole mechanism is inert for it.
+	ledger     *sessionLedger
+	httpClient *http.Client
+	// upstreamProxy mirrors the upstream transport's Proxy selector, published to
+	// adapters through the request context (see providers.WithUpstreamProxy).
+	upstreamProxy    func(*http.Request) (*url.URL, error)
+	sessionMarkerKey []byte
+	sessionFallback  func(time.Time, string, string) (string, string)
+	middleware       http.Handler
+	metricsToken     string
+	logger           *slog.Logger
+	inflight         atomic.Int64
+	// unauthorized counts inbound requests the authenticator rejected. A token
+	// gate that is being probed has to be visible to the operator: without a
+	// counter (and the Warn beside it) a brute-force attempt against
+	// CAVEMAN_AUTH_TOKEN is indistinguishable from an idle proxy.
+	unauthorized atomic.Int64
+	// capture is the local body-capture instrument (see capture.go). It is nil
+	// unless CAVE_CAPTURE_DIR names a writable directory, and it never affects
+	// what is sent, recorded, or claimed.
+	capture *bodyCapture
+	cloud   CloudLink
+	// routes is what the route stage remembers per session (route.go).
+	routes routeSessions
+	// recorder finishes rows off the request path (Config.AsyncRecord).
+	recorder *recorder
+	// fanout staggers sibling children on one new prefix (route_cache.go).
+	fanout fanout
+	// warmer keeps Anthropic prompt-cache entries warm while a session pauses
+	// (cache_warm.go); nil when warming is off. warmOrigin tells the
+	// provider's own API from any other origin (tests swap it for loopback).
+	warmer     *cacheWarmer
+	warmOrigin func(string, *url.URL) bool
+}
+
+// liveZoneCompressionAllowed reports whether subscription- or OAuth-classified
+// traffic may take the SAME live-zone compression path PAYG traffic uses. Local
+// compression is NOT account-gated: no login, no entitlement, and
+// no seat is required, because compression is the free adoption surface. It is on
+// by default and the operator turns it off with `subscription_compress: off`; any
+// unrecognized value fails closed to off here as well as in the config loader.
+//
+// Three conditions fail closed, because each one is a way to hand the
+// caller a request it cannot recover from or cannot keep paying for:
+//
+//   - the adapter must expose schema-aware frozen/live zones through
+//     PrefixStabilizer. Anthropic uses explicit cache_control breakpoints; OpenAI
+//     and Gemini expose only latest-user/latest-tool blocks as live and treat prior
+//     matching blocks as substitute-only. Adapters without that contract remain
+//     byte-identical passthrough.
+//   - recovery must run through the agent's own caveman_retrieve MCP tool. These
+//     paths are marker-only — the proxy never injects its server-side retrieve
+//     tool into them — so without MCP recovery the elided detail is unreachable.
+//   - the proxy must be able to keep the rewrite byte-stable on later turns
+//     (prefixStabilized), or turn N+1 flips the prefix back and busts the cache
+//     turn N created.
+//
+// This is a LOCAL-wrap-only capability. The managed gateway's lossless+stealth
+// rule for non-PAYG traffic is unchanged. Subscription rows it produces are
+// tokens-only: the row's dollar fields stay zero (see record()).
+func (s *Server) liveZoneCompressionAllowed(adapter providers.Adapter, body []byte) bool {
+	return s.liveZoneConfigured(adapter) && s.mcpRecoveryAvailable(body)
+}
+
+// liveZoneConfigured is every live-zone condition except the recovery proof,
+// which a request may carry in its own (possibly still encoded) body.
+func (s *Server) liveZoneConfigured(adapter providers.Adapter) bool {
+	switch s.subscriptionCompress {
+	case "", "live_zone":
+	default:
+		return false
+	}
+	if adapter == nil {
+		return false
+	}
+	return s.prefixStabilized(adapter)
+}
+
+// mcpRecoveryAvailable binds recoverability to caller: either wrap verified it
+// out of band, or request itself carries namespaced Caveman MCP retrieve tool.
+func (s *Server) mcpRecoveryAvailable(body []byte) bool {
+	return s.recoveryViaMCP || hasMcpRetrieveTool(body)
+}
+
+// prefixStabilized reports whether this server + adapter pair can keep a
+// compressed message byte-stable on every later turn: the adapter must expose its
+// frozen (already-cached) blocks and the server must hold a durable replacement
+// cache to substitute them from. Without both, compressing the live zone would
+// bust the provider cache on the very next turn, so the non-PAYG paths fail
+// closed to passthrough rather than book a saving the caller never receives.
+func (s *Server) prefixStabilized(adapter providers.Adapter) bool {
+	if s.prefixCache == nil {
+		return false
+	}
+	_, ok := adapter.(PrefixStabilizer)
+	return ok
+}
+
+// Config injects the three seams plus the upstream HTTP client. A nil HTTPClient
+// defaults to a plain client with no total request deadline; the standalone
+// binary passes an SSRF-guarded client (see StandaloneHTTPClient).
+type Config struct {
+	// Middleware is the independently authenticated compression-only API. It
+	// never enters provider forwarding or credential resolution. When it also
+	// implements Ready(ctx) and WriteMetrics(w), /health/ready and /metrics
+	// report it.
+	Middleware http.Handler
+	Adapters   []providers.Adapter
+	Auth       Authenticator
+	Creds      CredentialResolver
+	Sink       TelemetrySink
+	Compressor Compressor
+	// PrefixCache is the durable original→replacement map that keeps a compressed
+	// message byte-stable across turns (see PrefixCache). The standalone binary
+	// passes its local SQLite store; a nil cache leaves the non-PAYG live-zone
+	// paths closed.
+	PrefixCache PrefixCache
+	// RecoveryViaMCP routes S4 recovery through the agent's own caveman_retrieve MCP
+	// tool instead of the proxy's server-side loop (see Server.recoveryViaMCP).
+	RecoveryViaMCP bool
+	// ObserveEstimate enables record-mode observe-only estimation (see
+	// Server.observeEstimate). It requires a Compressor that implements Estimator;
+	// without one the record path stays a plain byte-safe pass-through.
+	ObserveEstimate bool
+	// ChatGPTUpstream overrides the /chatgpt passthrough target (tests only);
+	// empty means DefaultChatGPTUpstream.
+	ChatGPTUpstream string
+	// SubscriptionCompress is the operator off-switch for subscription live-zone
+	// compression: empty/"live_zone" allow it, "off" (and any unknown value) fail
+	// closed to S0 passthrough. It is the ONLY policy input — there is no account
+	// gate.
+	SubscriptionCompress string
+	// ToolSchemaStrip enables the tool-schema annotation strip when it is exactly
+	// "annotations". It is default OFF and additionally requires the same
+	// local-wrap conditions live-zone compression requires (see
+	// toolSchemaStripAllowed).
+	ToolSchemaStrip string
+	// BreakpointPlan enables the cache-breakpoint planner when it is exactly
+	// "frontier", which the config loader defaults to (see breakpointPlanAllowed).
+	BreakpointPlan string
+	HTTPClient     *http.Client
+	// SessionMarkerKey validates local native-hook correlation markers. Valid
+	// markers are stripped before provider inspection and forwarding.
+	SessionMarkerKey []byte
+	// SessionFallback may return one conservative native-session candidate when
+	// host removed signed marker. Returned basis must remain distinct from exact
+	// marker correlation; ambiguous cases return empty.
+	SessionFallback func(time.Time, string, string) (string, string)
+	Logger          *slog.Logger
+	// MetricsToken, when set, makes /metrics require `Authorization: Bearer
+	// <token>`. Empty falls back to CAVEMAN_METRICS_TOKEN; unset keeps /metrics
+	// open like the health probes.
+	MetricsToken string
+	// Cloud is the signed-in Cloud link (route stage + runtime/v1 sender). Nil
+	// keeps the proxy local-only.
+	Cloud CloudLink
+	// AsyncRecord finishes each telemetry row off the request path: the
+	// request token count, the sink write (batched when the sink is a
+	// BatchSink) and the Cloud observe run after the handler returns, so
+	// neither the client's connection nor a stream's last chunk waits on them.
+	// Rows reach the sink in the order they were recorded; Close writes out the
+	// rest. Off, every row is in the sink before ServeHTTP returns.
+	AsyncRecord bool
+	// CacheWarm switches prompt-cache warming (cache_warm.go); it is asked
+	// before every arm and every warm. Nil keeps warming off.
+	CacheWarm func() bool
+	// CacheWarmState is where the warm table keeps the return gaps this proxy
+	// has seen (counts per class only). Empty keeps them in memory.
+	CacheWarmState string
+}
+
+// BoundUpstreamTransport puts the connection-level bounds on an upstream
+// transport. With no total request deadline (CAVE_GATEWAY_UPSTREAM_TIMEOUT_MS
+// defaults to 0) these are the only thing standing between the proxy and an
+// upstream that connects and then never answers. ResponseHeaderTimeout is a
+// first-header deadline, not a body deadline, so a multi-hour SSE stream still
+// runs unbounded; 15 minutes matches the total cap this default replaced and is
+// far beyond any provider's time-to-first-header, streaming or not. Set
+// CAVE_GATEWAY_RESPONSE_HEADER_TIMEOUT_MS=0 to remove it.
+func BoundUpstreamTransport(t *http.Transport) {
+	t.ResponseHeaderTimeout = time.Duration(env.Int("CAVE_GATEWAY_RESPONSE_HEADER_TIMEOUT_MS", 900000)) * time.Millisecond
+	// Explicit rather than inherited: the clone above copies whatever the process
+	// left on http.DefaultTransport, and an idle keep-alive socket to a provider
+	// must not be held open indefinitely.
+	t.IdleConnTimeout = 90 * time.Second
+	// Go keeps only 2 idle connections per host by default, so a third
+	// concurrent caller (agent fan-out, a team behind one proxy) closes its
+	// connection after each response and the next request to that provider pays
+	// a new TCP and TLS handshake. Keep a pool sized for that concurrency; the
+	// idle timeout above still retires what goes quiet.
+	t.MaxIdleConns = 1024
+	t.MaxIdleConnsPerHost = 256
+}
+
+// New constructs a standalone proxy Server.
+func New(cfg Config) *Server {
+	client := cfg.HTTPClient
+	if client == nil {
+		// Client.Timeout includes the entire response body, including active SSE.
+		// Default to client cancellation; a positive env value is an explicit cap.
+		timeout := time.Duration(env.Int("CAVE_GATEWAY_UPSTREAM_TIMEOUT_MS", 0)) * time.Millisecond
+		transport := http.DefaultTransport.(*http.Transport).Clone()
+		BoundUpstreamTransport(transport)
+		client = &http.Client{Timeout: timeout, Transport: transport}
+	}
+	// Adapters that pre-flight their resolved endpoint (bedrock, vertex) need to
+	// know which destinations this client hands to a proxy: on a proxy-only
+	// network the pre-flight's DNS resolve is impossible and the proxy owns
+	// resolution anyway (#1001). Read it off the transport that will carry the
+	// request, so the two can never disagree.
+	var upstreamProxy func(*http.Request) (*url.URL, error)
+	if transport, ok := client.Transport.(*http.Transport); ok {
+		upstreamProxy = transport.Proxy
+	}
+	upstream := cfg.ChatGPTUpstream
+	if upstream == "" {
+		upstream = DefaultChatGPTUpstream
+	}
+	if cfg.ToolSchemaStrip == toolSchemaStripMode && cfg.Logger != nil {
+		// One startup line, because this lever rewrites the head of the provider
+		// cache prefix: the operator should be able to date the one-time cold write
+		// to a config change rather than to the provider.
+		cfg.Logger.Info("tool-schema annotation strip enabled",
+			"mode", toolSchemaStripMode, "strip_version", toolSchemaStripVersion)
+	}
+	if cfg.BreakpointPlan == breakpointPlanModeFrontier && cfg.Logger != nil {
+		// One startup line, for the same reason the strip has one: the planner moves
+		// where the provider cache boundary sits, so the operator should be able to
+		// date that change to a config change rather than to the provider.
+		cfg.Logger.Info("cache-breakpoint planner enabled", "mode", breakpointPlanModeFrontier)
+	}
+	s := &Server{
+		adapters:             cfg.Adapters,
+		auth:                 cfg.Auth,
+		creds:                cfg.Creds,
+		sink:                 cfg.Sink,
+		compressor:           cfg.Compressor,
+		prefixCache:          cfg.PrefixCache,
+		cacheGuard:           cacheguard.New(),
+		prefixMonitor:        newPrefixMonitor(),
+		recoveryViaMCP:       cfg.RecoveryViaMCP,
+		observeEstimate:      cfg.ObserveEstimate,
+		chatGPTUpstream:      strings.TrimSuffix(upstream, "/"),
+		subscriptionCompress: cfg.SubscriptionCompress,
+		toolSchemaStrip:      cfg.ToolSchemaStrip,
+		breakpointPlan:       cfg.BreakpointPlan,
+		ledger:               newSessionLedger(),
+		httpClient:           client,
+		upstreamProxy:        upstreamProxy,
+		sessionMarkerKey:     append([]byte(nil), cfg.SessionMarkerKey...),
+		sessionFallback:      cfg.SessionFallback,
+		middleware:           cfg.Middleware,
+		metricsToken:         strings.TrimSpace(cmp.Or(cfg.MetricsToken, env.String("CAVEMAN_METRICS_TOKEN", ""))),
+		logger:               cfg.Logger,
+		capture:              newBodyCapture(os.Getenv("CAVE_CAPTURE_DIR"), cfg.Logger),
+		cloud:                cfg.Cloud,
+		warmOrigin:           statsPricingOriginKnown,
+	}
+	if cfg.AsyncRecord && cfg.Sink != nil {
+		s.recorder = newRecorder(s.writeRecords, cfg.Logger)
+	}
+	if cfg.CacheWarm != nil {
+		s.warmer = newCacheWarmer(cfg.CacheWarm, s.sendCacheWarm, newWarmTable(cfg.CacheWarmState))
+	}
+	return s
+}
+
+// Handler returns the standalone HTTP handler: health, metrics, and the proxy
+// catch-all, plus the separately authenticated framework optimization API.
+func (s *Server) Handler() http.Handler {
+	mux := serveMux(s)
+	if s.upstreamProxy == nil {
+		return mux
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mux.ServeHTTP(w, r.WithContext(providers.WithUpstreamProxy(r.Context(), s.upstreamProxy)))
+	})
+}
+
+func serveMux(s *Server) *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /health/live", s.health)
+	mux.HandleFunc("GET /health/ready", s.ready)
+	mux.HandleFunc("GET /metrics", s.metrics)
+	mux.Handle("/caveman/v1/middleware/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s.middleware == nil {
+			w.Header().Set("Retry-After", "1")
+			httpx.JSON(w, http.StatusServiceUnavailable, map[string]any{"schema_version": 1, "error": map[string]string{"code": "runtime_unavailable"}})
+			return
+		}
+		// The middleware authenticates for itself, so its 401s would bypass
+		// rejectUnauthorized; count them on the way out instead.
+		recorder := &statusRecorder{ResponseWriter: w}
+		s.middleware.ServeHTTP(recorder, r)
+		if recorder.status == http.StatusUnauthorized {
+			s.noteUnauthorized(r)
+		}
+	}))
+	// ChatGPT-login Codex: OAuth-preserving forward with OpenAI Responses
+	// live-zone compression and exact-original fallback.
+	mux.HandleFunc("/chatgpt/", s.chatgpt)
+	mux.HandleFunc("/", s.proxy)
+	return mux
+}
+
+func (s *Server) health(w http.ResponseWriter, r *http.Request) {
+	httpx.JSON(w, http.StatusOK, map[string]any{
+		"ok":       true,
+		"service":  "caveman-proxy",
+		"schema":   "caveman.proxy.health.v1",
+		"billing":  "byok",
+		"adapters": len(s.adapters),
+	})
+}
+
+// ready is /health/ready. The body reports the middleware ("unavailable" with
+// no runtime, "degraded" when its store cannot take a write), but only a
+// listener that serves nothing else goes unready over it. Provider routes never
+// touch that store, so a Postgres outage must not pull every replica's
+// inference out of the Service at once.
+func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
+	status, state := http.StatusOK, "unavailable"
+	if s.middleware != nil {
+		state = "ok"
+		if probe, ok := s.middleware.(interface{ Ready(context.Context) error }); ok {
+			ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+			defer cancel()
+			if err := probe.Ready(ctx); err != nil {
+				state = "degraded"
+				if closed, ok := s.auth.(interface{ RefusesAll() bool }); ok && closed.RefusesAll() {
+					status = http.StatusServiceUnavailable
+				}
+				if s.logger != nil {
+					s.logger.Warn("middleware store not writable", "error", err)
+				}
+			}
+		}
+	}
+	httpx.JSON(w, status, map[string]any{
+		"ok":         status == http.StatusOK,
+		"service":    "caveman-proxy",
+		"schema":     "caveman.proxy.health.v1",
+		"billing":    "byok",
+		"adapters":   len(s.adapters),
+		"middleware": state,
+	})
+}
+
+func (s *Server) metrics(w http.ResponseWriter, r *http.Request) {
+	if s.metricsToken != "" {
+		presented, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if !ok || subtle.ConstantTimeCompare([]byte(strings.TrimSpace(presented)), []byte(s.metricsToken)) != 1 {
+			s.rejectUnauthorized(w, r)
+			return
+		}
+	}
+	w.Header().Set("content-type", "text/plain; version=0.0.4")
+	_, _ = io.WriteString(w, "# HELP cave_proxy_inflight_requests Proxied requests currently in flight.\n"+
+		"# TYPE cave_proxy_inflight_requests gauge\ncave_proxy_inflight_requests "+itoa(s.inflight.Load())+"\n"+
+		"# HELP cave_proxy_unauthorized_total Requests rejected for a missing or wrong credential, middleware and /metrics included.\n"+
+		"# TYPE cave_proxy_unauthorized_total counter\ncave_proxy_unauthorized_total "+itoa(s.unauthorized.Load())+"\n")
+	identity.WriteMetrics(w) // token map and TLS reloads
+	if m, ok := s.middleware.(interface{ WriteMetrics(io.Writer) }); ok {
+		m.WriteMetrics(w)
+	}
+}
+
+// statusRecorder notes the status a wrapped handler wrote. Unwrap keeps
+// http.ResponseController (read deadlines) working through it.
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (r *statusRecorder) WriteHeader(status int) {
+	r.status = status
+	r.ResponseWriter.WriteHeader(status)
+}
+
+func (r *statusRecorder) Unwrap() http.ResponseWriter { return r.ResponseWriter }
+
+// rejectUnauthorized is the single 401 exit for every handler behind the
+// inbound gate. It counts the rejection and logs it once — the path and the
+// remote HOST, never the presented token, the Authorization header, or the
+// source port. standalone.Auth deliberately returns one uniform error (a
+// missing token must not be distinguishable from a wrong one), so this is the
+// only place the operator learns the gate fired at all.
+func (s *Server) rejectUnauthorized(w http.ResponseWriter, r *http.Request) {
+	s.noteUnauthorized(r)
+	httpx.Error(w, r, http.StatusUnauthorized, "cave_unauthorized", "Request rejected by the proxy authenticator.")
+}
+
+// noteUnauthorized counts and logs one rejection; see rejectUnauthorized.
+func (s *Server) noteUnauthorized(r *http.Request) {
+	s.unauthorized.Add(1)
+	if s.logger != nil {
+		remote := r.RemoteAddr
+		if host, _, err := net.SplitHostPort(remote); err == nil {
+			remote = host
+		}
+		s.logger.Warn("inbound token rejected", "path", r.URL.Path, "remote", remote)
+	}
+}
+
+func itoa(n int64) string {
+	if n == 0 {
+		return "0"
+	}
+	neg := n < 0
+	if neg {
+		n = -n
+	}
+	var buf [20]byte
+	i := len(buf)
+	for n > 0 {
+		i--
+		buf[i] = byte('0' + n%10)
+		n /= 10
+	}
+	if neg {
+		i--
+		buf[i] = '-'
+	}
+	return string(buf[i:])
+}

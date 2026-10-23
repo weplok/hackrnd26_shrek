@@ -1,0 +1,1330 @@
+// Command caveman-proxy is the standalone byte-safe proxy binary. `caveman start`
+// launches it; it loads caveman.yaml, opens the local ~/.caveman/ spend store,
+// and serves the byte-safe lifecycle on 127.0.0.1:8787 with zero cloud
+// dependencies. Every savings figure it records is `inferred`.
+//
+// Subcommands:
+//
+//	caveman-proxy          serve the proxy (default)
+//	caveman-proxy serve    serve the proxy
+//	caveman-proxy stats    print local spend summary JSON; --recent N prints newest rows
+//	caveman-proxy trial    analyze/report/export local trial data
+//	caveman-proxy usage    import/link/refresh/unlink local usage data
+//	caveman-proxy learn    scan/report/apply/applied/simulate the local setup profiler
+//	                       scan [--repo substring] --retro [--behavior-budget-ms N] [--retro-budget-ms N]
+//	                       bounds both passes and adds the retrospective
+//	                       "would-have-saved" block for the scanned window
+package main
+
+import (
+	"cmp"
+	"context"
+	"crypto/subtle"
+	"crypto/tls"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"log/slog"
+	"maps"
+	"net"
+	"net/http"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"slices"
+	"strconv"
+	"strings"
+	"sync"
+	"syscall"
+	"time"
+
+	"github.com/JuliusBrussee/caveman/engine/ccr"
+	"github.com/JuliusBrussee/caveman/mem"
+	"github.com/JuliusBrussee/caveman/proxy/internal/cloudlink"
+	"github.com/JuliusBrussee/caveman/proxy/internal/config"
+	"github.com/JuliusBrussee/caveman/proxy/internal/identity"
+	"github.com/JuliusBrussee/caveman/proxy/internal/nativehook"
+	"github.com/JuliusBrussee/caveman/proxy/internal/nativeruntime"
+	"github.com/JuliusBrussee/caveman/proxy/internal/runstate"
+	"github.com/JuliusBrussee/caveman/proxy/internal/securehome"
+	"github.com/JuliusBrussee/caveman/proxy/internal/sessionusage"
+	"github.com/JuliusBrussee/caveman/proxy/internal/standalone"
+	"github.com/JuliusBrussee/caveman/proxy/internal/store"
+	"github.com/JuliusBrussee/caveman/shared/platform/env"
+	"github.com/JuliusBrussee/caveman/shared/platform/redact"
+	"gopkg.in/yaml.v3"
+)
+
+var version = "dev"
+
+func main() {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{ReplaceAttr: redact.SlogReplaceAttr}))
+	cmd := "serve"
+	if len(os.Args) > 1 {
+		cmd = os.Args[1]
+	}
+	switch cmd {
+	case "stats":
+		runStats(logger, os.Args[2:])
+	case "agent-evidence":
+		runAgentEvidence(logger, os.Args[2:])
+	case "trial":
+		runTrial(logger, os.Args[2:])
+	case "usage":
+		runUsage(logger, os.Args[2:])
+	case "learn":
+		// learn prints its result document on stdout; a failure has to reach
+		// stderr, which is the only stream the CLI surfaces when the child exits
+		// non-zero.
+		runLearn(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{ReplaceAttr: redact.SlogReplaceAttr})), os.Args[2:])
+	case "status":
+		// status prints one JSON document on stdout, which the CLI parses whole.
+		// Its diagnostics go to stderr so a config error cannot interleave a
+		// second JSON object into that document.
+		runStatus(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{ReplaceAttr: redact.SlogReplaceAttr})), os.Args[2:])
+	case "version":
+		runVersion(os.Args[2:])
+	case "native-why":
+		runNativeWhy(logger, os.Args[2:])
+	case "native-hook":
+		runNativeHookBridge(os.Args[2:])
+	case "provider-login":
+		runProviderLogin(os.Args[2:])
+	case "serve":
+		runServe(logger)
+	default:
+		logger.Error("unknown caveman-proxy subcommand", "command", cmd)
+		os.Exit(2)
+	}
+}
+
+const nativeHookMaxPayloadBytes = 2 * 1024 * 1024
+
+func runNativeHookBridge(args []string) {
+	if len(args) == 0 {
+		return
+	}
+	agent := args[0]
+	adapter := argFlag(args[1:], "--adapter", "")
+	node := argFlag(args[1:], "--node", "")
+	home := env.String("CAVEMAN_HOME", "")
+	if home == "" {
+		userHome, err := os.UserHomeDir()
+		if err != nil {
+			return
+		}
+		home = filepath.Join(userHome, ".caveman")
+	}
+	raw, err := readNativeHookPayload(os.Stdin)
+	if err != nil || len(raw) > nativeHookMaxPayloadBytes {
+		return
+	}
+	_ = nativehook.Run(context.Background(), home, agent, adapter, node, raw, os.Stdout, os.Stderr)
+}
+
+func readNativeHookPayload(r io.Reader) ([]byte, error) {
+	raw := make([]byte, 0, 4096)
+	buf := make([]byte, 16*1024)
+	for {
+		n, err := r.Read(buf)
+		if n > 0 {
+			if len(raw)+n > nativeHookMaxPayloadBytes {
+				return nil, fmt.Errorf("native hook payload too large")
+			}
+			raw = append(raw, buf[:n]...)
+			if json.Valid(raw) {
+				return raw, nil
+			}
+		}
+		if err != nil {
+			if err == io.EOF {
+				return raw, nil
+			}
+			return nil, err
+		}
+	}
+}
+
+func runNativeWhy(logger *slog.Logger, args []string) {
+	decisionID := argFlag(args, "--decision", "")
+	if decisionID == "" && len(args) == 1 && !strings.HasPrefix(args[0], "-") {
+		decisionID = args[0]
+	}
+	if decisionID == "" {
+		fmt.Fprintln(os.Stderr, "usage: caveman-proxy native-why --decision <dec_id>")
+		os.Exit(2)
+	}
+	home := mustHome(logger)
+	recovery, err := ccr.Open(ccrPath(home))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "cannot open local Decision Ledger")
+		os.Exit(1)
+	}
+	defer recovery.Close()
+	explanation, err := nativeruntime.ExplainDecision(recovery, decisionID)
+	if errors.Is(err, ccr.ErrNotFound) {
+		fmt.Fprintf(os.Stderr, "decision %s not found\n", decisionID)
+		os.Exit(1)
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+	printJSON(explanation)
+}
+
+func runAgentEvidence(logger *slog.Logger, args []string) {
+	home := mustHome(logger)
+	sessionID := argFlag(args, "--session", "")
+	buildSHA256 := argFlag(args, "--build", "")
+	planSHA256 := argFlag(args, "--plan", "")
+	spend, err := store.Open(dbPath(home), logger)
+	if err != nil {
+		logger.Error("cannot open local spend store", "error", err)
+		os.Exit(1)
+	}
+	defer spend.Close()
+	evidence, err := spend.AgentEvidenceForBuild(sessionID, buildSHA256, planSHA256)
+	if err != nil {
+		logger.Error("cannot read agent evidence", "error", err)
+		os.Exit(2)
+	}
+	printJSON(map[string]any{
+		"schema":       "caveman.agent.evidence.v1",
+		"basis":        "inferred",
+		"verified_usd": 0,
+		"requests":     evidence,
+	})
+}
+
+func runServe(logger *slog.Logger) {
+	home := mustHome(logger)
+	// The wrap CLI spawns this process detached with stdio ignored, so without
+	// a file every warning the proxy emits (upstream failures, copy errors) is
+	// lost and field reports like #897 arrive with no proxy-side evidence.
+	if f := openProxyLog(filepath.Join(home, "proxy.log"), proxyLogMaxBytes); f != nil {
+		defer f.Close()
+		logger = slog.New(slog.NewJSONHandler(io.MultiWriter(os.Stdout, f), &slog.HandlerOptions{ReplaceAttr: redact.SlogReplaceAttr}))
+	}
+	cfg, err := config.Load(env.String("CAVEMAN_CONFIG", filepath.Join(home, "caveman.yaml")))
+	if err != nil {
+		logger.Error("cannot load caveman.yaml", "error", err)
+		os.Exit(1)
+	}
+	for _, skipped := range cfg.SkippedCABundles {
+		logger.Warn("CA bundle env var names an unusable file; skipped", "env", skipped.Env, "error", skipped.Error)
+	}
+	spend, err := store.Open(dbPath(home), logger)
+	if err != nil {
+		logger.Error("cannot open local spend store", "error", err)
+		os.Exit(1)
+	}
+	defer spend.Close()
+	recovery, sessionMarkerKey := initializeNativePersistence(home, ccrPath(home), &cfg, logger)
+	if recovery != nil {
+		defer recovery.Close()
+	}
+
+	// One CCR store backs both exact S4 recovery and typed native-agent session
+	// objects. Record mode still never writes recovery originals: it only permits
+	// metadata-safe native runtime state when an installed host pack sends events.
+	opts := standalone.Options{SessionMarkerKey: sessionMarkerKey, Logger: logger}
+	// Identity and TLS the operator configured never degrade to something
+	// weaker: an unreadable token map, OIDC setting or certificate stops startup.
+	ids, err := standalone.NewIdentity(cfg, logger)
+	if err != nil {
+		logger.Error("cannot load middleware identity", "error", err)
+		os.Exit(1)
+	}
+	var serverTLS *identity.ServerTLS
+	if cfg.TLS.CertFile != "" {
+		if serverTLS, err = identity.NewServerTLS(cfg.TLS.CertFile, cfg.TLS.KeyFile, cfg.TLS.ClientCAFile); err != nil {
+			logger.Error("cannot load TLS listener configuration", "error", err)
+			os.Exit(1)
+		}
+		ids.UseServerTLS(serverTLS) // client certificates re-verify per request
+	}
+	var middlewareStore store.MiddlewareStore = spend
+	if databaseURL := cfg.Middleware.DatabaseURL; databaseURL != "" {
+		shared, err := store.OpenPostgresMiddleware(context.Background(), databaseURL)
+		if err != nil {
+			logger.Error("cannot open the middleware Postgres store", "error", err)
+			os.Exit(1)
+		}
+		defer shared.Close()
+		middlewareStore = shared
+	}
+	framework, err := standalone.NewMiddleware(cfg, middlewareStore, recovery, version, logger, ids)
+	switch {
+	case err != nil && cfg.Middleware.Configured():
+		// A middleware the operator configured (a shared store, keys, identity,
+		// limits) that cannot start exits (and restarts) rather than serving
+		// 503s behind a ready probe. Errors carry no secrets; key errors never
+		// echo the key.
+		logger.Error("framework middleware unavailable", "code", "runtime_initialization", "error", err)
+		os.Exit(1)
+	case err != nil:
+		// The default local middleware: inference keeps working, and readiness
+		// reports the middleware "degraded" (see gateway.Server.ready).
+		logger.Warn("framework middleware unavailable", "code", "runtime_initialization", "error", err)
+		opts.Middleware = middlewareDown{err}
+	default:
+		opts.Middleware = framework
+	}
+	switch {
+	case (cfg.Mode == "compress" || cfg.Mode == "pixel") && recovery != nil:
+		// With the logger: a recovery store that cannot be written stops
+		// compression, and that must not be silent (#1149).
+		opts.Compressor = standalone.NewEngineCompressorWithLogger(recovery, logger)
+		// The spend store doubles as the durable replacement cache that keeps a
+		// compressed message byte-identical on every later turn of a conversation.
+		opts.PrefixCache = spend
+	case cfg.ObserveEstimate && cfg.Mode == "record":
+		opts.Compressor = standalone.NewEstimateCompressor()
+		opts.ObserveEstimate = true
+	}
+	var nativeRuntime *nativeruntime.Runtime
+	var flushRows func() // set once the server exists, before anything serves
+	if recovery != nil {
+		usage := usageAfterFlush{flush: func() { flushRows() }, spend: spend}
+		nativeRuntime = nativeruntime.NewWithReceiptsAndUsage(recovery, filepath.Join(home, "receipts"), usage)
+		opts.SessionFallback = func(now time.Time, provider, model string) (string, string) {
+			return nativeRuntime.UniqueRecentSession(now, 5*time.Second, provider, model)
+		}
+	}
+
+	// Routing asks and runtime/v1 events, only while the CLI is signed in with
+	// the routing module on; every Cloud failure keeps the asked model.
+	link := cloudlink.New(home, logger)
+	link.Start() // the keychain read starts now, not on the first request
+	opts.Cloud = link
+	if nativeRuntime != nil {
+		// A session or prompt starting warms the route path before its model request.
+		nativeRuntime.OnTurnStart = link.Prime
+	}
+	// Rows are finished and written off the request path; server.Close below
+	// writes the last of them before the deferred spend.Close.
+	opts.AsyncRecord = true
+	opts.CacheWarm = cacheWarmSwitch(home, os.Getenv("CAVEMAN_CACHE_WARM"))
+	opts.CacheWarmState = filepath.Join(home, "cache-warm-gaps.json")
+	server := standalone.New(cfg, spend, opts)
+	flushRows = server.Flush
+
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+	if framework != nil {
+		// Expiry sweeps and batched retrieve renewals, off the request path.
+		go framework.Run(ctx)
+	}
+	reloaders := map[string]identity.Reloader{}
+	if cfg.Middleware.TokenMapFile != "" {
+		reloaders["token_map"] = ids
+	}
+	if serverTLS != nil {
+		reloaders["tls"] = serverTLS
+	}
+	if len(reloaders) > 0 {
+		// Rotated tokens and renewed certificates apply without a restart: on
+		// file change (Kubernetes Secret updates included) or SIGHUP.
+		go identity.Watch(ctx, logger, 10*time.Second, reloaders)
+	}
+	if nativeRuntime != nil {
+		go func() {
+			if err := nativeruntime.Serve(ctx, home, nativeRuntime); err != nil && ctx.Err() == nil {
+				logger.Warn("native runtime unavailable; hooks remain fail-open", "error", err)
+			}
+		}()
+	}
+	// A base URL can outlive the wrapper or any observed hook session. Never
+	// retire its listener on an idle clock, even when an old install exports
+	// CAVEMAN_NATIVE_IDLE_TIMEOUT. Only an explicit stop or process failure ends it.
+
+	handler := server.Handler()
+	if nativeRuntime != nil {
+		// Keep accepting heartbeats from older CLIs. Listener lifetime no longer
+		// depends on these beacons or on native session tracking.
+		handler = withKeepalive(handler, nativeRuntime.Keepalive)
+	}
+	srv := &http.Server{
+		Addr:              cfg.Listen,
+		Handler:           handler,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		IdleTimeout:       2 * time.Minute,
+		MaxHeaderBytes:    1 << 20,
+	}
+	listener, err := net.Listen("tcp", cfg.Listen)
+	if err != nil {
+		logger.Error("cannot bind proxy listener", "addr", cfg.Listen, "error", err)
+		os.Exit(1)
+	}
+	if serverTLS != nil {
+		listener = tls.NewListener(listener, serverTLS.Config())
+	}
+	state, err := runstate.New(cfg.Listen, cfg.Mode, env.String("CAVEMAN_PROXY_OWNER", "start"), version)
+	if err != nil {
+		_ = listener.Close()
+		logger.Error("cannot create proxy run state", "error", err)
+		os.Exit(1)
+	}
+	// Publish active gate inputs so a later wrap can prove a reused proxy matches
+	// its requested recovery contract before making a compression claim.
+	state.RecoveryViaMCP = env.String("CAVEMAN_RECOVERY", "") == "mcp"
+	state.CompatUpstreams = compatUpstreams(cfg)
+	state.ProviderUpstreams = standalone.ProviderUpstreams(cfg)
+	state.CompatForwardHeaders = make(map[string][]string)
+	for name, mount := range cfg.CompatUpstreams() {
+		state.CompatForwardHeaders[name] = append([]string(nil), mount.ForwardHeaders...)
+	}
+	srv.Handler = withRunState(handler, state, loopbackListen(cfg.Listen), cancel)
+	if err := runstate.Write(home, state); err != nil {
+		_ = listener.Close()
+		logger.Error("cannot write proxy run state", "error", err)
+		os.Exit(1)
+	}
+	// Whether inbound requests are gated is the difference between a loopback
+	// dev proxy and one reachable from a VPC. Log the fact, never the token.
+	var mechanisms []string
+	for mechanism, on := range map[string]bool{"token": cfg.AuthToken != "", "token_map": cfg.Middleware.TokenMapFile != "",
+		"oidc": cfg.Middleware.OIDC.Issuer != "", "mtls": cfg.TLS.ClientCAFile != ""} {
+		if on {
+			mechanisms = append(mechanisms, mechanism)
+		}
+	}
+	slices.Sort(mechanisms)
+	inboundAuth := cmp.Or(strings.Join(mechanisms, ","), "none")
+	if cfg.AuthToken != "" {
+		// A token on a loopback listener still gates every request, but the
+		// local `caveman wrap` path sends none — /health/live stays green while
+		// each inference 401s. Say so once here, where it is readable.
+		if loopbackListen(cfg.Listen) {
+			logger.Warn("CAVEMAN_AUTH_TOKEN is set on a loopback listener; local clients must present the token in x-cave-api-key or Authorization: Bearer", "addr", cfg.Listen)
+		}
+	}
+	go func() {
+		logger.Info("caveman proxy listening", "addr", cfg.Listen, "mode", cfg.Mode, "basis", "inferred", "inbound_auth", inboundAuth, "tls", serverTLS != nil)
+		if err := srv.Serve(listener); err != nil && err != http.ErrServerClosed {
+			logger.Error("proxy stopped", "error", err)
+			cancel()
+		}
+	}()
+	<-ctx.Done()
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdownCancel()
+	_ = srv.Shutdown(shutdownCtx)
+	_ = server.Close() // saves what cache warming learned, writes the last rows
+	if err := runstate.RemoveMatching(home, state.Port, state.InstanceToken); err != nil {
+		logger.Warn("cannot remove proxy run state", "error", err)
+	}
+}
+
+// usageAfterFlush reads a session's usage once the rows still being finished
+// off the request path are written, so the session's receipt counts its last
+// request.
+type usageAfterFlush struct {
+	flush func()
+	spend *store.Store
+}
+
+func (u usageAfterFlush) SessionUsage(sessionID string) (sessionusage.Snapshot, error) {
+	u.flush()
+	return u.spend.SessionUsage(sessionID)
+}
+
+// middlewareDown stands in for a default middleware that failed to start: its
+// routes answer 503 runtime_unavailable, as with no middleware at all, and
+// readiness reports it degraded.
+type middlewareDown struct{ err error }
+
+func (d middlewareDown) Ready(context.Context) error { return d.err }
+
+func (middlewareDown) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
+	for name, value := range map[string]string{"Retry-After": "1", "Content-Type": "application/json", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"} {
+		w.Header().Set(name, value)
+	}
+	w.WriteHeader(http.StatusServiceUnavailable)
+	_, _ = io.WriteString(w, `{"schema_version":1,"error":{"code":"runtime_unavailable"}}`+"\n")
+}
+
+// withKeepalive answers the no-op beacon older CLIs still send. It sits OUTSIDE
+// the gateway's inbound token gate on purpose: the beacon carries no credential,
+// reads nothing and changes nothing, and a 401 here would make an old CLI log a
+// failure for a call whose only effect is a timestamp.
+func withKeepalive(next http.Handler, beacon func()) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/caveman/keepalive" && r.Method == http.MethodPost {
+			beacon()
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// loopbackListen reports whether addr binds only the local machine. It is the
+// one test behind two decisions: whether a token on this listener deserves the
+// startup warning, and whether the instance identity header may be published.
+func loopbackListen(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return false
+	}
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
+// withInstanceIdentity proves that the health listener is the generation named
+// by its run-state file. The token is never attached to inference traffic.
+//
+// loopback gates the whole header: the only consumer is the local CLI matching
+// a run-state file it can already read, so on a shared listener the header
+// hands every unauthenticated /health/live caller a value that correlates
+// restarts and distinguishes instances behind a load balancer, for nothing.
+// A wildcard bind (0.0.0.0, ::) is the one shared listener the CLI and status
+// still reach through loopback, so there a loopback caller gets the header and
+// a caller from the network still does not.
+func withInstanceIdentity(next http.Handler, token, listen string) http.Handler {
+	loopback := loopbackListen(listen)
+	host, _, err := net.SplitHostPort(listen)
+	ip := net.ParseIP(host)
+	wildcard := err == nil && (host == "" || ip != nil && ip.IsUnspecified())
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if (loopback || wildcard && loopbackListen(r.RemoteAddr)) && r.Method == http.MethodGet && r.URL.Path == "/health/live" {
+			w.Header().Set(runstate.InstanceHeader, token)
+			w.Header().Set("Cache-Control", "no-store")
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// withRunState serves the two run-state endpoints: the instance identity any
+// local caller may read, and the shutdown only the run-state file's reader may
+// send.
+func withRunState(next http.Handler, state runstate.State, loopback bool, stop func()) http.Handler {
+	return withShutdown(withInstanceIdentity(next, state.InstanceToken, state.Listen), state.ShutdownToken, loopback, stop)
+}
+
+// withShutdown is `caveman stop` on Windows, where no signal reaches a
+// detached process gracefully: POST /caveman/shutdown runs the same drain as
+// SIGTERM. Loopback only, and only for the caller holding this generation's
+// run-state shutdown token; it sits outside the inbound token gate like the
+// keepalive. The CLI sends no Origin or Sec-Fetch-Site and names a loopback
+// Host, so a request carrying either header or another Host (a browser page,
+// a DNS-rebound name) is refused before the token is compared.
+func withShutdown(next http.Handler, token string, loopback bool, stop func()) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if loopback && token != "" && r.Method == http.MethodPost && r.URL.Path == "/caveman/shutdown" {
+			if len(r.Header.Values("Origin")) > 0 || len(r.Header.Values("Sec-Fetch-Site")) > 0 || !loopbackListen(r.Host) ||
+				subtle.ConstantTimeCompare([]byte(r.Header.Get(runstate.ShutdownHeader)), []byte(token)) != 1 {
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
+			w.WriteHeader(http.StatusAccepted)
+			stop()
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// compatUpstreams flattens the named OpenAI-compatible mounts to name → base URL
+// for publication in the run-state file. A client cannot otherwise learn which
+// /compat/<name>/ mounts this proxy actually serves.
+func compatUpstreams(cfg config.Config) map[string]string {
+	upstreams := cfg.CompatUpstreams()
+	out := make(map[string]string, len(upstreams))
+	for name, upstream := range upstreams {
+		out[name] = upstream.BaseURL
+	}
+	return out
+}
+
+// initializeNativePersistence keeps provider routing usable when local recovery
+// state is corrupt or unavailable. Compression and native runtime both depend on
+// durable exact recovery, so degradation is explicit record pass-through; no
+// in-memory handle or correlation marker is minted.
+func initializeNativePersistence(home, path string, cfg *config.Config, logger *slog.Logger) (*ccr.Store, []byte) {
+	recovery, err := ccr.Open(path)
+	if err != nil {
+		logger.Warn("CCR unavailable; forcing record pass-through and disabling native runtime", "error", err)
+		cfg.Mode = "record"
+		cfg.ObserveEstimate = false
+		return nil, nil
+	}
+	key, err := nativeruntime.LoadOrCreateSessionKey(home)
+	if err != nil {
+		_ = recovery.Close()
+		logger.Warn("native session correlation unavailable; forcing record pass-through and disabling native runtime", "error", err)
+		cfg.Mode = "record"
+		cfg.ObserveEstimate = false
+		return nil, nil
+	}
+	return recovery, key
+}
+
+func runStatus(logger *slog.Logger, args []string) {
+	home := mustHome(logger)
+	port := 0
+	if raw := argFlag(args, "--port", ""); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed < 1 || parsed > 65535 {
+			printJSON(runstate.Unknown())
+			return
+		}
+		port = parsed
+	} else {
+		// Status reads the port from the same config the proxy serves on. A config
+		// that does not load says nothing about the listener: report Unknown with
+		// the reason on stderr rather than probing DefaultListen, which would
+		// report some other port's state as if it were this config's.
+		cfg, err := config.Load(env.String("CAVEMAN_CONFIG", filepath.Join(home, "caveman.yaml")))
+		if err != nil {
+			logger.Error("cannot load caveman.yaml; status is unknown", "error", err)
+			printJSON(runstate.Unknown())
+			return
+		}
+		parsed, err := runstate.PortFromListen(cfg.Listen)
+		if err != nil {
+			logger.Error("caveman.yaml listen is not a usable address", "listen", cfg.Listen, "error", err)
+			printJSON(runstate.Unknown())
+			return
+		}
+		port = parsed
+	}
+	printJSON(runstate.ReadValidated(home, port))
+}
+
+func runVersion(args []string) {
+	if hasArg(args, "--json") {
+		printJSON(map[string]any{
+			"version": version,
+			"schema":  runstate.Schema,
+			"capabilities": []string{
+				"run_state",
+				"sessions_scanned",
+				"observe_token_accounting",
+				"native_runtime_v1",
+				"native_hook_bridge_v1",
+				"typed_ccr",
+				"decision_ledger_v1",
+			},
+		})
+		return
+	}
+	fmt.Println(version)
+}
+
+// runStats prints the local spend summary as JSON for `caveman stats`. The
+// summary's basis is always "inferred"; the figures are never re-projected.
+func runStats(logger *slog.Logger, args []string) {
+	if hasArg(args, "--report") {
+		runStatsReport(logger, args)
+		return
+	}
+	home := mustHome(logger)
+	spend, err := store.Open(dbPath(home), logger)
+	if err != nil {
+		logger.Error("cannot open local spend store", "error", err)
+		os.Exit(1)
+	}
+	defer spend.Close()
+	if recent := argFlag(args, "--recent", ""); recent != "" {
+		n, err := strconv.Atoi(recent)
+		if err != nil || n < 0 {
+			logger.Error("invalid --recent value", "value", recent)
+			os.Exit(2)
+		}
+		rows, err := spend.RecentRequests(n)
+		if err != nil {
+			logger.Error("cannot read recent request rows", "error", err)
+			os.Exit(1)
+		}
+		printJSON(rows)
+		return
+	}
+	// --json emits the compact observe-estimate object the CLI consumes for the
+	// session-end would-have-saved line, optionally filtered to a session start
+	// with --since <RFC3339>. Bare `stats` keeps printing the full Summary.
+	if hasArg(args, "--json") {
+		summary, err := spend.ObserveSummarySince(argFlag(args, "--since", ""))
+		if err != nil {
+			logger.Error("cannot read observe summary", "error", err)
+			os.Exit(1)
+		}
+		if memory, memErr := mem.Open(mem.Options{}); memErr == nil {
+			if count, countErr := memory.Count(); countErr == nil {
+				summary.MemBlocks = &count
+			}
+			_ = memory.Close()
+		}
+		printJSON(summary)
+		return
+	}
+	summary, err := spend.Summary()
+	if err != nil {
+		logger.Error("cannot read local spend store", "error", err)
+		os.Exit(1)
+	}
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode(summary)
+}
+
+func runTrial(logger *slog.Logger, args []string) {
+	sub := "report"
+	if len(args) > 0 {
+		sub = args[0]
+		args = args[1:]
+	}
+	home := mustHome(logger)
+	spend := mustStore(logger, home)
+	defer spend.Close()
+
+	switch sub {
+	case "start":
+		trialID := argFlag(args, "--trial-id", "")
+		agent := argFlag(args, "--agent", "unknown")
+		command := argFlag(args, "--command", "")
+		if err := spend.StartTrial(trialID, agent, command); err != nil {
+			fatalJSON(logger, err)
+		}
+		printJSON(map[string]any{"trial_id": trialID, "started": true, "basis": "inferred"})
+	case "finish":
+		trialID := argFlag(args, "--trial-id", "")
+		exitCode, _ := strconv.Atoi(argFlag(args, "--exit-code", "0"))
+		if err := spend.FinishTrial(trialID, exitCode); err != nil {
+			fatalJSON(logger, err)
+		}
+		printJSON(map[string]any{"trial_id": trialID, "finished": true, "exit_code": exitCode})
+	case "analyze":
+		trialID := requiredTrialID(logger, spend, args)
+		plan, err := spend.AnalyzeTrial(trialID, ccrPath(home))
+		if err != nil {
+			fatalJSON(logger, err)
+		}
+		printJSON(plan)
+	case "report":
+		trialID := requiredTrialID(logger, spend, args)
+		plan, err := spend.BuildTrialPlan(trialID)
+		if err != nil {
+			fatalJSON(logger, err)
+		}
+		if hasArg(args, "--json") {
+			printJSON(plan)
+			return
+		}
+		out := argFlag(args, "--out", store.DefaultReportPath(home, trialID))
+		if err := spend.WriteTrialHTML(plan, out); err != nil {
+			fatalJSON(logger, err)
+		}
+		printJSON(map[string]any{"trial_id": trialID, "report": out, "basis": plan.Basis})
+	case "export":
+		trialID := requiredTrialID(logger, spend, args)
+		plan, err := spend.BuildTrialPlan(trialID)
+		if err != nil {
+			fatalJSON(logger, err)
+		}
+		outDir := argFlag(args, "--out", filepath.Join(home, "exports", "trial-"+trialID))
+		paths, err := spend.ExportTrial(plan, outDir)
+		if err != nil {
+			fatalJSON(logger, err)
+		}
+		printJSON(map[string]any{"trial_id": trialID, "export": paths})
+	case "promote":
+		trialID := requiredTrialID(logger, spend, args)
+		optimizerID := firstPositional(args)
+		if optimizerID == "" {
+			fatalJSON(logger, fmt.Errorf("usage: caveman-proxy trial promote <optimizer_id> --trial-id <id>"))
+		}
+		plan, err := spend.BuildTrialPlan(trialID)
+		if err != nil {
+			fatalJSON(logger, err)
+		}
+		promoteMove(logger, home, trialID, optimizerID, plan)
+	default:
+		fatalJSON(logger, fmt.Errorf("unknown trial subcommand: %s", sub))
+	}
+}
+
+func runUsage(logger *slog.Logger, args []string) {
+	if len(args) == 0 {
+		fatalJSON(logger, fmt.Errorf("usage: caveman-proxy usage import|link|refresh|unlink <provider>"))
+	}
+	sub := args[0]
+	args = args[1:]
+	home := mustHome(logger)
+	spend := mustStore(logger, home)
+	defer spend.Close()
+	provider := firstPositional(args)
+	switch sub {
+	case "import":
+		if provider == "" {
+			fatalJSON(logger, fmt.Errorf("usage: caveman-proxy usage import codex|claude"))
+		}
+		path := argFlag(args, "--path", "")
+		since := argFlag(args, "--since", "")
+		switch provider {
+		case "codex":
+			out, err := spend.ImportCodex(path, since)
+			if err != nil {
+				fatalJSON(logger, err)
+			}
+			printJSON(out)
+		case "claude":
+			out, err := spend.ImportClaude(path, since)
+			if err != nil {
+				fatalJSON(logger, err)
+			}
+			printJSON(out)
+		default:
+			fatalJSON(logger, fmt.Errorf("unknown usage source: %s", provider))
+		}
+	case "link", "refresh":
+		switch provider {
+		case "", "claude":
+			out, err := spend.RefreshClaudeUsageFromEnv()
+			if err != nil {
+				fatalJSON(logger, err)
+			}
+			printJSON(out)
+		case "codex":
+			out, err := spend.ImportCodex(argFlag(args, "--path", ""), argFlag(args, "--since", ""))
+			if err != nil {
+				fatalJSON(logger, err)
+			}
+			printJSON(out)
+		default:
+			fatalJSON(logger, fmt.Errorf("unknown usage link source: %s", provider))
+		}
+	case "unlink":
+		switch provider {
+		case "claude", "anthropic":
+			if err := spend.DeleteQuotaProvider("anthropic"); err != nil {
+				fatalJSON(logger, err)
+			}
+			printJSON(map[string]any{"unlinked": "claude"})
+		case "codex", "openai":
+			if err := spend.DeleteQuotaProvider("openai"); err != nil {
+				fatalJSON(logger, err)
+			}
+			printJSON(map[string]any{"unlinked": "codex"})
+		default:
+			fatalJSON(logger, fmt.Errorf("usage unlink needs claude|codex"))
+		}
+	default:
+		fatalJSON(logger, fmt.Errorf("unknown usage subcommand: %s", sub))
+	}
+}
+
+func runLearn(logger *slog.Logger, args []string) {
+	sub := "scan"
+	if len(args) > 0 {
+		sub = args[0]
+		args = args[1:]
+	}
+	if sub == "capabilities" {
+		// The CLI's autopilot probes this before an unattended scan: an older
+		// proxy ignores unknown flags, so it would silently write cavemem and
+		// the canonical report. Answered before the store opens, so it is cheap.
+		printJSON(learnCapabilities())
+		return
+	}
+	home := mustHome(logger)
+	spend := mustStore(logger, home)
+	defer spend.Close()
+	cwd, _ := os.Getwd()
+	// Empty default defers to the store's normalizeSources default set, so new
+	// session sources (gemini/opencode/aider) are scanned without this flag
+	// needing to chase the adapter list.
+	sources := strings.Split(argFlag(args, "--sources", ""), ",")
+	since := argFlag(args, "--since", "30d")
+	repoFilter := argFlag(args, "--repo", "")
+
+	switch sub {
+	case "scan":
+		scope := "your agent sessions"
+		if picked := strings.Trim(strings.Join(sources, ","), ","); picked != "" {
+			scope = picked + " sessions"
+		}
+		fmt.Fprintf(os.Stderr, "reading %s from the last %s…\n", scope, since)
+		// --retro is opt-in: without it the scan runs exactly as before. With it,
+		// both passes are independently bounded so a cold base scan cannot consume
+		// the child deadline before retro returns partial measured coverage.
+		retro := learnRetroOptions(args)
+		var plan store.LearnPlan
+		var err error
+		if hasArg(args, "--no-remember") {
+			// Unattended scans (autopilot) must not grow cavemem: sink titles
+			// embed changing counts, so every run would store a near-duplicate.
+			plan, err = spend.BuildLearnPlanFilteredWithRetro(cwd, sources, since, retro, repoFilter)
+		} else {
+			plan, err = spend.LearnScanFilteredWithRetro(sources, since, retro, repoFilter)
+		}
+		if err != nil {
+			fatalJSON(logger, err)
+		}
+		// --reports-home keeps an unattended scan's report, snapshots and trend
+		// history apart from the canonical ones a user's own run writes.
+		reportsHome := argFlag(args, "--reports-home", home)
+		store.AttachLearnTrendHistory(&plan, reportsHome, time.Now())
+		counts := []string{}
+		for _, source := range slices.Sorted(maps.Keys(plan.SessionsBySource)) {
+			if n := plan.SessionsBySource[source]; n > 0 {
+				counts = append(counts, fmt.Sprintf("%s %d", source, n))
+			}
+		}
+		if len(counts) == 0 {
+			counts = append(counts, "none")
+		}
+		fmt.Fprintf(os.Stderr, "sessions found: %s · scoring…\n", strings.Join(counts, " · "))
+		if hasArg(args, "--write-report") {
+			out := argFlag(args, "--out", store.DefaultLearnReportPath(reportsHome))
+			if err := spend.WriteLearnHTML(plan, out); err != nil {
+				fatalJSON(logger, err)
+			}
+			generation := argFlag(args, "--write-report-token", "")
+			if _, err := spend.WriteLearnSidecars(reportsHome, plan, time.Now(), generation); err != nil {
+				fatalJSON(logger, err)
+			}
+		}
+		printJSON(plan)
+	case "report":
+		// --retro is the same opt-in as on scan: without it the report builds
+		// exactly as before; with it the "would have saved" replay block renders.
+		plan, err := spend.BuildLearnPlanFilteredWithRetro(cwd, sources, since, learnRetroOptions(args), repoFilter)
+		if err != nil {
+			fatalJSON(logger, err)
+		}
+		store.AttachLearnTrendHistory(&plan, home, time.Now())
+		out := argFlag(args, "--out", store.DefaultLearnReportPath(home))
+		if err := spend.WriteLearnHTML(plan, out); err != nil {
+			fatalJSON(logger, err)
+		}
+		sidecar, err := spend.WriteLearnSidecars(home, plan, time.Now(), "")
+		if err != nil {
+			fatalJSON(logger, err)
+		}
+		if hasArg(args, "--json") {
+			printJSON(plan)
+			return
+		}
+		printJSON(map[string]any{"report": out, "sidecar": sidecar, "cave_score": plan.CaveScore.Score, "basis": plan.Basis, "sinks": len(plan.Sinks)})
+	case "savings":
+		savings, err := spend.BuildLearnSavings(cwd, sources, since)
+		if err != nil {
+			fatalJSON(logger, err)
+		}
+		printJSON(savings)
+	case "apply":
+		sinkID := firstPositional(args)
+		if sinkID == "" {
+			fatalJSON(logger, fmt.Errorf("usage: caveman-proxy learn apply <sink_id> [--dry-run]"))
+		}
+		plan, err := spend.BuildLearnPlanFilteredWithRetro(cwd, sources, since, store.RetroOptions{}, repoFilter)
+		if err != nil {
+			fatalJSON(logger, err)
+		}
+		applyLearnSink(logger, home, sinkID, hasArg(args, "--dry-run"), plan)
+	case "applied":
+		sinkID := firstPositional(args)
+		if sinkID == "" {
+			fatalJSON(logger, fmt.Errorf("usage: caveman-proxy learn applied <sink_id> [--fix-kind <k>] [--note <s>]"))
+		}
+		plan, err := spend.BuildLearnPlanFilteredWithRetro(cwd, sources, since, store.RetroOptions{}, repoFilter)
+		if err != nil {
+			fatalJSON(logger, err)
+		}
+		recorded, err := spend.RecordAppliedFix(plan, sinkID, argFlag(args, "--fix-kind", ""), argFlag(args, "--note", ""))
+		if err != nil {
+			fatalJSON(logger, err)
+		}
+		printJSON(recorded)
+	case "simulate":
+		sinkIDs := learnSinkPositionals(args)
+		if len(sinkIDs) == 0 {
+			fatalJSON(logger, fmt.Errorf("usage: caveman-proxy learn simulate <sink_id> [<sink_id>...] [--sources <list>] [--since <window>]"))
+		}
+		simulation, err := spend.BuildLearnSimulationFiltered(cwd, sources, since, sinkIDs, repoFilter)
+		if err != nil {
+			fatalJSON(logger, err)
+		}
+		printJSON(simulation)
+	case "experiment":
+		runLearnExperiment(logger, spend, cwd, sources, args)
+	case "export":
+		runLearnExport(logger, spend, home, cwd, sources, since, args)
+	case "reconcile":
+		runLearnReconcile(logger, spend, cwd, sources, since, args)
+	default:
+		fatalJSON(logger, fmt.Errorf("unknown learn subcommand: %s", sub))
+	}
+}
+
+func learnCapabilities() map[string]any {
+	return map[string]any{
+		"schema":        "caveman.learn.capabilities.v1",
+		"no_remember":   true,
+		"reports_home":  true,
+		"memory_health": true,
+	}
+}
+
+var positionalValueFlags = map[string]bool{
+	"--agent": true, "--behavior-budget-ms": true, "--build": true,
+	"--command": true, "--decision": true, "--exit-code": true,
+	"--fix-kind": true, "--note": true, "--out": true, "--path": true,
+	"--plan": true, "--port": true, "--recent": true, "--repo": true, "--reports-home": true,
+	"--retro-budget-ms": true, "--session": true, "--since": true,
+	"--sources": true, "--trial-id": true, "--write-report-token": true,
+	"--sink": true, "--usage-export": true,
+}
+
+func learnSinkPositionals(args []string) []string {
+	var ids []string
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if strings.HasPrefix(arg, "--") {
+			if !strings.Contains(arg, "=") && positionalValueFlags[arg] && i+1 < len(args) {
+				i++
+			}
+			continue
+		}
+		ids = append(ids, arg)
+	}
+	return ids
+}
+
+func learnRetroOptions(args []string) store.RetroOptions {
+	behaviorBudget, _ := strconv.Atoi(argFlag(args, "--behavior-budget-ms", "0"))
+	retroBudget, _ := strconv.Atoi(argFlag(args, "--retro-budget-ms", "0"))
+	return store.RetroOptions{
+		Enabled:          hasArg(args, "--retro"),
+		BehaviorBudgetMS: behaviorBudget,
+		BudgetMS:         retroBudget,
+	}
+}
+
+// applyLearnSink materializes a candidate edit for a reducible sink under
+// ~/.caveman/candidates/ and returns it. It never edits user config files itself —
+// the analyzer is read-only; the consent-gated editing skill performs real edits.
+func applyLearnSink(logger *slog.Logger, home, sinkID string, dryRun bool, plan store.LearnPlan) {
+	var target *store.Sink
+	for i := range plan.Sinks {
+		if plan.Sinks[i].SinkID == sinkID {
+			target = &plan.Sinks[i]
+			break
+		}
+	}
+	if target == nil {
+		fatalJSON(logger, fmt.Errorf("sink %q not found in current learn plan", sinkID))
+	}
+	var candidate map[string]any
+	switch target.Class {
+	case "reducible":
+		candidate = map[string]any{
+			"sink_id":                        sinkID,
+			"title":                          target.Title,
+			"class":                          target.Class,
+			"expected_tokens_per_turn_saved": target.TokensPerTurn,
+			"suggestion":                     target.Suggestion,
+			"evidence":                       target.Evidence,
+			"net_token_negative_gate":        "the editing skill must measure before>after tokens/turn and reject any edit that does not reduce them",
+			"basis":                          plan.Basis,
+		}
+	case "recurring_context":
+		candidate = offloadCandidate(sinkID, target, plan.Basis, plan.Window.Since)
+	default:
+		printJSON(map[string]any{
+			"sink_id": sinkID, "applied": false, "class": target.Class,
+			"reason": "only reducible and recurring_context sinks have a materializable fix; behavioral findings are advice the editing skill turns into a consent-gated nudge",
+		})
+		return
+	}
+	if dryRun {
+		printJSON(map[string]any{"sink_id": sinkID, "applied": false, "dry_run": true, "candidate": candidate})
+		return
+	}
+	dir := filepath.Join(home, "candidates")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		fatalJSON(logger, err)
+	}
+	path := filepath.Join(dir, "learn-"+sanitizeID(sinkID)+".json")
+	raw, _ := json.MarshalIndent(candidate, "", "  ")
+	if err := os.WriteFile(path, append(raw, '\n'), 0o600); err != nil {
+		fatalJSON(logger, err)
+	}
+	printJSON(map[string]any{"sink_id": sinkID, "applied": false, "candidate_path": path, "candidate": candidate})
+}
+
+// offloadCandidate builds the cavemem_offload candidate for a recurring_context
+// sink. It carries content *locators* (file + line + block index + hash), the
+// measured numbers, and the net-token-negative inputs — never the block body. The
+// editing skill re-reads the body locally, offloads it to cavemem, trims the
+// source, and writes the pointer, after explicit consent. The proxy never edits
+// config and never calls cavemem.
+func offloadCandidate(sinkID string, target *store.Sink, basis, window string) map[string]any {
+	ev := target.Evidence
+	if ev == nil {
+		ev = map[string]any{}
+	}
+	topic := fmt.Sprintf("%v", ev["topic_label"])
+	pointer := fmt.Sprintf("Detail offloaded to cavemem: %s. Recall with `caveman mem recall %q`; byte-exact original via `caveman mem recover <handle>`.", topic, topic)
+	pointerCost := (len(pointer) + 3) / 4
+	return map[string]any{
+		"sink_id":  sinkID,
+		"fix_kind": "cavemem_offload",
+		"class":    target.Class,
+		"title":    target.Title,
+		"basis":    basis,
+		"what_to_offload": map[string]any{
+			"fingerprint":   ev["fingerprint"],
+			"block_tokens":  ev["block_tokens"],
+			"block_lines":   ev["block_lines"],
+			"segmenter":     ev["segmenter"],
+			"normalization": ev["normalization"],
+			"locators":      ev["locators"],
+		},
+		"measured": map[string]any{
+			"recurrence_sessions":       ev["recurrence_sessions"],
+			"occurrences_total":         ev["occurrences_total"],
+			"tokens_per_turn_amortized": target.TokensPerTurn,
+			"tokens_per_day_rate":       target.TokensPerDayRate,
+			"window":                    window,
+		},
+		"net_token_negative_inputs": map[string]any{
+			"repaste_tokens":              ev["block_tokens"],
+			"frequency_per_window":        ev["occurrences_total"],
+			"pointer_cost_tokens":         pointerCost,
+			"expected_recall_cost_tokens": nil,
+			"gate":                        "(repaste_tokens * frequency) > (pointer_cost + expected_recall_cost); the editing skill measures expected_recall_cost from a real cavemem recall and rejects the offload if this does not hold",
+		},
+		"proposed_pointer_text": pointer,
+		"applied":               false,
+		"boundary":              "Proxy materialized this candidate only. It did NOT edit any config file and did NOT call cavemem. The consent-gated editing skill re-reads the block locally from the locator, offloads it to cavemem, trims the source, and writes the pointer — after explicit approval.",
+	}
+}
+
+func sanitizeID(id string) string {
+	repl := strings.NewReplacer(":", "_", "/", "_", "..", "_", " ", "_")
+	return repl.Replace(id)
+}
+
+func dbPath(home string) string {
+	return env.String("CAVEMAN_DB", filepath.Join(home, "caveman.db"))
+}
+
+func ccrPath(home string) string {
+	return env.String("CAVEMAN_CCR_DB", filepath.Join(home, "ccr.db"))
+}
+
+func mustStore(logger *slog.Logger, home string) *store.Store {
+	spend, err := store.Open(dbPath(home), logger)
+	if err != nil {
+		logger.Error("cannot open local spend store", "error", err)
+		os.Exit(1)
+	}
+	return spend
+}
+
+func requiredTrialID(logger *slog.Logger, spend *store.Store, args []string) string {
+	trialID := argFlag(args, "--trial-id", "")
+	if trialID != "" {
+		return trialID
+	}
+	latest, err := spend.LatestTrialID()
+	if err != nil {
+		fatalJSON(logger, err)
+	}
+	if latest == "" {
+		fatalJSON(logger, fmt.Errorf("no trial_id supplied and no trial runs exist"))
+	}
+	return latest
+}
+
+func promoteMove(logger *slog.Logger, home, trialID, optimizerID string, plan store.TrialPlan) {
+	var move store.TrialMove
+	for _, candidate := range plan.Moves {
+		if candidate.OptimizerID == optimizerID {
+			move = candidate
+			break
+		}
+	}
+	if move.OptimizerID == "" {
+		fatalJSON(logger, fmt.Errorf("optimizer %q not found in trial %s", optimizerID, trialID))
+	}
+	if move.Status != "safe_now" || !(strings.HasPrefix(move.SafetyClass, "S0_") || strings.HasPrefix(move.SafetyClass, "S1_")) {
+		path := filepath.Join(home, "reports", "caveman-trial-"+trialID+"-"+optimizerID+"-candidate.yaml")
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			fatalJSON(logger, err)
+		}
+		raw, _ := yaml.Marshal(map[string]any{
+			"mode":         "record",
+			"optimizers":   map[string]bool{optimizerID: true},
+			"eval_command": "caveman evals run",
+		})
+		if err := os.WriteFile(path, raw, 0o600); err != nil {
+			fatalJSON(logger, err)
+		}
+		printJSON(map[string]any{
+			"trial_id": trialID, "optimizer_id": optimizerID, "promoted": false,
+			"candidate_config": path, "eval_command": "caveman evals run",
+			"reason": "move is not safe_now S0/S1",
+		})
+		return
+	}
+	path := env.String("CAVEMAN_CONFIG", filepath.Join(home, "caveman.yaml"))
+	cfg := config.Config{}
+	if raw, err := os.ReadFile(path); err == nil {
+		_ = yaml.Unmarshal(raw, &cfg)
+	}
+	if cfg.Optimizers == nil {
+		cfg.Optimizers = map[string]bool{}
+	}
+	cfg.Mode = "active"
+	cfg.Optimizers[optimizerID] = true
+	raw, _ := yaml.Marshal(cfg)
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		fatalJSON(logger, err)
+	}
+	if err := os.WriteFile(path, raw, 0o600); err != nil {
+		fatalJSON(logger, err)
+	}
+	printJSON(map[string]any{"trial_id": trialID, "optimizer_id": optimizerID, "promoted": true, "config": path})
+}
+
+func argFlag(args []string, name, fallback string) string {
+	for i, arg := range args {
+		if arg == name {
+			if i+1 < len(args) {
+				return args[i+1]
+			}
+			return fallback
+		}
+		if strings.HasPrefix(arg, name+"=") {
+			return strings.TrimPrefix(arg, name+"=")
+		}
+	}
+	return fallback
+}
+
+func hasArg(args []string, name string) bool {
+	for _, arg := range args {
+		if arg == name {
+			return true
+		}
+	}
+	return false
+}
+
+func firstPositional(args []string) string {
+	for i := 0; i < len(args); i++ {
+		if strings.HasPrefix(args[i], "--") {
+			if !strings.Contains(args[i], "=") && positionalValueFlags[args[i]] {
+				i++
+			}
+			continue
+		}
+		return args[i]
+	}
+	return ""
+}
+
+func printJSON(v any) {
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode(v)
+}
+
+func fatalJSON(logger *slog.Logger, err error) {
+	logger.Error("command failed", "error", err)
+	os.Exit(1)
+}
+
+// mustHome resolves and creates the ~/.caveman directory, honoring CAVEMAN_HOME.
+// proxyLogMaxBytes is where proxy.log rotates to one previous generation.
+const proxyLogMaxBytes = 16 << 20
+
+// proxyLog appends to a file and rotates a single previous generation (.1)
+// whenever a write would pass max, while serving and not only at startup: the
+// middleware audit trail writes a line per request. Nil on any open error:
+// logging must never block serving.
+type proxyLog struct {
+	mu   sync.Mutex
+	path string
+	max  int64
+	f    *os.File
+	size int64
+}
+
+func openProxyLog(path string, max int64) *proxyLog {
+	l := &proxyLog{path: path, max: max}
+	if l.open() != nil {
+		return nil
+	}
+	return l
+}
+
+func (l *proxyLog) open() error {
+	f, err := os.OpenFile(l.path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	info, err := f.Stat()
+	if err != nil {
+		_ = f.Close()
+		return err
+	}
+	l.f, l.size = f, info.Size()
+	return nil
+}
+
+func (l *proxyLog) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.f != nil && l.size > 0 && l.size+int64(len(p)) > l.max {
+		_ = l.f.Close()
+		_ = os.Rename(l.path, l.path+".1")
+		if l.open() != nil {
+			l.f = nil
+		}
+	}
+	if l.f == nil {
+		return len(p), nil // stdout still gets the line
+	}
+	n, err := l.f.Write(p)
+	l.size += int64(n)
+	return n, err
+}
+
+func (l *proxyLog) Close() error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.f == nil {
+		return nil
+	}
+	return l.f.Close()
+}
+
+func mustHome(logger *slog.Logger) string {
+	home := env.String("CAVEMAN_HOME", "")
+	if home == "" {
+		h, err := os.UserHomeDir()
+		if err != nil {
+			logger.Error("cannot resolve home directory", "error", err)
+			os.Exit(1)
+		}
+		home = filepath.Join(h, ".caveman")
+	}
+	if err := os.MkdirAll(home, 0o700); err != nil {
+		logger.Error("cannot create ~/.caveman", "error", err)
+		os.Exit(1)
+	}
+	if err := securehome.Restrict(home); err != nil {
+		logger.Warn("cannot make ~/.caveman private to this user", "error", err)
+	}
+	return home
+}

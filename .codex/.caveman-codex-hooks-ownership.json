@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "integration": "codex-hooks",
+  "entries": {
+    "caveman": {
+      "installedDigest": "a8c60cf86bc295ee1d87cb745f29214b7388caf064c9b01ccdb076ee016c764f"
+    }
+  },
+  "createdDirs": [
+    "."
+  ]
+}

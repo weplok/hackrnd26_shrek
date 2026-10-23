@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/.codex/caveman/hooks/codex-sessionstart.js\"",
+            "timeout": 5,
+            "statusMessage": "Loading caveman mode"
+          }
+        ]
+      }
+    ]
+  }
+}

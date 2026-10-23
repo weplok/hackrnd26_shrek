@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/JuliusBrussee/caveman/contracts-v2.1.0/packages/shared/contracts/schemas/middleware-plan.schema.json",
+  "title": "Caveman middleware optimize plan",
+  "description": "optimize 200 response. Closed on purpose: describes exactly what a protocol 1.1 server emits, and the conformance kit holds servers to it. Clients MUST NOT validate responses against this schema; they ignore unknown fields (docs/technical/middleware-protocol.md §4, §16).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "request_id",
+    "input_digest",
+    "runtime_build",
+    "policy_revision",
+    "replacement_set_id",
+    "status",
+    "reason",
+    "replacements",
+    "skipped",
+    "measurement",
+    "stability",
+    "recovery"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "request_id": {
+      "$ref": "middleware-common.schema.json#/$defs/token"
+    },
+    "input_digest": {
+      "$ref": "middleware-common.schema.json#/$defs/sha256"
+    },
+    "runtime_build": {
+      "type": "string",
+      "maxLength": 256
+    },
+    "policy_revision": {
+      "$ref": "middleware-common.schema.json#/$defs/token"
+    },
+    "replacement_set_id": {
+      "$ref": "middleware-common.schema.json#/$defs/sha256"
+    },
+    "status": {
+      "enum": [
+        "optimized",
+        "bypassed",
+        "record"
+      ]
+    },
+    "reason": {
+      "$ref": "middleware-common.schema.json#/$defs/token"
+    },
+    "replacements": {
+      "type": "array",
+      "items": {
+        "$ref": "middleware-common.schema.json#/$defs/replacement"
+      },
+      "maxItems": 256
+    },
+    "skipped": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "segment_id",
+          "reason"
+        ],
+        "properties": {
+          "segment_id": {
+            "$ref": "middleware-common.schema.json#/$defs/token"
+          },
+          "reason": {
+            "$ref": "middleware-common.schema.json#/$defs/token"
+          }
+        }
+      },
+      "maxItems": 256
+    },
+    "measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "basis",
+        "tokenizer",
+        "scope",
+        "tokens_before",
+        "tokens_after",
+        "unique_tokens_reduced",
+        "recovery_overhead_tokens",
+        "overhead_coverage",
+        "verified_saved_usd"
+      ],
+      "properties": {
+        "basis": {
+          "const": "inferred"
+        },
+        "tokenizer": {
+          "$ref": "middleware-common.schema.json#/$defs/token"
+        },
+        "scope": {
+          "const": "segment"
+        },
+        "tokens_before": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "tokens_after": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "unique_tokens_reduced": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "recovery_overhead_tokens": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "overhead_coverage": {
+          "const": "segment_and_declared_recovery_tool"
+        },
+        "verified_saved_usd": {
+          "const": 0
+        }
+      }
+    },
+    "stability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "native",
+        "provider_bytes",
+        "provider_cache_hits"
+      ],
+      "properties": {
+        "native": {
+          "enum": ["persistent_choices", "unavailable"]
+        },
+        "provider_bytes": {
+          "const": "unobserved"
+        },
+        "provider_cache_hits": {
+          "const": "unobserved"
+        }
+      }
+    },
+    "recovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "binding_id",
+        "available",
+        "persistent",
+        "expires_at"
+      ],
+      "properties": {
+        "binding_id": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "available": {
+          "type": "boolean"
+        },
+        "persistent": {
+          "type": "boolean"
+        },
+        "expires_at": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
+    }
+  }
+}

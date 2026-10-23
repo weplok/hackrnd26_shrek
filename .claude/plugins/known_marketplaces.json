@@ -1,0 +1,9 @@
+{
+  "caveman": {
+    "source": {
+      "source": "github",
+      "repo": "JuliusBrussee/caveman"
+    },
+    "installLocation": "/home/maksim/proj/hackrnd26_shrek/.claude/plugins/marketplaces/caveman"
+  }
+}

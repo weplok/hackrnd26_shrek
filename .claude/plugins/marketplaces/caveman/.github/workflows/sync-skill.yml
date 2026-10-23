@@ -1,0 +1,86 @@
+name: Sync SKILL.md and rules
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - skills/caveman/SKILL.md
+      - skills/ultracave/SKILL.md
+      - skills/megacave/SKILL.md
+      - skills/cavecrew/SKILL.md
+      - agents/cavecrew-*.md
+      - skills/caveman-compress/SKILL.md
+      - skills/caveman-compress/scripts/**
+
+concurrency:
+  group: sync-skill
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Pull latest before making changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+
+      - name: Sync SKILL.md copies
+        run: |
+          cp skills/caveman/SKILL.md plugins/caveman/skills/caveman/SKILL.md
+          mkdir -p plugins/caveman/skills/ultracave plugins/caveman/skills/megacave
+          cp skills/ultracave/SKILL.md plugins/caveman/skills/ultracave/SKILL.md
+          cp skills/megacave/SKILL.md plugins/caveman/skills/megacave/SKILL.md
+
+      - name: Sync caveman-compress skill to plugin
+        run: |
+          # Plugin distribution mirrors source verbatim — no rename, no sed.
+          mkdir -p plugins/caveman/skills/caveman-compress
+          cp skills/caveman-compress/SKILL.md plugins/caveman/skills/caveman-compress/SKILL.md
+          rm -rf plugins/caveman/skills/caveman-compress/scripts
+          cp -r skills/caveman-compress/scripts plugins/caveman/skills/caveman-compress/scripts
+          rm -rf plugins/caveman/skills/caveman-compress/scripts/__pycache__
+
+      - name: Sync cavecrew skill + agents to plugin
+        run: |
+          mkdir -p plugins/caveman/skills/cavecrew plugins/caveman/agents
+          cp skills/cavecrew/SKILL.md plugins/caveman/skills/cavecrew/SKILL.md
+          cp agents/cavecrew-investigator.md plugins/caveman/agents/cavecrew-investigator.md
+          cp agents/cavecrew-builder.md plugins/caveman/agents/cavecrew-builder.md
+          cp agents/cavecrew-reviewer.md plugins/caveman/agents/cavecrew-reviewer.md
+
+      - name: Rebuild caveman.skill ZIP
+        # `zip -r` ADDS to an existing archive, and dist/caveman.skill is tracked
+        # (.gitignore keeps it with `!dist/caveman.skill`), so a file deleted from
+        # skills/caveman/ never left the shipped ZIP — it just stopped being
+        # updated. Delete first so the archive is genuinely rebuilt.
+        run: mkdir -p dist && rm -f dist/caveman.skill && cd skills && zip -r ../dist/caveman.skill caveman/
+
+      - name: Commit and push if changed
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          git add \
+            skills/caveman-compress/ \
+            plugins/caveman/skills/caveman-compress/ \
+            plugins/caveman/skills/caveman/SKILL.md \
+            plugins/caveman/skills/ultracave/SKILL.md \
+            plugins/caveman/skills/megacave/SKILL.md \
+            plugins/caveman/skills/cavecrew/SKILL.md \
+            plugins/caveman/agents/cavecrew-investigator.md \
+            plugins/caveman/agents/cavecrew-builder.md \
+            plugins/caveman/agents/cavecrew-reviewer.md \
+            dist/caveman.skill
+          git diff --staged --quiet && exit 0
+          git commit -m "chore: sync SKILL.md copies [skip ci]"
+          git config --local credential.helper '!f() { echo "username=x-access-token"; echo "password=$GITHUB_TOKEN"; }; f'
+          git push "https://github.com/${GITHUB_REPOSITORY}.git" HEAD:main
+          git config --local --unset credential.helper

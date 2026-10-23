@@ -1,0 +1,129 @@
+# @caveman-ai/sdk
+
+`@caveman-ai/sdk` is the Apache-2.0-licensed TypeScript client in the main Caveman repository. It ships ESM and TypeScript declarations with no runtime dependencies. This quickstart uses published version `1.2.0` on Node.js 22.13 or newer.
+
+## Install
+
+```bash
+mkdir caveman-ts-example
+cd caveman-ts-example
+npm init -y
+npm install @caveman-ai/sdk@1.2.0
+```
+
+Use an `.mjs` file for the first run. In a TypeScript project, use ESM and NodeNext module resolution. The package does not publish a CommonJS `require` entrypoint.
+
+## Configure your service
+
+Set these variables in your shell or secret manager. Replace the values with your deployment's service address, accepted key, and enabled model:
+
+```bash
+export CAVE_BASE_URL="https://your-caveman-service.example"
+export CAVE_API_KEY="your-service-key"
+export CAVE_MODEL="your-enabled-model-id"
+# Only when your service requires a provider key:
+export OPENAI_API_KEY="your-provider-key"
+```
+
+The example address is a placeholder. Installing this package does not launch a service. The Caveman key authenticates to your configured service; the provider key supplies upstream access. Keep both on your application server.
+
+## Make your first request
+
+Save this as `quickstart.mjs`:
+
+```js
+import { Cave } from "@caveman-ai/sdk";
+
+function required(name) {
+  const value = process.env[name];
+  if (!value) throw new Error(`Set ${name} before running this example`);
+  return value;
+}
+
+const cave = new Cave({
+  apiKey: required("CAVE_API_KEY"),
+  baseURL: required("CAVE_BASE_URL"),
+  agent: "support-agent",
+  defaultWorkflow: "answer-question",
+  timeoutMs: 30_000,
+});
+
+try {
+  const response = await cave.openai({
+    upstreamKey: process.env.OPENAI_API_KEY,
+  }).responses.create({
+    model: required("CAVE_MODEL"),
+    input: "Explain what a retry loop is in one sentence.",
+  });
+  console.log(JSON.stringify(response, null, 2));
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exitCode = 1;
+}
+```
+
+```bash
+node quickstart.mjs
+```
+
+A successful call prints the provider's parsed JSON response, including its native output and usage fields when present. The client does not add the official OpenAI SDK's convenience properties. Read the provider response shape your application requested.
+
+## Compress a string
+
+In the same program, after creating `cave`, you can call a service that supports the compression API:
+
+```ts
+const original = JSON.stringify({ records: [
+  { id: 1, status: "ok" },
+  { id: 2, status: "ok" },
+] });
+const compressed = await cave.compress(original, { contentType: "json" });
+console.log({
+  output: compressed.output,
+  before: compressed.tokensBefore,
+  after: compressed.tokensAfter,
+  basis: compressed.basis,
+  recoveryHandle: compressed.recoveryHandle,
+});
+```
+
+Small payloads may remain unchanged. Network or malformed-response failures also return the original string with zero reported reduction. Use the [compression report](https://docs.caveman.so/concepts/optimizations) to distinguish a useful transformation from pass-through; successful JavaScript execution alone proves neither compression nor savings.
+
+## Use TypeScript
+
+Import public result and option types from the same entrypoint:
+
+```ts
+import type { CaveOptions, CompressResult } from "@caveman-ai/sdk";
+
+const options: CaveOptions = {
+  apiKey: process.env.CAVE_API_KEY!,
+  baseURL: process.env.CAVE_BASE_URL!,
+  agent: "support-agent",
+};
+const report: CompressResult = await cave.compress("tool output");
+console.log(report.tokenCountBasis);
+```
+
+The non-null assertions above are type annotations, not environment validation. Keep the quickstart's `required()` checks at your application boundary.
+
+## Next steps
+
+- [Configure credentials, labels, timeouts, and cancellation](https://docs.caveman.so/sdks/typescript).
+- [Use Anthropic, Gemini, Vertex, raw responses, or streaming](https://docs.caveman.so/sdks/typescript).
+- [Select tools](https://docs.caveman.so/sdks/typescript), [manage context](https://docs.caveman.so/sdks/typescript), or [trace a workflow](https://docs.caveman.so/sdks/typescript).
+- [Add local framework middleware](https://docs.caveman.so/integrations/frameworks) when you want to keep an existing framework integration.
+
+The SDK does not install the engine, run an agent loop, or guarantee that your configured service supports every exported method.
+
+## Full documentation
+
+[SDK overview](https://docs.caveman.so/sdks/typescript) · [API reference](https://docs.caveman.so/sdks/typescript) · [Troubleshooting](https://docs.caveman.so/reference/troubleshooting)
+
+## Native framework middleware
+
+For automatic projection of eligible tool results in an existing framework, use the separate [middleware package](https://docs.caveman.so/integrations/frameworks). Start with the complete [AI SDK quickstart](https://docs.caveman.so/integrations/frameworks). The local runtime is accountless; inference stays in your provider client. The thin connected APIs above remain explicit calls.
+
+The `@caveman-ai/sdk/middleware` subpath is the protocol client those adapters build on. It is stable and follows semver with the rest of the SDK, because `@caveman-ai/middleware` 1.x depends on it.
+
+Behind a corporate proxy, the middleware client honors `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` on its own; you do not need Node's `NODE_USE_ENV_PROXY`. A runtime on `localhost`, `127.0.0.1` or `::1` never goes through the proxy, so your content and runtime token stay on the machine. If you pass your own proxy-aware `fetch`, set `NO_PROXY=localhost,127.0.0.1,::1` so it does the same. For a runtime with a private certificate authority, pass its PEM certificate as the `ca` option.

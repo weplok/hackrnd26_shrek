@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/JuliusBrussee/caveman/contracts-v2.1.0/packages/shared/contracts/schemas/middleware-retrieve.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "scope",
+    "handle",
+    "offset",
+    "limit",
+    "query"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "scope": {
+      "$ref": "middleware-common.schema.json#/$defs/scope"
+    },
+    "handle": {
+      "$ref": "middleware-common.schema.json#/$defs/token"
+    },
+    "offset": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 262144
+    },
+    "query": {
+      "type": "string",
+      "maxLength": 1024
+    }
+  }
+}

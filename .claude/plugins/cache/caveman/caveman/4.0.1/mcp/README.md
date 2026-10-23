@@ -1,0 +1,59 @@
+# caveman-mcp
+
+The Caveman MCP server: five compression tools — `caveman_compress`,
+`caveman_retrieve`, `caveman_stats`, `caveman_toon_encode`, and
+`caveman_toon_decode` — over stdio, for any MCP host. It links the
+[Caveman Engine](../engine) in-process. **Local-only** (opens no
+network connection) and **inferred-only** (it never claims `verified` savings).
+
+## Install (Claude Code)
+
+```jsonc
+// .mcp.json / claude mcp config
+{
+  "mcpServers": {
+    "caveman": { "command": "npx", "args": ["-y", "caveman-mcp"] }
+  }
+}
+```
+
+The launcher downloads matching binary on first run, verifies
+key-signed checksum manifest plus artifact SHA-256, and caches it under
+`~/.caveman/bin`. No Go toolchain or global Caveman install is required.
+To use an existing reviewed binary instead:
+
+```bash
+CAVEMAN_MCP_BIN=/path/to/caveman-mcp npx caveman-mcp
+```
+
+npm launcher and downloaded binary are both Apache-2.0; see `BINARY_LICENSE.md`.
+
+## Tools
+
+| Tool | Input | Returns |
+|---|---|---|
+| `caveman_compress` | `input` (string) | compressed text, inferred `ratio`, `recovery_handle` (null on pass-through) |
+| `caveman_retrieve` | `recovery_handle` (string), optional `query` | byte-exact original without a query; ranked complete records with a query; error on unknown handle |
+| `caveman_stats` | — | this MCP process's compression-call totals, including repeated inputs and pass-throughs: tokens before/after, `requests`, `ratio`, `basis:"inferred"`, `scope:"session"` |
+| `caveman_toon_encode` | `input` (JSON string) | explicit JSON→TOON result with sizes; pass-through plus note when not encodable |
+| `caveman_toon_decode` | `input` (TOON string) | decoded JSON; error on invalid TOON |
+
+Compression is lossy (S4) but **reversible**: every drop is recoverable via
+`caveman_retrieve`. Incompressible or malformed input passes through unchanged
+with `ratio:0` — never an error.
+
+Repeated recovery calls remain available after host compaction. An empty query
+returns the exact stored original on every call; a nonempty query keeps the same
+record-narrowing behavior regardless of how many earlier calls were made.
+
+Hosts that publish compressed output can first call `caveman_retrieve` with
+`{"recovery_handle":"ccr://ccr_…","verify_only":true}`. Check for the
+`recovery_verification` capability in `caveman-mcp version --json` before using
+this optional mode: older servers may ignore unknown arguments.
+
+Verification returns a JSON text block containing the normalized bare
+`recovery_handle`, UTF-8 `byte_length`, and lowercase hexadecimal `sha256` of
+the complete stored original. It ignores `query`, errors on unknown handles,
+and does not count as a delivery. Compare all three fields with the proposed handle and original bytes;
+retain the original output when verification fails. This checks availability
+at publication time, not indefinite retention or immunity to later deletion.
