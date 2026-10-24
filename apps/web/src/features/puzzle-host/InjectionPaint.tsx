@@ -59,7 +59,7 @@ export function InjectionPaint({ puzzle, onCancel, onSubmit }: GameProps): React
     if (!delay) return;
     const timer = setTimeout(() => {
       if (phase === 'show') setPhase('draw');
-      else if (phase === 'check') setPhase(sheet.every((ink, i) => ink === target[i]) ? 'pass' : 'fail');
+      else if (phase === 'check') setPhase(sheet.every((ink, i) => ink !== target[i]) ? 'pass' : 'fail');
       else if (phase === 'fail') {
         setSheet(blank());
         setPhase('draw');

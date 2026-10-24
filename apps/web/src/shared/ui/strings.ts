@@ -222,7 +222,7 @@ export const ru = {
     ddosStatus: (reached: number, left: number) => `Волн у узла: ${String(reached)}/4 · осталось ${String(left)} с.`,
     ddosWon: 'Узел лёг. DDoS успешен.',
     ddosLost: 'Минута вышла. DDoS не удался.',
-    injectRules: 'Запомни рисунок и повтори его на чистом листе. Инъекция пройдёт, только если твой рисунок ляжет точно в исходный.',
+    injectRules: 'Запомни рисунок и нарисуй на чистом листе его инверсию: закрась пустые клетки и оставь пустыми закрашенные. Инъекция пройдёт, только если инверсия точная.',
     injectCell: (row: number, col: number) => `Клетка ${String(row)}:${String(col)}`,
     injectCheck: 'Внедрить',
     injectPhase: {
