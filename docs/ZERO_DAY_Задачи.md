@@ -27,6 +27,7 @@
 ### EPIC A — Каркас и платформа (M0)
 
 - [ ] **T-A1** · Монорепо: pnpm workspaces + uv, структура папок, Makefile · INF · M · P0 · *после:* — · в работе: misterEugene
+  - Прогресс: сделано pnpm workspaces (apps/web, packages/engine, packages/content-tools), services/api на uv (pyproject), папки content/, infra/, .github/workflows/, Makefile, .gitignore; осталось uv.lock (uv не установлен), решить судьбу npc_api/, проверка вторым человеком.
 - [ ] **T-A2** · Линтеры/форматтеры/strict-типы, pre-commit · INF · S · P0 · *после:* T-A1
 - [ ] **T-A3** · JSON Schema контента (v1) + кодоген TS и Pydantic · CNT · L · P0 · *после:* T-A1
 - [ ] **T-A4** · content-tools: валидатор схем + линтер ссылок + стоп-словарь · CNT · M · P0 · *после:* T-A3
