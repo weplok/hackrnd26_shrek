@@ -17,10 +17,15 @@ Boundaries: Write code, comments, commits, and docs in normal style.
 
 # Project rules
 
-- Read `SPEC.md` first when it exists. Treat it as source of truth.
+- Read `docs/ZERO DAY — Техническое задание.md` first. Treat it as source of truth.
+- Read task-specific `.md` files in `docs/` when needed. Filenames describe their scope.
+- Before work, identify affected requirements and relevant `docs/*.md` specifications.
+- Before implementation, discuss any conflict between developer request and specifications with developer.
+- After agreement, clarify specifications with developer. Change them only with explicit developer approval, then begin work.
+- Never modify specification `.md` files in `docs/` without explicit developer approval.
 - Optimize for token use first. Read only relevant files and avoid repeated context.
 - Optimize for time second. Make shortest viable change and stop when request is met.
 - Do not add over-engineering, speculative features, or unrelated cleanup.
 - Do not run failure-test cycles or extra checks. Run only smallest relevant check when needed.
-- Ask user when scope, requirements, or next action is unclear.
-- Preserve existing behavior unless request or `SPEC.md` requires change.
+- Ask developer about clarifications, disputes, or unsolvable problems.
+- Preserve existing behavior unless request or applicable project document requires change.
