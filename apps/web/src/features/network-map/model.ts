@@ -1,7 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 import type { Case, ContentNode, GameState, NodeAlertLevel, NodeRuntime } from '@zero-day/engine';
 import { ru } from '../../shared/ui/strings';
-import { resolveDevice, type DeviceKind } from './icons';
 
 const HORIZONTAL_SCALE = 10;
 const VERTICAL_SCALE = 8;
@@ -14,7 +13,6 @@ export type NetworkVisualState = 'untouched' | 'scanned' | 'compromised' | 'secu
 export type NetworkNodeData = {
   alertLevel: NodeAlertLevel;
   ariaLabel: string;
-  device: DeviceKind;
   disabled: boolean;
   inScope: boolean;
   isGateway: boolean;
@@ -114,7 +112,6 @@ export function buildNetworkMap(caseData: Case, gameState: GameState, selectedNo
       data: {
         alertLevel: runtime.alertLevel,
         ariaLabel: nodeAriaLabel(node, runtime, locked, gateway),
-        device: resolveDevice(node),
         disabled: locked,
         inScope: node.inScope,
         isGateway: gateway,

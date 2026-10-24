@@ -1,5 +1,6 @@
 @import './tokens.css';
 @import '../features/puzzle-host/puzzle-host.css';
+@import './screens.css';
 
 * {
   box-sizing: border-box;

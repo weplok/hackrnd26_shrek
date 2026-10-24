@@ -123,16 +123,8 @@
 }
 
 .network-map__node-kind {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   color: var(--color-green);
   font: 1.125rem/1 var(--font-mono);
-}
-
-.network-map__device-icon {
-  width: 1.75rem;
-  height: 1.75rem;
 }
 
 .network-map__node-label {
@@ -260,5 +252,30 @@
 
   .network-map__canvas {
     height: 27rem;
+  }
+}
+
+.network-map__node--untouched:not(.network-map__node--locked),
+.network-map__node--scanned:not(.network-map__node--locked) {
+  animation: node-pulse 1.6s ease-out infinite;
+}
+
+@keyframes node-pulse {
+  0% {
+    border-color: #3b9cff;
+    box-shadow:
+      0 0 0 0 rgb(59 156 255 / 95%),
+      0 0 0.5rem 0.125rem rgb(59 156 255 / 80%);
+  }
+  70% {
+    border-color: #3b9cff;
+    box-shadow:
+      0 0 0 1rem rgb(59 156 255 / 0%),
+      0 0 1.75rem 0.5rem rgb(59 156 255 / 60%);
+  }
+  100% {
+    box-shadow:
+      0 0 0 0 rgb(59 156 255 / 0%),
+      0 0 0.5rem 0.125rem rgb(59 156 255 / 40%);
   }
 }

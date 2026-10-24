@@ -29,7 +29,49 @@
   font: 0.75rem/1.4 var(--font-mono);
   text-align: center;
 }
-.puzzle-scene--radar { border-radius: 50%; min-height: 10rem; background: radial-gradient(circle, #123322 1%, #000 66%); }
+.puzzle-scene--radar {
+  position: relative;
+  width: min(16rem, 100%);
+  aspect-ratio: 1;
+  margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid rgb(59 156 255 / 60%);
+  border-radius: 50%;
+  background:
+    repeating-radial-gradient(circle, transparent 0 24%, rgb(59 156 255 / 18%) 24% 25%),
+    radial-gradient(circle, #0b2238 1%, #000 70%);
+  color: #cfe6ff;
+  isolation: isolate;
+}
+.puzzle-scene--radar::before,
+.puzzle-scene--radar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border: 3px solid #3b9cff;
+  border-radius: 50%;
+  box-shadow:
+    0 0 1.25rem #3b9cff,
+    inset 0 0 1.25rem rgb(59 156 255 / 60%);
+  animation: radar-wave 2.4s ease-out infinite;
+}
+.puzzle-scene--radar::after {
+  animation-delay: 1.2s;
+}
+@keyframes radar-wave {
+  from {
+    transform: scale(0.05);
+    opacity: 1;
+  }
+  70% {
+    opacity: 0.8;
+  }
+  to {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
 .puzzle-scene--breach { clip-path: polygon(0 0, 85% 0, 100% 35%, 82% 55%, 100% 100%, 0 100%); }
 .puzzle-scene--tower { align-items: end; background: repeating-linear-gradient(0deg, #07140e 0 1.25rem, #000 1.25rem 2.5rem); }
 .puzzle-scene--beams { background: repeating-linear-gradient(135deg, #000 0 0.9rem, #351114 0.9rem 1rem, #000 1rem 1.9rem); }

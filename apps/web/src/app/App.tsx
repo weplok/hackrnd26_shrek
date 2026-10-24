@@ -1,16 +1,22 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import {
+  BrowserRouter,
+  Link,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from 'react-router-dom';
 import { Button, Panel } from '@zero-day/ui';
-import type { Campaign, Case, Content, GameState } from '@zero-day/engine';
 import { ErrorBoundary } from './ErrorBoundary';
+import { CodexPage, ContractsPage, DEMO_CASE, IntroPage, caseUnlocked } from './pages';
+import { MissionPage } from './mission';
 import { content } from '../content';
-import { BriefingModal } from '../features/briefing';
-import { useCaseStore } from '../features/game-session';
-import { GameHud } from '../features/hud';
-import { NetworkMap } from '../features/network-map/NetworkMap';
-import { SaveRepository, startAutosave } from '../features/persistence';
-import { PuzzleHost, ToolLab } from '../features/puzzle-host';
-import { NodeContextMenu, Terminal } from '../features/terminal';
+import { SaveRepository } from '../features/persistence';
+import { ToolLab } from '../features/puzzle-host';
 import { loadContentSummary, type ContentSummary } from '../shared/content/loadContent';
 import { readNickname, saveNickname } from '../shared/profile/storage';
 import { validateNickname, type NicknameError } from '../shared/profile/nickname';
@@ -18,26 +24,7 @@ import { createAnonymousSession, type SessionState } from '../shared/session/cre
 import { ru } from '../shared/ui/strings';
 import { TelemetryClient } from '../telemetry';
 
-type CampaignStart = {
-  caseData: Case;
-  caseId: string;
-  level: Campaign['levels'][number];
-};
-
-function getCampaignStart(gameContent: Content): CampaignStart {
-  const level = gameContent.campaign.levels[0];
-  const caseId = level?.cases[0];
-  const caseData = caseId ? gameContent.cases[caseId] : undefined;
-
-  if (!level || !caseId || !caseData) {
-    throw new Error('Campaign has no playable case.');
-  }
-
-  return { caseData, caseId, level };
-}
-
 const gameContent = content;
-const campaignStart = getCampaignStart(gameContent);
 const saveRepository = new SaveRepository(gameContent.campaign.contentVersion);
 
 type ContentState = { status: 'loading' } | { status: 'ready'; summary: ContentSummary } | { status: 'offline' };
@@ -123,10 +110,26 @@ function ApplicationRoutes({ bootstrap }: { bootstrap: BootstrapState }): ReactN
         }
       />
       <Route
+        path="/intro"
+        element={
+          <Screen>
+            <IntroPage />
+          </Screen>
+        }
+      />
+      <Route
         path="/campaign"
         element={
           <Screen>
-            <GamePage />
+            <CampaignPage />
+          </Screen>
+        }
+      />
+      <Route
+        path="/play/:caseId"
+        element={
+          <Screen>
+            <PlayPage />
           </Screen>
         }
       />
@@ -142,7 +145,7 @@ function ApplicationRoutes({ bootstrap }: { bootstrap: BootstrapState }): ReactN
         path="/codex"
         element={
           <Screen>
-            <PlaceholderPage title={ru.codex} copy={ru.codexCopy} />
+            <CodexPage content={gameContent} opened={saveRepository.load().save.codex} />
           </Screen>
         }
       />
@@ -200,12 +203,16 @@ function PageLayout({ children }: { children: ReactNode }): ReactNode {
 
 function StartPage({ bootstrap }: { bootstrap: BootstrapState }): ReactNode {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const demo = params.get('case');
   const [draftNickname, setDraftNickname] = useState(readNickname() ?? '');
   const hasSave = Boolean(readNickname());
 
   function beginNewGame(): void {
     navigate('/nickname', { state: { draftNickname } });
   }
+
+  if (demo && demo in gameContent.cases) return <Navigate to={`/play/${demo}`} replace />;
 
   return (
     <>
@@ -316,7 +323,7 @@ function NicknamePage(): ReactNode {
       return;
     }
 
-    navigate('/campaign');
+    navigate('/intro');
   }
 
   return (
@@ -409,50 +416,6 @@ function ContentStatusPanel({
   );
 }
 
-function NodeActionsPanel({
-  caseData,
-  caseRun,
-  selectedNodeId,
-  onClose,
-}: {
-  caseData: Case;
-  caseRun: GameState;
-  selectedNodeId: string | null;
-  onClose: () => void;
-}): ReactNode {
-  const dispatch = useCaseStore((state) => state.dispatch);
-  const [scopeWarning, setScopeWarning] = useState(false);
-  const selectedNode = selectedNodeId ? caseData.nodes.find((node) => node.id === selectedNodeId) : undefined;
-
-  return (
-    <Panel className="game-screen__node" title={ru.nodeMenu.title}>
-      {selectedNode && !caseRun.nodes[selectedNode.id]?.secured ? (
-        <NodeContextMenu
-          node={selectedNode.id}
-          label={selectedNode.label}
-          vulns={Object.values(gameContent.vulnerabilities)}
-          onScan={(node) => {
-            const result = dispatch({ type: 'ScanNode', node });
-            setScopeWarning(Boolean(result?.state.pendingScope));
-          }}
-          onHypothesis={(node, vuln) => {
-            const result = dispatch({ type: 'ProposeHypothesis', node, vuln });
-            setScopeWarning(Boolean(result?.state.pendingScope));
-          }}
-          onClose={onClose}
-        />
-      ) : (
-        <p className="campaign-map__selection">{ru.networkMap.selectNode}</p>
-      )}
-      {scopeWarning ? (
-        <p className="campaign-map__warning" role="status">
-          {ru.networkMap.scopeWarning}
-        </p>
-      ) : null}
-    </Panel>
-  );
-}
-
 function PlaceholderPage({ title, copy }: { title: string; copy: string }): ReactNode {
   return (
     <Panel className="page-panel" title={ru.appName}>
@@ -465,81 +428,18 @@ function PlaceholderPage({ title, copy }: { title: string; copy: string }): Reac
   );
 }
 
-function GamePage(): ReactNode {
-  const { caseData, caseId, level } = campaignStart;
-  const caseRun = useCaseStore((state) => state.caseRun);
-  const start = useCaseStore((state) => state.start);
-  const resume = useCaseStore((state) => state.resume);
-  const [loaded] = useState(() => saveRepository.load());
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [briefingOpen, setBriefingOpen] = useState(true);
+function CampaignPage(): ReactNode {
+  const [params] = useSearchParams();
+  const demo = params.get('case');
+  // FR-004: jury demo link ?case=L2C1 skips straight to the case.
+  if (demo && demo in gameContent.cases) return <Navigate to={`/play/${demo}`} replace />;
+  return <ContractsPage content={gameContent} save={saveRepository.load().save} nickname={readNickname()} />;
+}
 
-  useEffect(() => {
-    if (caseRun?.caseId === caseId) return;
-    if (loaded.save.caseRun?.caseId === caseId) {
-      resume(gameContent, loaded.save.caseRun);
-      return;
-    }
-    start({ caseId, content: gameContent, difficulty: level.difficulty });
-  }, [caseId, caseRun?.caseId, level, loaded, resume, start]);
-
-  useEffect(() => startAutosave(saveRepository, () => useCaseStore.getState().caseRun), []);
-
-  if (!caseRun || caseRun.caseId !== caseId) {
-    return (
-      <Panel className="page-panel" title={ru.appName}>
-        {ru.contentLoading}
-      </Panel>
-    );
-  }
-
-  const levelNumber = gameContent.campaign.levels.indexOf(level) + 1;
-
-  return (
-    <section className="game-screen" aria-label={ru.campaign}>
-      {briefingOpen ? (
-        <BriefingModal
-          caseData={caseData}
-          onClose={() => {
-            setBriefingOpen(false);
-          }}
-        />
-      ) : null}
-      <GameHud caseData={caseData} caseRun={caseRun} flipper={gameContent.flipper} level={levelNumber} />
-      <div className="game-screen__map">
-        <NetworkMap
-          caseData={caseData}
-          gameState={caseRun}
-          onSelectNode={setSelectedNodeId}
-          selectedNodeId={selectedNodeId}
-        />
-      </div>
-      <Panel className="game-screen__brief" title={ru.briefTitle(caseData.brief.client)}>
-        <p className="copy">{caseData.brief.text}</p>
-        {(loaded.status === 'case-reset' || loaded.status === 'corrupt') && (
-          <p className="fine-print" role="status">
-            {ru.saveCaseReset}
-          </p>
-        )}
-      </Panel>
-      <NodeActionsPanel
-        key={selectedNodeId ?? ''}
-        caseData={caseData}
-        caseRun={caseRun}
-        selectedNodeId={selectedNodeId}
-        onClose={() => {
-          setSelectedNodeId(null);
-        }}
-      />
-      <div className="game-screen__terminal">
-        <Terminal vulns={Object.values(gameContent.vulnerabilities)} />
-      </div>
-      <PuzzleHost />
-      <Link className="zd-button button-link game-screen__back" to="/">
-        {ru.backToMenu}
-      </Link>
-    </section>
-  );
+function PlayPage(): ReactNode {
+  const { caseId = DEMO_CASE } = useParams();
+  if (!caseUnlocked(gameContent, saveRepository.load().save, caseId, true)) return <Navigate to="/campaign" replace />;
+  return <MissionPage key={caseId} content={gameContent} caseId={caseId} repository={saveRepository} />;
 }
 
 function renderRootError(_: Error, retry: () => void): ReactNode {

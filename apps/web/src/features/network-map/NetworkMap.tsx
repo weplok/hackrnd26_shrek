@@ -12,7 +12,6 @@ import type { ReactNode } from 'react';
 import { useEffect, useMemo } from 'react';
 import type { Case, GameState } from '@zero-day/engine';
 import { ru } from '../../shared/ui/strings';
-import { DeviceIcon } from './icons';
 import { buildNetworkMap, type NetworkFlowNode, type NetworkMapNode, type SegmentFlowNode } from './model';
 import './network-map.css';
 import '@xyflow/react/dist/style.css';
@@ -22,6 +21,14 @@ export type NetworkMapProps = {
   gameState: GameState;
   onSelectNode: (nodeId: string) => void;
   selectedNodeId: string | null;
+};
+
+const KIND_ICON: Record<NetworkFlowNode['data']['kind'], string> = {
+  machine: '▣',
+  person: '◉',
+  object: '◇',
+  target: '◎',
+  decoy: '◌',
 };
 
 const ALERT_ICON: Record<NetworkFlowNode['data']['alertLevel'], string> = {
@@ -114,7 +121,7 @@ function NetworkNode({ data, id }: NodeProps<InteractiveNode>): ReactNode {
         type="button"
       >
         <span aria-hidden="true" className="network-map__node-kind">
-          <DeviceIcon device={data.device} />
+          {KIND_ICON[data.kind]}
         </span>
         <span className="network-map__node-label">{data.label}</span>
         <span className="network-map__node-status">
