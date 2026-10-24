@@ -108,6 +108,7 @@
 }
 
 .network-map__node-button {
+  position: relative;
   display: grid;
   width: 100%;
   min-height: 5.75rem;
@@ -279,4 +280,15 @@
       0 0 0 0 rgb(59 156 255 / 0%),
       0 0 0.5rem 0.125rem rgb(59 156 255 / 40%);
   }
+}
+
+.network-map__node-unread {
+  position: absolute;
+  top: -0.25rem;
+  right: -0.25rem;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 50%;
+  background: var(--color-amber);
+  box-shadow: 0 0 0 2px var(--color-panel);
 }

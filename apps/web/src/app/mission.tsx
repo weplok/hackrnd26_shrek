@@ -9,6 +9,7 @@ import { AttackNotice, AttackTable } from '../features/attack-log';
 import { NetworkMap } from '../features/network-map/NetworkMap';
 import { startAutosave, withCaseRun, type SaveRepository } from '../features/persistence';
 import { PuzzleHost } from '../features/puzzle-host';
+import { socialKey, useSocial } from '../features/social';
 import { NodeContextMenu, Terminal } from '../features/terminal';
 import { ru } from '../shared/ui/strings';
 import { caseOrder } from './pages';
@@ -48,6 +49,7 @@ export function MissionPage({
 
   function begin(): void {
     if (!level) return;
+    useSocial.getState().reset();
     start({ caseId, content, difficulty: level.difficulty });
     setSelectedNodeId(null);
     setBriefing(true);
@@ -56,8 +58,16 @@ export function MissionPage({
   useEffect(() => {
     const unfinished = unfinishedRun(repository, caseId);
     if (unfinished) resume(content, unfinished);
-    else if (level) start({ caseId, content, difficulty: level.difficulty });
+    else if (level) {
+      useSocial.getState().reset();
+      start({ caseId, content, difficulty: level.difficulty });
+    }
   }, [caseId, content, level, repository, resume, start]);
+
+  // A lost level resets every social-engineering session.
+  useEffect(() => {
+    if (caseRun?.phase === 'caught') useSocial.getState().reset();
+  }, [caseRun?.phase]);
 
   useEffect(() => startAutosave(repository, () => useCaseStore.getState().caseRun), [repository]);
 
@@ -173,6 +183,7 @@ export function MissionPage({
           }}
         />
       )}
+      <SocialOverlay content={content} caseData={caseData} caseRun={caseRun} />
       {caseRun.activeChat && <ChatOverlay content={content} caseData={caseData} caseRun={caseRun} run={run} />}
       {caseRun.pendingScope && (
         <ScopeOverlay content={content} caseData={caseData} nodeId={caseRun.pendingScope} dispatch={dispatch} />
@@ -276,6 +287,17 @@ function NodeInspector({
             );
           })}
         </div>
+      ) : node.kind === 'person' ? (
+        <NodeContextMenu
+          node={node.id}
+          label={node.label}
+          vulns={[]}
+          person
+          onScan={() => undefined}
+          onHypothesis={() => undefined}
+          onSocial={(id) => void useSocial.getState().open(caseRun.caseId, id)}
+          onClose={onClose}
+        />
       ) : npc ? (
         <Button
           type="button"
@@ -526,6 +548,97 @@ function ChatOverlay({
           type="button"
           onClick={() => {
             run(closeChat);
+          }}
+        >
+          {t.close}
+        </Button>
+      </div>
+    </Overlay>
+  );
+}
+
+function SocialOverlay({
+  content,
+  caseData,
+  caseRun,
+}: {
+  content: Content;
+  caseData: Case;
+  caseRun: GameState;
+}): ReactNode {
+  const openKey = useSocial((state) => state.openKey);
+  const chat = useSocial((state) => (openKey ? state.chats[openKey] : undefined));
+  const [draft, setDraft] = useState('');
+  const historyRef = useRef<HTMLDivElement | null>(null);
+  const messageCount = chat?.messages.length ?? 0;
+  useEffect(() => {
+    if (historyRef.current) historyRef.current.scrollTop = historyRef.current.scrollHeight;
+  }, [messageCount, chat?.pending]);
+
+  const node = caseData.nodes.find((item) => openKey === socialKey(caseRun.caseId, item.id));
+  if (!openKey || !node) return null;
+  const st = ru.social;
+  const nodeId = node.id;
+  const closed = !chat?.npcId || chat.verdict !== 'continue' || caseRun.phase !== 'playing';
+
+  function submit(): void {
+    if (!draft.trim()) return;
+    void useSocial.getState().send(content, caseRun.caseId, nodeId, draft);
+    setDraft('');
+  }
+
+  return (
+    <Overlay title={st.title(node.label)} tone={chat?.verdict === 'noticed' ? 'danger' : undefined}>
+      <p className="fine-print">{st.trust(chat?.trust ?? null)}</p>
+      <div className="chat__history" ref={historyRef} role="log">
+        {!chat && <p className="fine-print">{st.connecting}</p>}
+        {chat && chat.messages.length === 0 && <p className="fine-print">{st.empty}</p>}
+        {chat?.messages.map((message, index) => (
+          <p key={index} className={`chat__bubble chat__bubble--${message.from}`}>
+            {message.text}
+          </p>
+        ))}
+        {chat?.pending && <p className="fine-print">{st.typing}</p>}
+      </div>
+      {chat && chat.verdict !== 'continue' && (
+        <p className={chat.verdict === 'complete' ? 'inspector__ok' : 'inspector__warning'}>
+          {st.verdict[chat.verdict]}
+        </p>
+      )}
+      {!closed && (
+        <form
+          className="chat__form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            submit();
+          }}
+        >
+          <textarea
+            className="chat__input"
+            aria-label={st.placeholder}
+            placeholder={st.placeholder}
+            value={draft}
+            rows={2}
+            onChange={(event) => {
+              setDraft(event.target.value);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                submit();
+              }
+            }}
+          />
+          <Button type="submit" variant="primary" disabled={!draft.trim() || chat?.pending}>
+            {st.send}
+          </Button>
+        </form>
+      )}
+      <div className="form-actions">
+        <Button
+          type="button"
+          onClick={() => {
+            useSocial.getState().close();
           }}
         >
           {t.close}

@@ -12,6 +12,7 @@ import type { ReactNode } from 'react';
 import { useEffect, useMemo } from 'react';
 import type { Case, GameState } from '@zero-day/engine';
 import { ru } from '../../shared/ui/strings';
+import { socialKey, useSocial } from '../social';
 import { buildNetworkMap, type NetworkFlowNode, type NetworkMapNode, type SegmentFlowNode } from './model';
 import './network-map.css';
 import '@xyflow/react/dist/style.css';
@@ -42,13 +43,15 @@ export function NetworkMap({ caseData, gameState, onSelectNode, selectedNodeId }
     () => buildNetworkMap(caseData, gameState, selectedNodeId),
     [caseData, gameState, selectedNodeId],
   );
+  const chats = useSocial((state) => state.chats);
   const interactiveNodes = useMemo(
     () =>
       nodes.map((node) => {
         if (node.type !== 'network') return node;
-        return { ...node, data: { ...node.data, onSelect: onSelectNode } };
+        const unread = Boolean(chats[socialKey(gameState.caseId, node.id)]?.unread);
+        return { ...node, data: { ...node.data, onSelect: onSelectNode, unread } };
       }),
-    [nodes, onSelectNode],
+    [nodes, onSelectNode, chats, gameState.caseId],
   );
 
   return (
@@ -99,7 +102,7 @@ function AutoFit({ nodeCount }: { nodeCount: number }): null {
   return null;
 }
 
-type InteractiveNodeData = NetworkFlowNode['data'] & { onSelect: (nodeId: string) => void };
+type InteractiveNodeData = NetworkFlowNode['data'] & { onSelect: (nodeId: string) => void; unread: boolean };
 type InteractiveNode = Omit<NetworkFlowNode, 'data'> & { data: InteractiveNodeData };
 
 function NetworkNode({ data, id }: NodeProps<InteractiveNode>): ReactNode {
@@ -124,6 +127,9 @@ function NetworkNode({ data, id }: NodeProps<InteractiveNode>): ReactNode {
           {KIND_ICON[data.kind]}
         </span>
         <span className="network-map__node-label">{data.label}</span>
+        {data.unread ? (
+          <span className="network-map__node-unread" role="status" aria-label={ru.social.unread} />
+        ) : null}
         <span className="network-map__node-status">
           <span aria-hidden="true">{ALERT_ICON[data.alertLevel]}</span> {ru.networkMap.state[data.state]}
         </span>

@@ -26,6 +26,14 @@ Successful response uses `201 Created`:
 }
 ```
 
+## List NPCs
+
+```http
+GET /api/v1/npcs
+```
+
+Returns every `npc_id` from `chars/npc_ids.csv`: `{"npc_ids": ["emp1", "emp2"]}`.
+
 ## Send an NPC message
 
 `POST /dialogue` keeps the existing contract. It accepts only this JSON shape:
@@ -51,7 +59,7 @@ Unknown fields, missing fields, non-string values, and empty strings return `400
 
 The injection judge runs before NPC generation. It must return exactly `True` or `False`.
 
-Each active `(npc_id, uuid)` pair uses one SQLite-backed session. Its history and trust level survive restart. A verdict of `ended` or `noticed` clears the session.
+Each active `(npc_id, uuid)` pair uses one SQLite-backed session. Its history and trust level survive restart. A verdict of `ended`, `noticed`, or `complete` clears the session. `complete` means the NPC trusted the player and handed over personal data; it is accepted only at trust `70` or higher, otherwise it is downgraded to `continue`.
 
 The trust judge must return JSON with this form:
 

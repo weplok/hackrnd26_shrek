@@ -14,6 +14,7 @@ export {
   openChat,
   closeChat,
   present,
+  socialOutcome,
   confirmScope,
   wait,
   answerReport,

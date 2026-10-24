@@ -24,6 +24,7 @@ from .schemas import (
     DialogueRequest,
     DialogueResponse,
     HealthResponse,
+    NpcListResponse,
     SessionResponse,
     TelemetryRequest,
     TelemetryResponse,
@@ -205,6 +206,10 @@ def create_app(settings: Settings | None = None, client: LlmClient | None = None
         )
         session = await get_anonymous_sessions().create()
         return SessionResponse(session_id=session.session_id, expires_at=session.expires_at)
+
+    @app.get("/api/v1/npcs", response_model=NpcListResponse)
+    async def list_npcs() -> NpcListResponse:
+        return NpcListResponse(npc_ids=CharacterRepository(get_settings().npc_ids_path).ids())
 
     @app.post("/dialogue", response_model=DialogueResponse)
     async def dialogue(payload: DialogueRequest, request: Request) -> DialogueResponse:

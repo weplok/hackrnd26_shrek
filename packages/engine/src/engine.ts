@@ -475,6 +475,32 @@ export function present(
   return s;
 }
 
+/** Applies the final verdict of an LLM social-engineering chat with a person node. */
+export function socialOutcome(
+  content: Content,
+  state: GameState,
+  nodeId: string,
+  verdict: 'ended' | 'noticed' | 'complete',
+): GameState {
+  const s = clone(state);
+  if (s.phase !== 'playing') return s;
+  const n = node(getCase(content, s), nodeId);
+  if (!n) return s;
+  s.socialActions += 1;
+  if (verdict === 'complete') {
+    s.socialSuccesses += 1;
+    compromise(content, s, n);
+  } else if (verdict === 'noticed') {
+    s.log.push({ t: `!! ${n.label} сообщил в службу безопасности.`, kind: 'bad' });
+    s.noise[n.id] = (s.noise[n.id] ?? 0) + 30;
+    s.tracks.alarm = clamp((s.tracks.alarm ?? 0) + 30);
+  } else {
+    s.log.push({ t: `${n.label} прервал диалог.`, kind: 'bad' });
+  }
+  recompute(content, s);
+  return s;
+}
+
 export function confirmScope(content: Content, state: GameState, go: boolean): GameState {
   const s = clone(state);
   const nodeId = s.pendingScope;

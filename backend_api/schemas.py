@@ -22,10 +22,17 @@ class DialogueRequest(BaseModel):
         return value
 
 
+JudgeVerdict = Literal["continue", "ended", "noticed", "complete"]
+
+
 class DialogueResponse(BaseModel):
     answer: str
-    verdict: Literal["continue", "ended", "noticed"]
+    verdict: JudgeVerdict
     trust_points: int
+
+
+class NpcListResponse(BaseModel):
+    npc_ids: list[str]
 
 
 class HealthResponse(BaseModel):
@@ -35,9 +42,6 @@ class HealthResponse(BaseModel):
 class SessionResponse(BaseModel):
     session_id: str
     expires_at: datetime
-
-
-JudgeVerdict = Literal["continue", "ended", "noticed"]
 
 
 class TrustVerdict(BaseModel):
