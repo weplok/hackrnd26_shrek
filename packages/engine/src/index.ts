@@ -22,5 +22,7 @@ export {
   profileStyle,
 } from './engine.ts';
 export { generatePuzzle, verifyPuzzle } from './puzzles.ts';
+export { apply, validate } from './commands.ts';
+export type { Command, GameEvent, RejectReason, StepResult } from './commands.ts';
 export { resolveNpcTurn } from './npc.ts';
 export { buildContent } from './load.ts';

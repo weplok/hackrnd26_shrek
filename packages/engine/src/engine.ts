@@ -6,6 +6,7 @@ import { generatePuzzle, verifyPuzzle } from './puzzles.ts';
 import { resolveNpcTurn } from './npc.ts';
 
 const NOISE: Record<string, number> = { quiet: 4, moderate: 9, loud: 16 };
+export const DEFAULT_FAIL_HINT = 'Узел не поддался: приём не подошёл.';
 
 function getCase(content: Content, s: GameState): Case {
   const c = content.cases[s.caseId];
@@ -155,7 +156,13 @@ export function scan(content: Content, state: GameState, nodeId: string): GameSt
     s.pendingScope = nodeId;
     return s;
   }
-  if (nodeRt(s, nodeId).scanned) return s;
+  if (nodeRt(s, nodeId).scanned) {
+    // FR-030: repeat scan yields nothing new but still makes noise
+    s.log.push({ t: `[scan] ${n.label}: нового нет, только шум.`, kind: 'bad' });
+    stepAlarm(s, n.scanNoise);
+    recompute(content, s);
+    return s;
+  }
   nodeRt(s, nodeId).scanned = true;
   s.scans += 1;
   s.techActions += 1;
@@ -239,7 +246,7 @@ export function submitPuzzle(content: Content, state: GameState, selected: strin
     compromise(content, s, n);
     stepAlarm(s, noise);
   } else {
-    const hint = n.failHints[inst.vuln] ?? 'Узел не поддался: приём не подошёл.';
+    const hint = n.failHints[inst.vuln] ?? DEFAULT_FAIL_HINT;
     s.log.push({ t: `✗ не та слабость. ${hint}`, kind: 'bad' });
     stepAlarm(s, s.difficulty.wrongGuessNoise);
   }
