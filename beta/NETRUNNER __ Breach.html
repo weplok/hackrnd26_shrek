@@ -1,0 +1,972 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>NETRUNNER // Breach</title>
+<meta name="description" content="Игра про этичного хакера: меню, прогрессия уровней от соседского Wi-Fi до городской инфраструктуры, награды и магазин апгрейдов.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" crossorigin></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.2/babel.min.js" crossorigin></script>
+<style>
+  :root{
+    --bg:#000000; --panel:#07140e; --panel2:#0b1f17; --line:#1b3b2c;
+    --green:#4a9a72; --green-bright:#7CFFB2; --green-dim:#2f5e47;
+    --white:#e8efe9; --mut:#8aa399; --mag:#E30B5C; --amber:#e8b047; --gold:#f5d76e;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--white);
+    font-family:'JetBrains Mono',ui-monospace,'Courier New',monospace;
+    -webkit-font-smoothing:antialiased;}
+  body{min-height:100vh;}
+  button{font-family:inherit;cursor:pointer;color:inherit}
+  button:disabled{cursor:not-allowed;opacity:.4}
+  input{font-family:inherit}
+  ::selection{background:var(--mag);color:#fff}
+  .scroll::-webkit-scrollbar{width:8px;height:8px}
+  .scroll::-webkit-scrollbar-thumb{background:var(--line)}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(124,255,178,.5)}50%{box-shadow:0 0 0 10px rgba(124,255,178,0)}}
+  @keyframes blink{50%{opacity:.25}}
+  @keyframes flicker{0%,100%{opacity:1}97%{opacity:1}98%{opacity:.5}}
+  @keyframes dash{to{stroke-dashoffset:-16}}
+  @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  #root{min-height:100vh}
+  #boot{padding:28px;color:#4a9a72;font-family:'JetBrains Mono',monospace;font-size:13px}
+  @media (max-width: 820px){
+    .topgrid{grid-template-columns:1fr !important}
+    .botgrid{grid-template-columns:1fr !important}
+    .lvlgrid{grid-template-columns:1fr !important}
+    .shopgrid{grid-template-columns:1fr !important}
+  }
+</style>
+</head>
+<body>
+<div id="root"><div id="boot">root@breach:~$ загрузка ядра…</div></div>
+<script type="text/babel" data-presets="react">
+const {useState, useMemo, useEffect, useRef} = React;
+
+/* ============================================================
+   NETRUNNER // Breach
+   Игра про этичного хакера (white-hat). Всё внутри — игровая
+   абстракция: очки, вероятности, состояние. Реального кода атак нет.
+   ============================================================ */
+
+const DEFENSES = {
+  FW:    {id:"FW",    name:"Файрвол",         short:"FW",    blurb:"Фильтрует пакеты на периметре. Пропускает только разрешённые сервисы."},
+  IDS:   {id:"IDS",   name:"СОВ (IDS/IPS)",   short:"IDS",   blurb:"Система обнаружения вторжений. Ловит аномальный и шумный трафик."},
+  CRYPT: {id:"CRYPT", name:"Шифрование",      short:"CRYPT", blurb:"Данные и каналы зашифрованы. Прямое чтение бесполезно."},
+  AUTH:  {id:"AUTH",  name:"Аутентификация",  short:"AUTH",  blurb:"Доступ закрыт учётными данными. Нужен валидный логин/пароль."},
+  PATCH: {id:"PATCH", name:"Актуальные патчи",short:"PATCH", blurb:"ПО обновлено, известных дыр нет. Техникой не пробить — только человек."},
+  EDR:   {id:"EDR",   name:"Антивирус / EDR", short:"EDR",   blurb:"Поведенческая защита узла. Палит известные payload'ы мгновенно."},
+};
+const DEF_ORDER = ["FW","IDS","CRYPT","AUTH","PATCH","EDR"];
+
+// price: null = нельзя купить (стартовый). Иначе стоимость в магазине.
+const TOOLS = [
+  { id:"scan", name:"Сканер портов", tag:"nmap", kind:"recon", noise:6, price:null,
+    desc:"Разведка узла: раскрывает тип защиты и даёт +15% к следующей атаке по этому узлу. Сам ничего не взламывает.", eff:{} },
+  { id:"exploit", name:"Эксплойт сервиса", tag:"exploit", kind:"attack", noise:16, price:null,
+    desc:"Бьёт по сервису, торчащему сквозь файрвол. Бесполезен против пропатченного ПО.",
+    eff:{FW:90, IDS:20, CRYPT:10, AUTH:15, PATCH:5, EDR:25} },
+  { id:"brute", name:"Брутфорс / словарь", tag:"brute", kind:"attack", noise:28, price:null,
+    desc:"Перебор учётных данных. Крошит слабую аутентификацию, но ОЧЕНЬ шумный.",
+    eff:{FW:10, IDS:15, CRYPT:15, AUTH:90, PATCH:10, EDR:10} },
+  { id:"phish", name:"Фишинг / соц.инженерия", tag:"social", kind:"attack", noise:9, price:null,
+    desc:"Обходит технику через человека. Единственный ключ к полностью пропатченным узлам.",
+    eff:{FW:20, IDS:10, CRYPT:15, AUTH:30, PATCH:90, EDR:20} },
+  { id:"evade", name:"Стелс-обход", tag:"evasion", kind:"attack", noise:8, price:120,
+    desc:"Фрагментация и маскировка трафика — проскакивает мимо СОВ.",
+    eff:{FW:20, IDS:90, CRYPT:10, AUTH:12, PATCH:12, EDR:40} },
+  { id:"crypto", name:"Криптоанализ", tag:"crypto", kind:"attack", noise:6, price:150,
+    desc:"Перехват ключей и анализ слабой криптографии. Долго и тихо. Ключ к зашифрованным узлам.",
+    eff:{FW:10, IDS:10, CRYPT:90, AUTH:25, PATCH:10, EDR:10} },
+  { id:"rootkit", name:"Руткит / обфускация", tag:"rootkit", kind:"attack", noise:-6, price:170,
+    desc:"Прячет присутствие и глушит EDR. Снижает трассировку при применении.",
+    eff:{FW:15, IDS:40, CRYPT:10, AUTH:10, PATCH:15, EDR:90} },
+  { id:"clean", name:"Чистка логов", tag:"wipe", kind:"utility", noise:-32, price:90,
+    desc:"Затирает следы и сбрасывает часть трассировки. Узел не взламывает — выигрывает время.", eff:{} },
+];
+const TOOL_BY_ID = Object.fromEntries(TOOLS.map(t => [t.id, t]));
+
+const LEVELS = [
+  {
+    id:"L1", name:"Сосед Петрович", place:"домашняя сеть", diff:1,
+    brief:"Сосед по площадке попросил «глянуть, не ломанут ли его». Заодно проверишь, легко ли попасть к нему на компьютер. Разминка: защиты видны, трассировка прощает ошибки.",
+    goal:"Получить доступ к ПК соседа",
+    traceBudget:100, passive:2, par:6, maxR:100, minR:30, step:12,
+    entry:"w0", target:"w3",
+    nodes:[
+      {id:"w0",label:"Твой ноут",kind:"gateway",x:10,y:50,def:"FW"},
+      {id:"w1",label:"Wi-Fi роутер",kind:"router",x:35,y:50,def:"AUTH"},
+      {id:"w2",label:"Смарт-ТВ",kind:"workstation",x:60,y:24,def:"PATCH"},
+      {id:"w3",label:"ПК соседа [ЦЕЛЬ]",kind:"target",x:78,y:62,def:"PATCH"},
+    ],
+    edges:[["w0","w1"],["w1","w2"],["w1","w3"]],
+  },
+  {
+    id:"L2", name:"Магазин «У дома»", place:"розничная точка", diff:2,
+    brief:"Владелец магазина боится, что уведут базу клиентов и кассу. Задача — добраться до БД продаж. Появляются файрвол и камеры с СОВ, часть узлов придётся разведывать.",
+    goal:"Скомпрометировать БД продаж",
+    traceBudget:100, passive:3, par:9, maxR:160, minR:50, step:12,
+    entry:"s0", target:"s5",
+    nodes:[
+      {id:"s0",label:"Гостевой Wi-Fi",kind:"gateway",x:8,y:50,def:"FW"},
+      {id:"s1",label:"Роутер магазина",kind:"router",x:26,y:28,def:"FW"},
+      {id:"s2",label:"IP-камеры",kind:"router",x:26,y:74,def:"IDS",hidden:true},
+      {id:"s3",label:"Касса / POS",kind:"server",x:50,y:34,def:"AUTH"},
+      {id:"s4",label:"Товароучёт",kind:"server",x:52,y:72,def:"PATCH",hidden:true},
+      {id:"s5",label:"БД продаж [ЦЕЛЬ]",kind:"target",x:82,y:50,def:"AUTH",hidden:true},
+    ],
+    edges:[["s0","s1"],["s0","s2"],["s1","s3"],["s2","s4"],["s3","s5"],["s4","s5"]],
+  },
+  {
+    id:"L3", name:"Региональная IT-компания", place:"корпоративная сеть", diff:3,
+    brief:"Аутсорс-компания заказала пентест домена. Домен-контроллер, EDR на серверах, шифрованный датацентр. Почти всё скрыто — без разведки легко нарваться. Пора докупать инструменты.",
+    goal:"Пробиться в датацентр",
+    traceBudget:100, passive:3, par:13, maxR:240, minR:80, step:12,
+    entry:"r0", target:"r7",
+    nodes:[
+      {id:"r0",label:"VPN-шлюз",kind:"gateway",x:7,y:50,def:"FW"},
+      {id:"r1",label:"Пограничный FW",kind:"router",x:22,y:24,def:"FW"},
+      {id:"r2",label:"IDS-сенсор",kind:"router",x:22,y:76,def:"IDS",hidden:true},
+      {id:"r3",label:"AD-контроллер",kind:"server",x:44,y:38,def:"AUTH",hidden:true},
+      {id:"r4",label:"Файлсервер (EDR)",kind:"server",x:44,y:72,def:"EDR"},
+      {id:"r5",label:"Web-сервер",kind:"server",x:64,y:22,def:"PATCH"},
+      {id:"r6",label:"Апп-сервер",kind:"server",x:66,y:58,def:"FW",hidden:true},
+      {id:"r7",label:"Датацентр [ЦЕЛЬ]",kind:"target",x:87,y:44,def:"CRYPT",hidden:true},
+    ],
+    edges:[["r0","r1"],["r0","r2"],["r1","r3"],["r2","r4"],["r3","r5"],["r3","r6"],["r4","r6"],["r5","r7"],["r6","r7"]],
+  },
+  {
+    id:"L4", name:"Городская инфраструктура", place:"муниципальная АСУ ТП", diff:4,
+    brief:"Финал. Муниципалитет проверяет готовность критической сети: СКАДА, резервные EDR, шифрошлюзы. Все шесть типов защиты, почти всё скрыто, трассировка беспощадна. Сюда идут только с прокачанным китом.",
+    goal:"Взять под контроль АСУ ТП",
+    traceBudget:100, passive:4, par:18, maxR:360, minR:120, step:14,
+    entry:"c0", target:"c10",
+    nodes:[
+      {id:"c0",label:"Внешний шлюз",kind:"gateway",x:6,y:50,def:"FW"},
+      {id:"c1",label:"DMZ-роутер",kind:"router",x:19,y:28,def:"FW"},
+      {id:"c2",label:"СОВ периметра",kind:"router",x:19,y:72,def:"IDS",hidden:true},
+      {id:"c3",label:"Прокси",kind:"server",x:34,y:50,def:"PATCH",hidden:true},
+      {id:"c4",label:"Сервер аутент.",kind:"server",x:49,y:24,def:"AUTH",hidden:true},
+      {id:"c5",label:"АРМ оператора",kind:"workstation",x:49,y:76,def:"EDR",hidden:true},
+      {id:"c6",label:"Шифр-шлюз",kind:"server",x:64,y:38,def:"CRYPT",hidden:true},
+      {id:"c7",label:"Сервер SCADA",kind:"server",x:64,y:66,def:"PATCH",hidden:true},
+      {id:"c8",label:"Резервный EDR",kind:"server",x:78,y:26,def:"EDR",hidden:true},
+      {id:"c9",label:"Ядро сети",kind:"server",x:78,y:70,def:"IDS",hidden:true},
+      {id:"c10",label:"АСУ ТП [ЦЕЛЬ]",kind:"target",x:92,y:48,def:"CRYPT",hidden:true},
+    ],
+    edges:[["c0","c1"],["c0","c2"],["c1","c3"],["c2","c3"],["c3","c4"],["c3","c5"],
+           ["c4","c6"],["c5","c7"],["c6","c8"],["c7","c9"],["c6","c9"],["c8","c10"],["c9","c10"]],
+  },
+];
+const LEVEL_IDX = Object.fromEntries(LEVELS.map((l,i) => [l.id, i]));
+
+function band(v){ return v>=80?"hi":v>=40?"mid":"lo"; }
+const BAND_COLOR = {hi:"var(--green-bright)",mid:"var(--amber)",lo:"var(--mag)"};
+function baseEff(tool, def){ return (tool.eff && tool.eff[def] != null) ? tool.eff[def] : 10; }
+const KIND_GLYPH = {gateway:"▣",router:"◇",server:"▤",workstation:"◻",db:"▦",target:"◉"};
+const COIN = "◈";
+
+/* ---------- профиль / сохранение ---------- */
+const MAX_UPG = 3, MAX_PERS = 5;
+function defaultProfile(nick){
+  return { nick:nick, coins:0, completed:{}, best:{},
+    owned:{scan:true,exploit:true,brute:true,phish:true},
+    upg:{}, pers:0, zeroStock:1 };
+}
+function loadSave(nick){ try{ const r=localStorage.getItem("breach_save_"+nick); return r?JSON.parse(r):null; }catch(e){ return null; } }
+function writeSave(p){ try{ localStorage.setItem("breach_save_"+p.nick, JSON.stringify(p)); localStorage.setItem("breach_lastnick", p.nick); }catch(e){} }
+function lastNick(){ try{ return localStorage.getItem("breach_lastnick")||""; }catch(e){ return ""; } }
+
+function noiseMult(pers){ return Math.max(0.4, 1 - 0.12*pers); }
+function effChance(tool, def, upg, recon){
+  let c = baseEff(tool, def) + 8*(upg||0);
+  if(recon) c += 15;
+  return Math.min(99, c);
+}
+function effNoise(tool, profile){
+  if(tool.noise <= 0) return tool.noise;
+  let n = tool.noise - 2*(profile.upg[tool.id]||0);
+  n = Math.round(n * noiseMult(profile.pers));
+  return Math.max(1, n);
+}
+function effPassive(level, profile){ return Math.max(1, level.passive - Math.floor(profile.pers/2)); }
+function rewardFor(level, turns, firstClear){
+  const over = Math.max(0, turns - level.par);
+  let c = Math.max(level.minR, level.maxR - over*level.step);
+  if(!firstClear) c = Math.round(c*0.5);
+  return c;
+}
+function levelUnlocked(idx, profile){
+  if(idx===0) return true;
+  return !!profile.completed[LEVELS[idx-1].id];
+}
+
+/* ============================================================
+   ROOT APP — маршрутизация экранов
+   ============================================================ */
+function App(){
+  const [screen,setScreen] = useState("menu"); // menu|intro|levels|shop|game|exit
+  const [profile,setProfile] = useState(null);
+  const [curLevel,setCurLevel] = useState(0);
+
+  useEffect(() => { if(profile) writeSave(profile); }, [profile]);
+
+  function startNew(nick){
+    setProfile(defaultProfile(nick));
+    setScreen("intro");
+  }
+  function continueGame(nick){
+    const s = loadSave(nick);
+    setProfile(s || defaultProfile(nick));
+    setScreen("levels");
+  }
+
+  if(screen==="menu") return <Menu onNew={startNew} onContinue={continueGame} onExit={()=>setScreen("exit")} />;
+  if(screen==="exit") return <ExitSplash onBack={()=>setScreen("menu")} />;
+  if(!profile) { setScreen("menu"); return null; }
+
+  if(screen==="intro") return <Intro onDone={()=>setScreen("levels")} />;
+  if(screen==="levels") return (
+    <LevelSelect profile={profile}
+      onPlay={(i)=>{ setCurLevel(i); setScreen("game"); }}
+      onShop={()=>setScreen("shop")}
+      onMenu={()=>setScreen("menu")} />
+  );
+  if(screen==="shop") return <Shop profile={profile} setProfile={setProfile} onBack={()=>setScreen("levels")} />;
+  if(screen==="game") return (
+    <Mission level={LEVELS[curLevel]} profile={profile} setProfile={setProfile}
+      onExit={()=>setScreen("levels")} onShop={()=>setScreen("shop")}
+      onNext={()=>{ if(curLevel<LEVELS.length-1){ setCurLevel(curLevel+1); } else { setScreen("levels"); } }} />
+  );
+  return null;
+}
+
+/* ---------- общие мелочи ---------- */
+function PanelTitle(props){
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",borderBottom:"1px solid var(--line)",background:"var(--panel2)"}}>
+      <span style={{width:9,height:9,background:"var(--mag)",borderRadius:"50%"}}/>
+      <span style={{width:9,height:9,background:"var(--amber)",borderRadius:"50%"}}/>
+      <span style={{width:9,height:9,background:"var(--green-bright)",borderRadius:"50%"}}/>
+      <span style={{fontSize:11,letterSpacing:2,color:"var(--mut)",marginLeft:4}}>{props.children}</span>
+    </div>
+  );
+}
+function Shell(props){
+  return (
+    <div style={{maxWidth:props.wide?1280:760,margin:"0 auto",padding:"24px 16px 60px",animation:"flicker 7s infinite"}}>
+      {props.children}
+    </div>
+  );
+}
+function btn(kind){
+  if(kind==="solid") return {background:"var(--green-bright)",color:"#05140d",border:"none",padding:"12px 22px",fontWeight:800,letterSpacing:1};
+  if(kind==="gold") return {background:"var(--gold)",color:"#1a1405",border:"none",padding:"12px 22px",fontWeight:800,letterSpacing:1};
+  return {background:"transparent",color:"var(--white)",border:"1px solid var(--line)",padding:"12px 22px",letterSpacing:1};
+}
+
+/* ============================================================
+   MENU
+   ============================================================ */
+function Menu(props){
+  const [nick,setNick] = useState(lastNick());
+  const trimmed = nick.trim();
+  const hasSave = trimmed ? !!loadSave(trimmed) : false;
+  return (
+    <Shell>
+      <div style={{textAlign:"center",marginTop:40,animation:"rise .5s"}}>
+        <div style={{fontSize:12,letterSpacing:4,color:"var(--green)"}}>root@breach:~$ ./netrunner --login</div>
+        <h1 style={{fontSize:56,fontWeight:800,letterSpacing:2,margin:"18px 0 4px"}}>
+          NETRUNNER<span style={{color:"var(--mag)"}}>_</span>Breach
+        </h1>
+        <div style={{color:"var(--mut)",fontSize:14}}>симулятор этичного хакера</div>
+      </div>
+
+      <div style={{maxWidth:420,margin:"40px auto 0",background:"var(--panel)",border:"1px solid var(--line)"}}>
+        <PanelTitle>ВХОД ОПЕРАТОРА</PanelTitle>
+        <div style={{padding:22}}>
+          <label style={{fontSize:11,letterSpacing:2,color:"var(--mut)"}}>НИКНЕЙМ <span style={{color:"var(--green-dim)"}}>(для сохранения прогресса)</span></label>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8,border:"1px solid var(--line)",background:"#000",padding:"10px 12px"}}>
+            <span style={{color:"var(--green)"}}>&gt;</span>
+            <input value={nick} maxLength={18} onChange={e=>setNick(e.target.value)} placeholder="ghost_in_shell"
+              style={{flex:1,background:"transparent",border:"none",outline:"none",color:"var(--white)",fontSize:16}} />
+            <span style={{animation:"blink 1s steps(1) infinite",color:"var(--green)"}}>&#9612;</span>
+          </div>
+
+          <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:20}}>
+            <button disabled={!trimmed} onClick={()=>{ if(hasSave){ if(confirm("Для «"+trimmed+"» есть сохранение. Начать заново — перезапишет прогресс.")) props.onNew(trimmed); } else props.onNew(trimmed); }}
+              style={Object.assign({},btn("solid"),{width:"100%"})}>НОВАЯ ИГРА</button>
+            <button disabled={!hasSave} onClick={()=>props.onContinue(trimmed)}
+              style={Object.assign({},btn("ghost"),{width:"100%"})}>
+              ПРОДОЛЖИТЬ {hasSave?"":"— нет сохранения"}
+            </button>
+            <button onClick={props.onExit} style={Object.assign({},btn("ghost"),{width:"100%",color:"var(--mut)",borderColor:"var(--line)"})}>ВЫХОД</button>
+          </div>
+          <div style={{fontSize:10.5,color:"var(--green-dim)",marginTop:16,lineHeight:1.5}}>
+            Прогресс хранится в этом браузере. Кросс-девайс сохранение — через серверную БД (следующий шаг).
+          </div>
+        </div>
+      </div>
+    </Shell>
+  );
+}
+
+function ExitSplash(props){
+  useEffect(()=>{ try{ window.close(); }catch(e){} },[]);
+  return (
+    <Shell>
+      <div style={{textAlign:"center",marginTop:120,animation:"rise .5s"}}>
+        <div style={{color:"var(--green)",fontSize:14}}>root@breach:~$ logout</div>
+        <h2 style={{fontSize:30,fontWeight:800,margin:"16px 0"}}>сессия завершена</h2>
+        <p style={{color:"var(--mut)",fontSize:13,lineHeight:1.6,maxWidth:420,margin:"0 auto 24px"}}>
+          Можно закрыть вкладку. Прогресс сохранён — вернёшься под тем же ником.
+        </p>
+        <button onClick={props.onBack} style={btn("ghost")}>&#8592; вернуться в меню</button>
+      </div>
+    </Shell>
+  );
+}
+
+/* ============================================================
+   INTRO — брифинг «белой шляпы»
+   ============================================================ */
+function Intro(props){
+  const lines = [
+    {c:"var(--green)",   t:"> инициализация профиля…"},
+    {c:"var(--white)",   t:"Ты — пентестер. «Белая шляпа» (white-hat)."},
+    {c:"var(--mut)",     t:"Компании и люди сами нанимают тебя, чтобы ты попробовал взломать их сеть РАНЬШЕ настоящих злоумышленников — и указал, где дыры."},
+    {c:"var(--white)",   t:"Каждый узел сети прикрыт своим типом защиты."},
+    {c:"var(--mut)",     t:"У каждого инструмента есть защита, против которой он силён, и те, против которых он почти бесполезен. Веди разведку, подбирай связку, запоминай что работает."},
+    {c:"var(--mag)",     t:"Любое действие поднимает ТРАССИРОВКУ. Дойдёт до 100% — тебя запеленгуют, задание провалено."},
+    {c:"var(--white)",   t:"За быстрые и чистые проходы платят монеты."},
+    {c:"var(--mut)",     t:"Монеты — в магазин: новые инструменты, апгрейд старых, прокачка собственной скрытности."},
+    {c:"var(--green-bright)", t:"> готов. добро пожаловать в профессию, оператор."},
+  ];
+  const [n,setN] = useState(0);
+  useEffect(()=>{ if(n<lines.length){ const id=setTimeout(()=>setN(n+1), n===0?250:650); return ()=>clearTimeout(id);} },[n]);
+  return (
+    <Shell>
+      <div style={{background:"var(--panel)",border:"1px solid var(--line)",marginTop:20}}>
+        <PanelTitle>БРИФИНГ</PanelTitle>
+        <div style={{padding:"22px 22px 8px",minHeight:300}}>
+          {lines.slice(0,n).map((l,i)=>(
+            <p key={i} style={{color:l.c,fontSize:15,lineHeight:1.65,margin:"0 0 14px",animation:"rise .35s"}}>{l.t}</p>
+          ))}
+          {n<lines.length && <span style={{color:"var(--green)",animation:"blink 1s steps(1) infinite"}}>&#9612;</span>}
+        </div>
+        <div style={{padding:"8px 22px 22px"}}>
+          <button onClick={props.onDone} disabled={n<lines.length}
+            style={Object.assign({},btn("solid"))}>К заданиям &#8594;</button>
+          {n<lines.length && <button onClick={()=>setN(lines.length)} style={Object.assign({},btn("ghost"),{marginLeft:10})}>пропустить</button>}
+        </div>
+      </div>
+    </Shell>
+  );
+}
+
+/* ============================================================
+   TOPBAR (для levels / shop)
+   ============================================================ */
+function TopBar(props){
+  const p = props.profile;
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap",borderBottom:"1px solid var(--line)",paddingBottom:14}}>
+      <span style={{fontSize:13,color:"var(--green)"}}>root@breach:~$</span>
+      <span style={{fontWeight:800,fontSize:16}}>{p.nick}</span>
+      <span style={{color:"var(--gold)",fontWeight:800,fontSize:16}}>{COIN} {p.coins}</span>
+      <div style={{marginLeft:"auto",display:"flex",gap:8}}>
+        {props.onShop && <button onClick={props.onShop} style={Object.assign({},btn("ghost"),{padding:"8px 16px",fontSize:12})}>&#128179; МАГАЗИН</button>}
+        {props.onLevels && <button onClick={props.onLevels} style={Object.assign({},btn("ghost"),{padding:"8px 16px",fontSize:12})}>&#9632; ЗАДАНИЯ</button>}
+        {props.onMenu && <button onClick={props.onMenu} style={Object.assign({},btn("ghost"),{padding:"8px 16px",fontSize:12,color:"var(--mut)"})}>МЕНЮ</button>}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   LEVEL SELECT
+   ============================================================ */
+function LevelSelect(props){
+  const p = props.profile;
+  const DIFF = {1:"★☆☆☆",2:"★★☆☆",3:"★★★☆",4:"★★★★"};
+  return (
+    <Shell wide>
+      <TopBar profile={p} onShop={props.onShop} onMenu={props.onMenu} />
+      <h2 style={{fontSize:24,fontWeight:800,margin:"18px 0 4px"}}>Выбор задания</h2>
+      <p style={{color:"var(--mut)",fontSize:13,margin:"0 0 18px"}}>Сложность растёт — заходи в магазин между контрактами.</p>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}} className="lvlgrid">
+        {LEVELS.map((lv,i)=>{
+          const unlocked = levelUnlocked(i, p);
+          const done = !!p.completed[lv.id];
+          const best = p.best[lv.id];
+          return (
+            <div key={lv.id} style={{background:"var(--panel)",border:"1px solid "+(done?"var(--green)":"var(--line)"),
+              opacity:unlocked?1:.5,display:"flex",flexDirection:"column"}}>
+              <div style={{padding:"14px 16px",borderBottom:"1px solid var(--line)",background:"var(--panel2)",
+                display:"flex",alignItems:"center",gap:10}}>
+                <span style={{fontSize:11,color:"var(--mut)",letterSpacing:2}}>{lv.id}</span>
+                <span style={{fontWeight:800,fontSize:16}}>{lv.name}</span>
+                <span style={{marginLeft:"auto",color:"var(--amber)",fontSize:13,letterSpacing:1}}>{DIFF[lv.diff]}</span>
+              </div>
+              <div style={{padding:"14px 16px",flex:1,display:"flex",flexDirection:"column",gap:10}}>
+                <div style={{fontSize:11,color:"var(--green)",letterSpacing:1}}>{lv.place}</div>
+                <p style={{fontSize:12.5,color:"var(--mut)",lineHeight:1.5,margin:0,minHeight:58}}>{lv.brief.replace("小","")}</p>
+                <div style={{fontSize:12,color:"var(--white)"}}><span style={{color:"var(--mag)"}}>◉</span> {lv.goal}</div>
+                <div style={{display:"flex",gap:14,fontSize:11,color:"var(--mut)",flexWrap:"wrap"}}>
+                  <span style={{color:"var(--gold)"}}>{COIN} до {lv.maxR} (за ≤{lv.par} ходов)</span>
+                  {done && <span style={{color:"var(--green-bright)"}}>✓ пройдено · рекорд {best} ход.</span>}
+                </div>
+                <div style={{marginTop:"auto",paddingTop:6}}>
+                  {unlocked
+                    ? <button onClick={()=>props.onPlay(i)} style={Object.assign({},btn(done?"ghost":"solid"),{width:"100%",padding:"10px"})}>
+                        {done?"пройти снова (×0.5 награда)":"НАЧАТЬ КОНТРАКТ →"}</button>
+                    : <div style={{textAlign:"center",color:"var(--mut)",fontSize:12,padding:"10px",border:"1px dashed var(--line)"}}>
+                        &#128274; пройди {LEVELS[i-1].name}</div>}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Shell>
+  );
+}
+
+/* ============================================================
+   SHOP
+   ============================================================ */
+function Shop(props){
+  const p = props.profile;
+  const [msg,setMsg] = useState("");
+  function spend(cost, apply){
+    if(p.coins < cost){ setMsg("Недостаточно монет."); return; }
+    const np = JSON.parse(JSON.stringify(p));
+    np.coins -= cost;
+    apply(np);
+    props.setProfile(np);
+    setMsg("");
+  }
+  const buyTools = TOOLS.filter(t=>t.price!=null && !p.owned[t.id]);
+  const ownedAttack = TOOLS.filter(t=>p.owned[t.id] && t.kind==="attack");
+
+  return (
+    <Shell wide>
+      <TopBar profile={p} onLevels={props.onBack} />
+      <h2 style={{fontSize:24,fontWeight:800,margin:"18px 0 4px"}}>Магазин</h2>
+      <p style={{color:"var(--mut)",fontSize:13,margin:"0 0 6px"}}>Монеты зарабатываются за быстрые и чистые проходы.</p>
+      {msg && <div style={{color:"var(--mag)",fontSize:13,margin:"0 0 10px"}}>{msg}</div>}
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginTop:10}} className="shopgrid">
+
+        {/* Новые инструменты */}
+        <ShopCard title="НОВЫЕ ИНСТРУМЕНТЫ">
+          {buyTools.length===0 && <Empty>Все инструменты куплены.</Empty>}
+          {buyTools.map(t=>(
+            <Row key={t.id} title={t.name} tag={t.tag} desc={t.desc}
+              price={t.price} coins={p.coins}
+              onBuy={()=>spend(t.price, np=>{ np.owned[t.id]=true; })} />
+          ))}
+        </ShopCard>
+
+        {/* Личная защита */}
+        <ShopCard title="ЛИЧНАЯ СКРЫТНОСТЬ">
+          <div style={{padding:"10px 14px",fontSize:12,color:"var(--mut)",lineHeight:1.5,borderBottom:"1px solid var(--line)"}}>
+            Снижает шум от всех действий и пассивный рост трассировки.
+            Текущий уровень: <b style={{color:"var(--green-bright)"}}>{p.pers}/{MAX_PERS}</b> → шум ×{noiseMult(p.pers).toFixed(2)}, пассив −{Math.floor(p.pers/2)}.
+          </div>
+          {p.pers>=MAX_PERS
+            ? <Empty>Максимальный уровень скрытности.</Empty>
+            : <Row title={"Стелс-профиль ур."+(p.pers+1)} tag="stealth"
+                desc={"Шум всех действий ×"+noiseMult(p.pers+1).toFixed(2)+", пассив −"+Math.floor((p.pers+1)/2)+"."}
+                price={100*(p.pers+1)} coins={p.coins}
+                onBuy={()=>spend(100*(p.pers+1), np=>{ np.pers+=1; })} />}
+          <div style={{padding:"10px 14px",borderTop:"1px solid var(--line)"}}>
+            <Row title="Заряд 0-day" tag="0day"
+              desc={"Универсальная отмычка на любой узел. В запасе: "+p.zeroStock+". Тратится при использовании."}
+              price={110} coins={p.coins}
+              onBuy={()=>spend(110, np=>{ np.zeroStock+=1; })} />
+          </div>
+        </ShopCard>
+
+        {/* Апгрейд инструментов */}
+        <ShopCard title="АПГРЕЙД ИНСТРУМЕНТОВ" span>
+          <div style={{padding:"10px 14px",fontSize:12,color:"var(--mut)",borderBottom:"1px solid var(--line)"}}>
+            Каждый уровень: +8% к эффективности и −2 к шуму инструмента.
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0}}>
+            {ownedAttack.map((t,idx)=>{
+              const lvl = p.upg[t.id]||0;
+              const cost = 80*(lvl+1);
+              const maxed = lvl>=MAX_UPG;
+              return (
+                <div key={t.id} style={{padding:"12px 14px",borderTop:"1px solid var(--line)",
+                  borderRight:idx%2===0?"1px solid var(--line)":"none",display:"flex",alignItems:"center",gap:10}}>
+                  <span style={{fontSize:10,color:"var(--green)",border:"1px solid var(--line)",padding:"2px 5px",minWidth:52,textAlign:"center"}}>{t.tag}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:12.5,fontWeight:700}}>{t.name}</div>
+                    <div style={{fontSize:11,color:"var(--mut)"}}>ур. {lvl}/{MAX_UPG}</div>
+                  </div>
+                  {maxed
+                    ? <span style={{fontSize:11,color:"var(--green-bright)"}}>MAX</span>
+                    : <button onClick={()=>spend(cost, np=>{ np.upg[t.id]=(np.upg[t.id]||0)+1; })}
+                        disabled={p.coins<cost}
+                        style={Object.assign({},btn("gold"),{padding:"7px 12px",fontSize:12})}>{COIN}{cost}</button>}
+                </div>
+              );
+            })}
+          </div>
+        </ShopCard>
+      </div>
+    </Shell>
+  );
+}
+function ShopCard(props){
+  return (
+    <div style={{background:"var(--panel)",border:"1px solid var(--line)",gridColumn:props.span?"1 / -1":"auto"}}>
+      <PanelTitle>{props.title}</PanelTitle>
+      <div>{props.children}</div>
+    </div>
+  );
+}
+function Empty(props){ return <div style={{padding:"18px 14px",color:"var(--mut)",fontSize:12.5}}>{props.children}</div>; }
+function Row(props){
+  const afford = props.coins>=props.price;
+  return (
+    <div style={{padding:"12px 14px",borderTop:"1px solid var(--line)",display:"flex",alignItems:"center",gap:12}}>
+      <span style={{fontSize:10,color:"var(--green)",border:"1px solid var(--line)",padding:"2px 5px",minWidth:52,textAlign:"center"}}>{props.tag}</span>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontSize:13,fontWeight:700}}>{props.title}</div>
+        <div style={{fontSize:11,color:"var(--mut)",lineHeight:1.45,marginTop:2}}>{props.desc}</div>
+      </div>
+      <button onClick={props.onBuy} disabled={!afford}
+        style={Object.assign({},btn("gold"),{padding:"8px 14px",fontSize:12,whiteSpace:"nowrap"})}>{COIN}{props.price}</button>
+    </div>
+  );
+}
+
+/* ============================================================
+   MISSION — собственно взлом
+   ============================================================ */
+function Mission(props){
+  const level = props.level, profile = props.profile, setProfile = props.setProfile;
+  const [nodes,setNodes] = useState({});
+  const [trace,setTrace] = useState(0);
+  const [turns,setTurns] = useState(0);
+  const [selected,setSelected] = useState(null);
+  const [log,setLog] = useState([]);
+  const [discovered,setDiscovered] = useState({});
+  const [status,setStatus] = useState("brief"); // brief|play|win|lose
+  const [reward,setReward] = useState(0);
+  const logRef = useRef(null);
+
+  function reset(){
+    const map = {};
+    level.nodes.forEach(n => { map[n.id] = { compromised:n.id===level.entry, hidden:!!n.hidden && n.id!==level.entry, recon:false }; });
+    const en = level.nodes.find(n=>n.id===level.entry), tg = level.nodes.find(n=>n.id===level.target);
+    setNodes(map); setTrace(0); setTurns(0); setSelected(null); setStatus("brief"); setReward(0);
+    setLog([
+      {t:"> контракт: "+level.name+" ("+level.place+")",k:"sys"},
+      {t:"> точка входа ["+(en?en.label:"")+"] под контролем",k:"ok"},
+      {t:"> цель: "+level.goal,k:"sys"},
+    ]);
+  }
+  useEffect(()=>{ reset(); }, [level]);
+  useEffect(()=>{ if(logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; }, [log]);
+
+  const nodeById = useMemo(()=>Object.fromEntries(level.nodes.map(n=>[n.id,n])), [level]);
+  const reachable = useMemo(()=>{
+    const r = new Set();
+    for(const e of level.edges){
+      const a=e[0],b=e[1];
+      if(nodes[a]&&nodes[a].compromised && !(nodes[b]&&nodes[b].compromised)) r.add(b);
+      if(nodes[b]&&nodes[b].compromised && !(nodes[a]&&nodes[a].compromised)) r.add(a);
+    }
+    return r;
+  }, [nodes, level]);
+
+  const ownedTools = TOOLS.filter(t=>profile.owned[t.id]);
+  function pushLog(t,k){ setLog(l=>l.concat([{t,k}]).slice(-80)); }
+  function endTurnTrace(extra){
+    setTrace(prev=>{
+      const nv = Math.max(0, Math.min(100, prev + extra + effPassive(level,profile)));
+      if(nv>=100){ setStatus("lose"); pushLog("!! ТРАССИРОВКА 100% — вас запеленговали.","bad"); }
+      return nv;
+    });
+    setTurns(t=>t+1);
+  }
+
+  function useTool(toolId){
+    if(status!=="play" || !selected) return;
+    const tool = TOOL_BY_ID[toolId];
+    const nd = nodes[selected], meta = nodeById[selected];
+    if(!nd || nd.compromised) return;
+    if(toolId==="zero" ? false : !profile.owned[toolId]) return;
+
+    if(tool.kind==="recon"){
+      setNodes(m=>Object.assign({},m,{[selected]:Object.assign({},m[selected],{hidden:false,recon:true})}));
+      pushLog("[scan] "+meta.label+": защита = "+DEFENSES[meta.def].name+". +15% к след. атаке.","ok");
+      endTurnTrace(effNoise(tool,profile)); return;
+    }
+    if(tool.kind==="utility"){
+      pushLog("[wipe] следы затёрты, трассировка снижена.","ok");
+      endTurnTrace(effNoise(tool,profile)); return;
+    }
+
+    const chance = effChance(tool, meta.def, profile.upg[tool.id], nd.recon);
+    setDiscovered(d=>Object.assign({},d,{[tool.id+":"+meta.def]:baseEff(tool,meta.def)}));
+    const roll = Math.random()*100;
+    const defName = nd.hidden ? "???" : DEFENSES[meta.def].name;
+    pushLog("$ "+tool.tag+" --target "+meta.label+"  (защита: "+defName+", шанс "+chance+"%)","cmd");
+    if(roll < chance){
+      setNodes(m=>Object.assign({},m,{[selected]:Object.assign({},m[selected],{compromised:true,hidden:false})}));
+      pushLog("  ✓ УЗЕЛ ВЗЛОМАН: "+meta.label,"ok");
+      endTurnTrace(effNoise(tool,profile));
+      if(selected===level.target) setTimeout(()=>finishWin(), 60);
+    } else {
+      pushLog("  ✗ отбито защитой. Поднят шум.","bad");
+      setNodes(m=>Object.assign({},m,{[selected]:Object.assign({},m[selected],{hidden:false})}));
+      endTurnTrace(effNoise(tool,profile)+12);
+    }
+  }
+
+  function useZero(){
+    if(status!=="play" || !selected) return;
+    if(profile.zeroStock<=0){ pushLog("нет зарядов 0-day","bad"); return; }
+    const nd = nodes[selected], meta = nodeById[selected];
+    if(!nd || nd.compromised) return;
+    const z = TOOL_BY_ID["zero"] || {eff:{FW:62,IDS:60,CRYPT:55,AUTH:55,PATCH:68,EDR:55},noise:22,tag:"0day"};
+    // 0-day задаётся прямо здесь (не в owned)
+    const effMap = {FW:62,IDS:60,CRYPT:55,AUTH:55,PATCH:68,EDR:55};
+    let chance = (effMap[meta.def]||55) + (nd.recon?15:0);
+    chance = Math.min(99, chance);
+    setProfile(Object.assign({},profile,{zeroStock:profile.zeroStock-1}));
+    const roll = Math.random()*100;
+    pushLog("$ 0day --target "+meta.label+"  (шанс "+chance+"%, зарядов осталось "+(profile.zeroStock-1)+")","cmd");
+    if(roll<chance){
+      setNodes(m=>Object.assign({},m,{[selected]:Object.assign({},m[selected],{compromised:true,hidden:false})}));
+      pushLog("  ✓ 0-DAY СРАБОТАЛ: "+meta.label,"ok");
+      endTurnTrace(Math.max(1, Math.round(22*noiseMult(profile.pers))));
+      if(selected===level.target) setTimeout(()=>finishWin(),60);
+    } else {
+      pushLog("  ✗ 0-day не прошёл. Шум поднят.","bad");
+      setNodes(m=>Object.assign({},m,{[selected]:Object.assign({},m[selected],{hidden:false})}));
+      endTurnTrace(Math.max(1, Math.round(22*noiseMult(profile.pers)))+12);
+    }
+  }
+
+  function finishWin(){
+    setStatus("win");
+    setTurns(tn=>{
+      const firstClear = !profile.completed[level.id];
+      const coins = rewardFor(level, tn, firstClear);
+      setReward(coins);
+      const np = JSON.parse(JSON.stringify(profile));
+      np.coins += coins;
+      np.completed[level.id] = true;
+      if(!np.best[level.id] || tn < np.best[level.id]) np.best[level.id] = tn;
+      setProfile(np);
+      pushLog(">> ЦЕЛЬ ДОСТИГНУТА за "+tn+" ход. Награда: "+coins+" "+COIN,"win");
+      return tn;
+    });
+  }
+
+  const sel = selected ? nodeById[selected] : null;
+  const selState = selected ? nodes[selected] : null;
+  const traceColor = trace>=75?"var(--mag)":trace>=45?"var(--amber)":"var(--green-bright)";
+  const targetOwned = !!(nodes[level.target] && nodes[level.target].compromised);
+
+  return (
+    <div style={{maxWidth:1280,margin:"0 auto",padding:"18px 16px 60px",animation:"flicker 7s infinite"}}>
+      {/* шапка миссии */}
+      <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",borderBottom:"1px solid var(--line)",paddingBottom:12}}>
+        <span style={{fontSize:13,color:"var(--green)"}}>root@breach:~$</span>
+        <span style={{fontWeight:800,fontSize:16}}>{level.id} · {level.name}</span>
+        <span style={{color:"var(--mut)",fontSize:12}}>{level.place}</span>
+        <div style={{marginLeft:"auto",display:"flex",gap:8,alignItems:"center"}}>
+          <span style={{color:"var(--gold)",fontWeight:800}}>{COIN} {profile.coins}</span>
+          <button onClick={props.onExit} style={Object.assign({},btn("ghost"),{padding:"7px 14px",fontSize:12})}>&#9632; задания</button>
+        </div>
+      </div>
+
+      <div style={{display:"flex",flexWrap:"wrap",gap:12,margin:"14px 0"}}>
+        <Metric label="ТРАССИРОВКА" value={trace+"%"} color={traceColor} bar={trace} barColor={traceColor} />
+        <Metric label="ХОДЫ" value={String(turns)} color={turns<=level.par?"var(--green-bright)":"var(--amber)"} sub={"цель ≤"+level.par} />
+        <Metric label="0-DAY" value={String(profile.zeroStock)} color={profile.zeroStock>0?"var(--green-bright)":"var(--mut)"} />
+        <Metric label="ЦЕЛЬ" value={targetOwned?"ВЗЛОМ":"ЗАКРЫТА"} color={targetOwned?"var(--green-bright)":"var(--mut)"} />
+        <button onClick={reset} style={{marginLeft:"auto",alignSelf:"center",background:"transparent",border:"1px solid var(--line)",color:"var(--mut)",padding:"8px 16px",fontSize:12,letterSpacing:1}}>&#8635; RESTART</button>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr",gap:16}}>
+        <div style={{display:"grid",gridTemplateColumns:"minmax(0,1.55fr) minmax(260px,1fr)",gap:16}} className="topgrid">
+          <Board level={level} nodes={nodes} reachable={reachable}
+                 selected={selected} setSelected={(id)=>{ if(status==="play") setSelected(id); }} />
+          <Inspector sel={sel} selState={selState} level={level} tools={ownedTools}
+                     profile={profile} onTool={useTool} onZero={useZero} status={status} />
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) minmax(0,1fr)",gap:16}} className="botgrid">
+          <Codex discovered={discovered} ownedIds={profile.owned} />
+          <div style={{background:"var(--panel)",border:"1px solid var(--line)"}}>
+            <PanelTitle>КОНСОЛЬ</PanelTitle>
+            <div ref={logRef} className="scroll" style={{height:230,overflowY:"auto",padding:"12px 14px",fontSize:12.5,lineHeight:1.7}}>
+              {log.map((l,i)=>(<div key={i} style={{color:logColor(l.k),whiteSpace:"pre-wrap"}}>{l.t}</div>))}
+              <div style={{color:"var(--green)"}}>root@breach:~$ <span style={{animation:"blink 1s steps(1) infinite"}}>&#9612;</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {status==="brief" && <BriefOverlay level={level} onStart={()=>setStatus("play")} onExit={props.onExit} />}
+      {(status==="win"||status==="lose") && (
+        <ResultOverlay status={status} level={level} turns={turns} reward={reward}
+          isLast={LEVEL_IDX[level.id]>=LEVELS.length-1}
+          onRetry={reset} onShop={props.onShop} onLevels={props.onExit} onNext={props.onNext} />
+      )}
+    </div>
+  );
+}
+
+function Metric(props){
+  return (
+    <div style={{background:"var(--panel)",border:"1px solid var(--line)",padding:"10px 16px",minWidth:120}}>
+      <div style={{fontSize:10,letterSpacing:2,color:"var(--mut)"}}>{props.label}</div>
+      <div style={{fontSize:22,fontWeight:800,color:props.color}}>{props.value}</div>
+      {props.sub && <div style={{fontSize:10,color:"var(--mut)"}}>{props.sub}</div>}
+      {typeof props.bar==="number" && (
+        <div style={{height:4,background:"var(--line)",marginTop:6}}>
+          <div style={{height:"100%",width:props.bar+"%",background:props.barColor,transition:"width .25s"}}/>
+        </div>
+      )}
+    </div>
+  );
+}
+function logColor(k){ return k==="ok"||k==="win"?"var(--green-bright)":k==="bad"?"var(--mag)":k==="cmd"?"var(--white)":"var(--green)"; }
+
+function Board(props){
+  const level=props.level, nodes=props.nodes, reachable=props.reachable, selected=props.selected, setSelected=props.setSelected;
+  return (
+    <div style={{background:"var(--panel)",border:"1px solid var(--line)"}}>
+      <PanelTitle>КАРТА СЕТИ</PanelTitle>
+      <div style={{position:"relative",width:"100%",aspectRatio:"16/9",
+        backgroundImage:"radial-gradient(circle at 1px 1px, rgba(27,59,44,.6) 1px, transparent 0)",backgroundSize:"28px 28px"}}>
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{position:"absolute",inset:0,width:"100%",height:"100%"}}>
+          {level.edges.map((e,i)=>{
+            const a=level.nodes.find(n=>n.id===e[0]), b=level.nodes.find(n=>n.id===e[1]);
+            const na=nodes[e[0]], nb=nodes[e[1]];
+            const active=(na&&na.compromised)||(nb&&nb.compromised);
+            const live=(na&&na.compromised&&reachable.has(e[1]))||(nb&&nb.compromised&&reachable.has(e[0]));
+            return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+              stroke={live?"var(--green-bright)":active?"var(--green)":"var(--line)"}
+              strokeWidth={live?0.7:0.5} vectorEffect="non-scaling-stroke"
+              strokeDasharray={live?"4 4":"0"} style={live?{animation:"dash .6s linear infinite"}:{}} />;
+          })}
+        </svg>
+        {level.nodes.map(n=>{
+          const st=nodes[n.id]||{}; const isReach=reachable.has(n.id); const isSel=selected===n.id; const isTarget=n.id===level.target;
+          let bg="var(--panel2)",bd="var(--line)",fg="var(--mut)";
+          if(st.compromised){ bg="#0c2a1d"; bd="var(--green-bright)"; fg="var(--green-bright)"; }
+          else if(isReach){ bd=isTarget?"var(--mag)":"var(--green)"; fg="var(--white)"; }
+          const canClick=st.compromised||isReach;
+          const statusText=st.compromised?"OWNED":(st.hidden?"[ ?? ]":(isReach?DEFENSES[n.def].short:"— — —"));
+          const statusColor=st.compromised?"var(--green)":(isReach?(st.hidden?"var(--amber)":"var(--mut)"):"var(--green-dim)");
+          return (
+            <button key={n.id} onClick={()=>canClick&&setSelected(n.id)} disabled={!canClick}
+              style={{position:"absolute",left:n.x+"%",top:n.y+"%",transform:"translate(-50%,-50%)",
+                background:bg,border:"2px solid "+bd,color:fg,padding:"7px 9px",minWidth:84,textAlign:"center",
+                outline:isSel?"2px solid var(--white)":"none",outlineOffset:2,
+                boxShadow:isSel?"0 0 18px rgba(232,239,233,.25)":"none",
+                animation:(isReach&&!st.compromised)?"pulse 1.8s infinite":"none"}}>
+              <div style={{fontSize:16,lineHeight:1,color:isTarget?"var(--mag)":fg}}>{KIND_GLYPH[n.kind]}</div>
+              <div style={{fontSize:10.5,marginTop:4,fontWeight:700,lineHeight:1.15,maxWidth:96}}>{n.label}</div>
+              <div style={{fontSize:9,marginTop:3,letterSpacing:1,color:statusColor}}>{statusText}</div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function Inspector(props){
+  const sel=props.sel, selState=props.selState, level=props.level, tools=props.tools, profile=props.profile;
+  const onTool=props.onTool, onZero=props.onZero, status=props.status;
+  if(!sel||!selState){
+    return (
+      <div style={{background:"var(--panel)",border:"1px solid var(--line)"}}>
+        <PanelTitle>УЗЕЛ</PanelTitle>
+        <div style={{padding:20,color:"var(--mut)",fontSize:13,lineHeight:1.7}}>
+          Выбери подсвеченный узел на карте.<br/><br/>
+          <span style={{color:"var(--green)"}}>&#9673;</span> пульсирует — доступен.<br/>
+          <span style={{color:"var(--green-bright)"}}>&#9635; OWNED</span> — под контролем.<br/>
+          <span style={{color:"var(--amber)"}}>[ ?? ]</span> — защита скрыта, нужен сканер.
+        </div>
+      </div>
+    );
+  }
+  const compromised=selState.compromised, hidden=selState.hidden, def=DEFENSES[sel.def];
+  return (
+    <div style={{background:"var(--panel)",border:"1px solid var(--line)",display:"flex",flexDirection:"column"}}>
+      <PanelTitle>{"УЗЕЛ // "+sel.id.toUpperCase()}</PanelTitle>
+      <div style={{padding:"14px 14px 6px"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:22,color:sel.id===level.target?"var(--mag)":"var(--green-bright)"}}>{KIND_GLYPH[sel.kind]}</span>
+          <div><div style={{fontWeight:800,fontSize:15}}>{sel.label}</div>
+            <div style={{fontSize:11,color:"var(--mut)"}}>{compromised?"статус: под контролем":"статус: цель"}</div></div>
+        </div>
+        <div style={{marginTop:12,padding:"10px 12px",background:"var(--panel2)",border:"1px solid var(--line)"}}>
+          <div style={{fontSize:10,letterSpacing:2,color:"var(--mut)"}}>ЗАЩИТА</div>
+          {compromised ? <div style={{color:"var(--green-bright)",fontWeight:700,marginTop:3}}>нейтрализована &#10003;</div>
+            : hidden ? <div style={{color:"var(--amber)",fontWeight:700,marginTop:3}}>скрыта — примени «Сканер портов»</div>
+            : (<React.Fragment>
+                <div style={{color:"var(--white)",fontWeight:700,marginTop:3}}>{def.name}</div>
+                <div style={{fontSize:11.5,color:"var(--mut)",marginTop:4,lineHeight:1.5}}>{def.blurb}</div>
+              </React.Fragment>)}
+          {selState.recon && !compromised && <div style={{fontSize:11,color:"var(--green-bright)",marginTop:6}}>+15% к атаке (разведано)</div>}
+        </div>
+      </div>
+      {!compromised ? (
+        <div style={{padding:"4px 14px 14px",display:"flex",flexDirection:"column",gap:7}}>
+          <div style={{fontSize:10,letterSpacing:2,color:"var(--mut)",margin:"6px 0 2px"}}>ИНСТРУМЕНТЫ</div>
+          {tools.map(t=>{
+            const disabled=status!=="play";
+            const tagColor=t.kind==="recon"?"var(--green-bright)":(t.kind==="utility"?"var(--amber)":"var(--green)");
+            const n=effNoise(t,profile); const up=profile.upg[t.id]||0;
+            return (
+              <button key={t.id} onClick={()=>onTool(t.id)} disabled={disabled} title={t.desc}
+                style={{textAlign:"left",background:"var(--panel2)",border:"1px solid var(--line)",padding:"8px 10px",display:"flex",alignItems:"center",gap:10}}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--green)";}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor="var(--line)";}}>
+                <span style={{fontSize:10,color:tagColor,border:"1px solid var(--line)",padding:"2px 5px",minWidth:52,textAlign:"center"}}>{t.tag}</span>
+                <span style={{flex:1}}><span style={{fontSize:12.5,fontWeight:700}}>{t.name}{up>0?(" +"+up):""}</span></span>
+                <span style={{fontSize:10,color:n<0?"var(--green-bright)":"var(--mut)"}}>{n<0?("шум "+n):("шум +"+n)}</span>
+              </button>
+            );
+          })}
+          <button onClick={onZero} disabled={status!=="play"||profile.zeroStock<=0} title="Универсальная отмычка, тратит заряд"
+            style={{textAlign:"left",background:"#1a0a14",border:"1px solid var(--mag)",padding:"8px 10px",display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:10,color:"var(--mag)",border:"1px solid var(--mag)",padding:"2px 5px",minWidth:52,textAlign:"center"}}>0day</span>
+            <span style={{flex:1}}><span style={{fontSize:12.5,fontWeight:700,color:"var(--mag)"}}>Эксплойт 0-day · {profile.zeroStock}</span></span>
+            <span style={{fontSize:10,color:"var(--mut)"}}>любая цель</span>
+          </button>
+        </div>
+      ) : (
+        <div style={{padding:"4px 14px 16px",color:"var(--green)",fontSize:12.5,lineHeight:1.6}}>
+          Узел захвачен. Соседние узлы доступны — ищи путь к цели.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Codex(props){
+  const discovered=props.discovered, ownedIds=props.ownedIds;
+  const attacks=TOOLS.filter(t=>t.kind==="attack");
+  return (
+    <div style={{background:"var(--panel)",border:"1px solid var(--line)"}}>
+      <PanelTitle>СПРАВОЧНИК — ЭФФЕКТИВНОСТЬ</PanelTitle>
+      <div className="scroll" style={{padding:"10px 12px",overflowX:"auto"}}>
+        <div style={{fontSize:11,color:"var(--mut)",marginBottom:8,lineHeight:1.5}}>
+          Связки раскрываются по мере применения. Серым — ещё не куплено.
+        </div>
+        <table style={{borderCollapse:"collapse",width:"100%",fontSize:11}}>
+          <thead><tr>
+            <th style={{textAlign:"left",padding:"4px 6px",color:"var(--mut)",fontWeight:400}}>инстр. &#9586; защита</th>
+            {DEF_ORDER.map(d=>(<th key={d} style={{padding:"4px 6px",color:"var(--white)",fontWeight:700,borderLeft:"1px solid var(--line)"}}>{DEFENSES[d].short}</th>))}
+          </tr></thead>
+          <tbody>
+            {attacks.map(t=>{
+              const owned=!!ownedIds[t.id];
+              return (
+                <tr key={t.id} style={{borderTop:"1px solid var(--line)",opacity:owned?1:.5}}>
+                  <td style={{padding:"5px 6px",color:owned?"var(--green)":"var(--mut)",whiteSpace:"nowrap"}}>{t.tag}{owned?"":" 🔒"}</td>
+                  {DEF_ORDER.map(d=>{
+                    const known=Object.prototype.hasOwnProperty.call(discovered,t.id+":"+d);
+                    const b=band(baseEff(t,d));
+                    const glyph=known?(b==="hi"?"███":(b==="mid"?"▓▓":"░")):"·";
+                    return <td key={d} style={{padding:"5px 6px",textAlign:"center",borderLeft:"1px solid var(--line)",color:known?BAND_COLOR[b]:"var(--green-dim)",fontWeight:known?700:400}}>{glyph}</td>;
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        <div style={{display:"flex",gap:14,marginTop:10,fontSize:10.5,flexWrap:"wrap"}}>
+          <span style={{color:"var(--green-bright)"}}>&#9608;&#9608;&#9608; высокая</span>
+          <span style={{color:"var(--amber)"}}>&#9619;&#9619; средняя</span>
+          <span style={{color:"var(--mag)"}}>&#9617; низкая</span>
+          <span style={{color:"var(--green-dim)"}}>&#183; неизвестно</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BriefOverlay(props){
+  const lv=props.level;
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.9)",display:"flex",alignItems:"center",justifyContent:"center",padding:20,zIndex:50}}>
+      <div style={{background:"var(--panel)",border:"2px solid var(--green)",maxWidth:520,width:"100%",animation:"rise .4s"}}>
+        <PanelTitle>{"КОНТРАКТ // "+lv.id}</PanelTitle>
+        <div style={{padding:"22px 24px"}}>
+          <h2 style={{margin:"0 0 4px",fontSize:24,fontWeight:800}}>{lv.name}</h2>
+          <div style={{fontSize:12,color:"var(--green)",letterSpacing:1,marginBottom:14}}>{lv.place}</div>
+          <p style={{color:"var(--mut)",fontSize:13.5,lineHeight:1.6,margin:"0 0 16px"}}>{lv.brief.replace("小","")}</p>
+          <div style={{background:"var(--panel2)",border:"1px solid var(--line)",padding:"12px 14px",fontSize:13}}>
+            <div><span style={{color:"var(--mag)"}}>◉ Цель:</span> {lv.goal}</div>
+            <div style={{color:"var(--mut)",marginTop:6}}>Награда до <b style={{color:"var(--gold)"}}>{COIN}{lv.maxR}</b> за ≤{lv.par} ходов (дальше — меньше).</div>
+          </div>
+          <div style={{display:"flex",gap:10,marginTop:20}}>
+            <button onClick={props.onStart} style={btn("solid")}>НАЧАТЬ ВЗЛОМ →</button>
+            <button onClick={props.onExit} style={btn("ghost")}>назад</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ResultOverlay(props){
+  const win=props.status==="win";
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",padding:20,zIndex:50}}>
+      <div style={{background:"var(--panel)",border:"2px solid "+(win?"var(--green-bright)":"var(--mag)"),maxWidth:470,width:"100%",padding:"28px 26px",textAlign:"center",animation:"rise .4s"}}>
+        <div style={{fontSize:13,letterSpacing:3,color:"var(--mut)"}}>{props.level.name}</div>
+        <h2 style={{margin:"10px 0 6px",fontSize:34,fontWeight:800,color:win?"var(--green-bright)":"var(--mag)"}}>{win?"ДОСТУП ПОЛУЧЕН":"ВАС ЗАСЕКЛИ"}</h2>
+        {win ? (
+          <React.Fragment>
+            <p style={{color:"var(--mut)",fontSize:13.5,lineHeight:1.6,margin:"0 0 10px"}}>Цель скомпрометирована за {props.turns} ход. Отчёт заказчику отправлен.</p>
+            <div style={{fontSize:30,fontWeight:800,color:"var(--gold)",margin:"6px 0 20px"}}>+{props.reward} {COIN}</div>
+            <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
+              <button onClick={props.onShop} style={btn("gold")}>&#128179; магазин</button>
+              {!props.isLast
+                ? <button onClick={props.onNext} style={btn("solid")}>следующий контракт →</button>
+                : <button onClick={props.onLevels} style={btn("solid")}>все контракты пройдены ✓</button>}
+              <button onClick={props.onLevels} style={btn("ghost")}>к заданиям</button>
+            </div>
+          </React.Fragment>
+        ) : (
+          <React.Fragment>
+            <p style={{color:"var(--mut)",fontSize:13.5,lineHeight:1.6,margin:"0 0 22px"}}>Трассировка достигла предела — защита запеленговала канал. Попробуй тише: разведка, стелс-инструменты, чистка логов.</p>
+            <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
+              <button onClick={props.onRetry} style={btn("solid")}>&#8635; заново</button>
+              <button onClick={props.onShop} style={btn("gold")}>&#128179; магазин</button>
+              <button onClick={props.onLevels} style={btn("ghost")}>к заданиям</button>
+            </div>
+          </React.Fragment>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const rootEl=document.getElementById("root");
+rootEl.innerHTML="";
+ReactDOM.createRoot(rootEl).render(<App/>);
+</script>
+</body>
+</html>
+
+</body></html>
