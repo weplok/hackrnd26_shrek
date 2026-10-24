@@ -10,3 +10,5 @@ paths = [
   '''^\.opencode/skills/''',
   '''^beta/''',
 ]
+# RFC 6455 sample nonce used in the README WebSocket check.
+regexes = ['''dGhlIHNhbXBsZSBub25jZQ==''']
