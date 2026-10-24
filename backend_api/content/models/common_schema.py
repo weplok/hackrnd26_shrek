@@ -296,6 +296,13 @@ class EffectCompleteObjective(BaseModel):
     completeObjective: Id
 
 
+class EffectCompromiseNode(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    compromiseNode: Id
+
+
 class Frequency(StrEnum):
     low = 'low'
     medium = 'medium'
@@ -335,6 +342,7 @@ class Effect(
         | EffectUnlockCodex
         | EffectFlipperSay
         | EffectCompleteObjective
+        | EffectCompromiseNode
     ]
 ):
     root: (
@@ -346,6 +354,7 @@ class Effect(
         | EffectUnlockCodex
         | EffectFlipperSay
         | EffectCompleteObjective
+        | EffectCompromiseNode
     ) = Field(..., description='One simple operation. Each object holds exactly one key.', title='Effect')
 
 

@@ -40,6 +40,7 @@ class Settings:
     rate_limit_window_seconds: int = 60
     session_rate_limit: int = 10
     dialogue_rate_limit: int = 20
+    telemetry_retention_days: int = 30
 
     def require_llm(self) -> None:
         values = {
@@ -78,6 +79,7 @@ class Settings:
             rate_limit_window_seconds=_positive_int("RATE_LIMIT_WINDOW_SECONDS", 60),
             session_rate_limit=_positive_int("SESSION_RATE_LIMIT", 10),
             dialogue_rate_limit=_positive_int("DIALOGUE_RATE_LIMIT", 20),
+            telemetry_retention_days=_positive_int("TELEMETRY_RETENTION_DAYS", 30),
         )
         if require_llm:
             settings.require_llm()

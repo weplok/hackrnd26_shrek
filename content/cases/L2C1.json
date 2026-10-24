@@ -374,7 +374,7 @@
             ]
           },
           "requires": {
-            "hasClue": "controller_tech"
+            "hasClue": "anton_vouch"
           },
           "knobs": {
             "attempts": 4,

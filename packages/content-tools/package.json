@@ -4,9 +4,11 @@
   "private": true,
   "type": "module",
   "devDependencies": {
+    "ajv": "8.17.1",
     "json-schema-to-typescript": "^16.0.0"
   },
   "scripts": {
+    "check": "node src/check.mjs",
     "codegen": "node src/codegen.mjs",
     "typecheck": "tsc --project tsconfig.json --noEmit"
   }
