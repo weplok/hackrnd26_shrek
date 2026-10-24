@@ -588,7 +588,7 @@ function SocialOverlay({
   }
 
   return (
-    <Overlay title={st.title(node.label)} tone={chat?.verdict === 'noticed' ? 'danger' : undefined}>
+    <Overlay title={st.title(node.label)} {...(chat?.verdict === 'noticed' ? { tone: 'danger' as const } : {})}>
       <p className="fine-print">{st.trust(chat?.trust ?? null)}</p>
       <div className="chat__history" ref={historyRef} role="log">
         {!chat && <p className="fine-print">{st.connecting}</p>}
