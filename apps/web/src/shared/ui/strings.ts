@@ -215,7 +215,7 @@ export const ru = {
     bruteRules: 'Крути барабаны и проверяй код. Верная цифра горит зелёным, у остальных подсказка. Попытки не ограничены.',
     bruteUp: (dial: number) => `Барабан ${String(dial)}: больше`,
     bruteDown: (dial: number) => `Барабан ${String(dial)}: меньше`,
-    bruteHint: { eq: '=', up: 'больше ▲', down: 'меньше ▼' },
+    bruteHint: { eq: '=', up: 'мало', down: 'много' },
     bruteTries: (count: number) => `Проверок: ${String(count)}.`,
     bruteOpen: 'Код подобран. Замок открыт.',
     bruteCheck: 'Проверить',
