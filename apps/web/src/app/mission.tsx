@@ -148,6 +148,7 @@ export function MissionPage({
             caseData={caseData}
             caseRun={caseRun}
             nodeId={selectedNodeId}
+            terminalOnly={levelIndex >= 2}
             dispatch={dispatch}
             run={run}
             onClose={() => {
@@ -166,7 +167,7 @@ export function MissionPage({
         <Journal caseRun={caseRun} />
       </div>
       <div className="mission__terminal">
-        <Terminal vulns={Object.values(content.vulnerabilities)} />
+        <Terminal vulns={Object.values(content.vulnerabilities)} caseData={caseData} />
       </div>
 
       <PuzzleHost />
@@ -228,6 +229,7 @@ function NodeInspector({
   caseData,
   caseRun,
   nodeId,
+  terminalOnly,
   dispatch,
   run,
   onClose,
@@ -236,6 +238,8 @@ function NodeInspector({
   caseData: Case;
   caseRun: GameState;
   nodeId: string | null;
+  /** From level 3 on, attacks are typed in the terminal. */
+  terminalOnly: boolean;
   dispatch: Dispatch;
   run: (fn: EngineFn) => void;
   onClose: () => void;
@@ -293,6 +297,7 @@ function NodeInspector({
           label={node.label}
           vulns={[]}
           person
+          terminalOnly={terminalOnly}
           onScan={() => undefined}
           onHypothesis={() => undefined}
           onSocial={(id) => void useSocial.getState().open(caseRun.caseId, id)}
@@ -315,6 +320,7 @@ function NodeInspector({
           label={node.label}
           vulns={Object.values(content.vulnerabilities)}
           nodeVulns={node.exploits?.map((exploit) => exploit.vuln)}
+          terminalOnly={terminalOnly}
           onScan={(id) => dispatch({ type: 'ScanNode', node: id })}
           onHypothesis={(id, vuln) => dispatch({ type: 'ProposeHypothesis', node: id, vuln })}
           onClose={onClose}

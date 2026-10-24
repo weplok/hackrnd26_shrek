@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { Vulnerability } from '@zero-day/engine';
-import { ATTACKS } from '../attack-log';
+import { ATTACKS, attackVuln, type AttackId } from '../attack-log';
+import { ATTACK_COMMANDS } from './parser';
 import { ru } from '../../shared/ui/strings';
 
 const t = ru.nodeMenu;
@@ -14,6 +15,8 @@ export interface NodeContextMenuProps {
   nodeVulns?: readonly string[];
   /** People expose social engineering and nothing else. */
   person?: boolean;
+  /** Buttons only teach the terminal command instead of running the action. */
+  terminalOnly?: boolean;
   onScan: (node: string) => void;
   onHypothesis: (node: string, vuln: string) => void;
   onSocial?: (node: string) => void;
@@ -27,15 +30,18 @@ export function NodeContextMenu({
   vulns,
   nodeVulns = [],
   person = false,
+  terminalOnly = false,
   onScan,
   onHypothesis,
   onSocial,
   onClose,
 }: NodeContextMenuProps): ReactNode {
-  const pick = (archetypes: readonly string[]): string | undefined => {
-    const matching = vulns.filter((vuln) => archetypes.includes(vuln.archetype));
-    return (matching.find((vuln) => nodeVulns.includes(vuln.id)) ?? matching[0])?.id;
+  const [hint, setHint] = useState('');
+  const teach = (command: string): boolean => {
+    if (terminalOnly) setHint(t.terminalHint(`${command} ${node}`));
+    return terminalOnly;
   };
+  const commandOf = (attack: AttackId): string => ATTACK_COMMANDS[attack];
 
   return (
     <div className="node-menu" role="group" aria-label={t.label(label)}>
@@ -47,7 +53,7 @@ export function NodeContextMenu({
               type="button"
               className="node-menu__item"
               onClick={() => {
-                onSocial?.(node);
+                if (!teach(commandOf('social'))) onSocial?.(node);
               }}
             >
               {t.attacks.social}
@@ -60,14 +66,14 @@ export function NodeContextMenu({
                 type="button"
                 className="node-menu__item"
                 onClick={() => {
-                  onScan(node);
+                  if (!teach('scan')) onScan(node);
                 }}
               >
                 {t.scan}
               </button>
             </li>
             {ATTACKS.filter((attack) => attack.id !== 'social').map((attack) => {
-              const vuln = pick(attack.archetypes);
+              const vuln = attackVuln(vulns, attack.id, nodeVulns);
               return (
                 <li key={attack.id}>
                   <button
@@ -75,7 +81,7 @@ export function NodeContextMenu({
                     className="node-menu__item"
                     disabled={!vuln}
                     onClick={() => {
-                      if (vuln) onHypothesis(node, vuln);
+                      if (vuln && !teach(commandOf(attack.id))) onHypothesis(node, vuln);
                     }}
                   >
                     {t.attacks[attack.id]}
@@ -91,6 +97,11 @@ export function NodeContextMenu({
           </button>
         </li>
       </ul>
+      {hint && (
+        <p className="node-menu__hint" role="status">
+          {hint}
+        </p>
+      )}
     </div>
   );
 }

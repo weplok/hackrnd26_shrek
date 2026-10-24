@@ -127,6 +127,7 @@ function NetworkNode({ data, id }: NodeProps<InteractiveNode>): ReactNode {
           {KIND_ICON[data.kind]}
         </span>
         <span className="network-map__node-label">{data.label}</span>
+        <span className="network-map__node-id">{id}</span>
         {data.unread ? (
           <span className="network-map__node-unread" role="status" aria-label={ru.social.unread} />
         ) : null}

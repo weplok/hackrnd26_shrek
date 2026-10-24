@@ -97,8 +97,10 @@ export const ru = {
     inputLabel: 'Команда',
     placeholder: 'help — список команд',
     help: [
-      '<узел> <СЛ-xx> — заявить гипотезу: применить слабость к узлу',
       'scan <узел> — сканировать узел',
+      'bruteforce | virus | ddos | inject <узел> — атаковать узел',
+      'social <узел> — социальная инженерия (только люди)',
+      '<узел> <СЛ-xx> — заявить гипотезу: применить слабость к узлу',
       'codex <СЛ-xx> — открыть карточку Кодекса',
       'Tab — автодополнение, ↑/↓ — история. SL-01 и СЛ-01 равнозначны.',
     ],
@@ -126,6 +128,8 @@ export const ru = {
       'scope-pending': 'Сначала реши, выходить ли за рамки договора.',
       'no-scope-pending': 'Нет вопроса о рамках договора.',
     },
+    notPerson: (node: string) => `${node} — не человек: социальная инженерия не сработает.`,
+    personOnlySocial: (node: string) => `${node} — человек: тут поможет только social ${node}.`,
     scanned: (node: string) => `Скан ${node}: готово.`,
     scanOpened: (node: string) => `Скан ${node}: радар запущен.`,
     rescanned: (node: string) => `Скан ${node}: нового нет, шум вырос.`,
@@ -181,6 +185,7 @@ export const ru = {
       injection: 'Инъекции',
     },
     close: 'Закрыть',
+    terminalHint: (command: string) => `Применить можно только из терминала внизу. Введите: ${command}`,
   },
   hud: {
     objectives: 'ЦЕЛИ',

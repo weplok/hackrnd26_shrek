@@ -128,6 +128,12 @@
   font: 1.125rem/1 var(--font-mono);
 }
 
+.network-map__node-id {
+  color: var(--color-green);
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+}
+
 .network-map__node-label {
   align-self: center;
   margin: 0.25rem 0;

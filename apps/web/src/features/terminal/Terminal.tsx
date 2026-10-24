@@ -1,6 +1,8 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import type { GameEvent, Vulnerability } from '@zero-day/engine';
+import type { Case, GameEvent, Vulnerability } from '@zero-day/engine';
+import { attackVuln } from '../attack-log';
 import { subscribeToGameEvents, useCaseStore } from '../game-session';
+import { useSocial } from '../social';
 import { ru } from '../../shared/ui/strings';
 import { complete, parseCommand, type ParseResult, type TerminalContext } from './parser';
 
@@ -9,6 +11,8 @@ const t = ru.terminal;
 export interface TerminalProps {
   /** Open weakness catalog for the current case. */
   vulns: readonly Vulnerability[];
+  /** Current case: attack commands need the node's kind and weaknesses. */
+  caseData?: Case;
   onCodex?: (vuln: string) => void;
 }
 
@@ -51,9 +55,10 @@ export function eventText(event: GameEvent): string | null {
   }
 }
 
-export function Terminal({ vulns, onCodex }: TerminalProps): ReactNode {
+export function Terminal({ vulns, caseData, onCodex }: TerminalProps): ReactNode {
   const inputId = useId();
   const nodes = useCaseStore((state) => state.caseRun?.nodes);
+  const caseId = useCaseStore((state) => state.caseRun?.caseId);
   const dispatch = useCaseStore((state) => state.dispatch);
   const [value, setValue] = useState('');
   const [lines, setLines] = useState<Line[]>([]);
@@ -100,6 +105,22 @@ export function Terminal({ vulns, onCodex }: TerminalProps): ReactNode {
         print('output', [t.codex(result.vuln, vulns.find((vuln) => vuln.id === result.vuln)?.title ?? '')]);
         onCodex?.(result.vuln);
         return;
+      case 'attack': {
+        const node = caseData?.nodes.find((item) => item.id === result.node);
+        const person = node?.kind === 'person';
+        if (result.attack === 'social') {
+          if (person && caseId) void useSocial.getState().open(caseId, result.node);
+          else print('error', [t.notPerson(result.node)]);
+          return;
+        }
+        const vuln = node && !person ? attackVuln(vulns, result.attack, node.exploits.map((e) => e.vuln)) : undefined;
+        if (!vuln) {
+          print('error', [person ? t.personOnlySocial(result.node) : t.rejected['not-exploitable']]);
+          return;
+        }
+        if (!dispatch({ type: 'ProposeHypothesis', node: result.node, vuln })) print('error', [t.rejected['not-playing']]);
+        return;
+      }
       case 'scan':
       case 'hypothesis': {
         const step = dispatch(
