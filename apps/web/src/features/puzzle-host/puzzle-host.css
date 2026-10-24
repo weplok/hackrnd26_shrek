@@ -179,7 +179,20 @@
   color: var(--color-text);
   background: #000;
 }
-.brute-lock__turn:hover { border-color: var(--color-green-bright); }
+.brute-lock__turn:hover,
+.brute-lock__turn--pressed { border-color: var(--color-green-bright); }
+.brute-lock__turn--pressed { background: rgb(124 255 178 / 18%); }
+.brute-lock__keys { display: none; }
+@media (hover: hover) and (pointer: fine) {
+  .brute-lock__keys {
+    display: block;
+    margin: 0;
+    color: var(--color-muted);
+    font: 0.75rem var(--font-mono);
+    text-align: center;
+  }
+  .brute-lock__dial--active .brute-lock__drum { outline: 1px dashed var(--color-green-bright); outline-offset: 2px; }
+}
 .brute-lock__drum {
   display: grid;
   width: 100%;
