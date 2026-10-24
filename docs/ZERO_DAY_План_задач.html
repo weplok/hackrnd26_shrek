@@ -119,15 +119,25 @@ const N = {
   D1:'Каталог СЛ (13) + карточки Кодекса', D2:'Кейс L2C1 «Колледж»', D3:'Реплики Флиппера + карты последствий', D4:'Кейс L1C1 «Сосед»',
   D4b:'Кейс L1C2 «Друг» + интерлюдия', D5:'Кейс L2C2 «Банк»', D6:'Кейсы L3C1, L3C2 + головоломки 10, 11', D7:'СЛ-10 и СЛ-11 без таймера',
   D8:'Арт: спрайт Флиппера, иллюстрации брифов',
+<<<<<<< HEAD
   E1:'FakeLlm, контрактные тесты адаптера и circuit breaker', E2:'Конвейер POST /dialogue — ядро реализовано, закрыть DoD', E3:'Бюджеты LLM, метрики, инциденты', E4:'LlmProvider на клиенте + fallback', E5:'Eval-набор NPC, golden-фикстуры',
   F1:'Домен дуэли + 5 верификаторов', F2:'Матчмейкинг, комнаты, WS', F3:'Клиент дуэли', F4:'MCP-сервер + бот', F5:'Воркер ИИ-игрока',
+=======
+  E1:'LlmClient + адаптер + FakeLlm', E2:'Конвейер POST /npc/turn', E3:'Бюджеты LLM, метрики, инциденты', E4:'LlmProvider на клиенте + fallback', E5:'Eval-набор NPC, golden-фикстуры',
+  F1:'Домен дуэли + 5 верификаторов + схема карт дуэли', F2:'Матчмейкинг, комнаты, WS', F3:'Клиент дуэли', F4:'MCP-сервер + бот', F5:'Воркер ИИ-игрока',
+>>>>>>> refs/remotes/origin/main
   G1:'Телеметрия', G2:'Prometheus + алерты', G3:'E2E Playwright', G4:'a11y, Lighthouse, size-limit', G5:'Нагрузочный тест k6',
   G6:'Плейтесты + отчёт', G7:'Презентация', G8:'Ответ жюри про вымышленный техслой'
 };
 const CRIT = new Set(['A1','A3','B1','B3','B5','C5','D4','B10','D2','G3','G7']);
 // Task status: keep in sync with docs/ZERO_DAY_Задачи.md.
+<<<<<<< HEAD
 const DONE = new Set([]);
 const WIP = { A1: 'misterEugene', A3: 'misterEugene', E2: 'ядро npc_api готово; нужны тесты и review' };
+=======
+const DONE = new Set(['A1', 'A3']);
+const WIP = { G8: 'misterEugene', D1: 'misterEugene' };
+>>>>>>> refs/remotes/origin/main
 // t(id, after, extra-name, continued)
 const t = (id, after, x, cont) => ({ id, after, x, cont });
 const c = (id, x) => t(id, '', x, true);
