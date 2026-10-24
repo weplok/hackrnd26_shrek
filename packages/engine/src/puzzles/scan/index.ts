@@ -1,26 +1,42 @@
-import { type PuzzleLogic, knob, mistakeNoise, options, strs, verifySet } from '../types.ts';
+import { nextInt, shuffle } from '../../rng.ts';
+import { type PuzzleLogic, strs, verifySet } from '../types.ts';
 
-const PHANTOMS = ['эхо: 138/udp', 'эхо: 445/tcp', 'эхо: 1900/udp', 'эхо: 8081/tcp', 'эхо: 31337/tcp'];
+const PHANTOMS = ['138/udp', '445/tcp', '1900/udp', '8081/tcp', '31337/tcp'];
+const SLOTS = [18, 50, 82];
+
+const port = (label: string): string => label.replace(/^эхо:\s*/, '');
 
 export const scan: PuzzleLogic = {
   archetype: 'scan',
-  generate(params, knobs, rng) {
-    const ports = strs(params, 'ports', ['эхо: 443/tcp', 'эхо: 53/udp']);
-    const falseEchoes = knob(knobs, 'falseEchoes', knobs.decoys ?? 2);
-    const [next, opts, correct] = options(rng, ports, PHANTOMS.slice(0, falseEchoes));
+  generate(params, _knobs, rng) {
+    const ports = strs(params, 'ports', ['443/tcp']).map(port);
+    let s = rng;
+    let r: number;
+    [s, r] = nextInt(s);
+    const good = ports[r % ports.length] ?? '443/tcp';
+    let phantoms: string[];
+    [s, phantoms] = shuffle(s, PHANTOMS.filter((p) => !ports.includes(p)));
+    let labels: string[];
+    [s, labels] = shuffle(s, [good, ...phantoms.slice(0, 2)]);
+    const opts = labels.map((label, i) => ({ id: `o${String(i)}`, label }));
+    const peaks = opts.map((o, i) => {
+      [s, r] = nextInt(s);
+      return { id: o.id, label: o.label, x: (SLOTS[i] ?? 50) + ((r % 9) - 4), height: 55 + (r % 40) };
+    });
     return [
-      next,
+      s,
       {
-        prompt: 'Пусти импульс и отметь устойчивые эхо-точки. Ложные вспышки затухнут после следующего хода.',
+        prompt: 'Наведи ползунок на пик сигнала и отправь. Только один порт отвечает по-настоящему.',
         options: opts,
-        multi: true,
+        multi: false,
         ordered: false,
-        correct,
-        view: { defense: params.defense ?? 'пассивный фильтр', fadeSteps: knob(knobs, 'fadeSteps', 1), target: params.target ?? '' },
+        correct: [opts[labels.indexOf(good)]?.id ?? ''],
+        view: { peaks, target: params.target ?? '' },
       },
     ];
   },
   verify: verifySet,
-  noise: mistakeNoise,
-  explainMismatch: () => 'Эхо не совпало с картой узла.',
+  // misses are free: the player retries until the right port; leaving the tool is what costs noise
+  noise: () => 0,
+  explainMismatch: () => 'Этот порт молчит. Попробуй другой пик.',
 };

@@ -38,9 +38,10 @@ void test('every tool is deterministic and solvable', () => {
 });
 
 void test('tool controls change generated views and decoy count', () => {
-  const scan = gen('scan', SAMPLES.scan ?? {}, { falseEchoes: 4, fadeSteps: 2 });
-  assert.equal(scan.options.length, 6);
-  assert.equal(scan.view.fadeSteps, 2);
+  const scan = gen('scan', SAMPLES.scan ?? {});
+  assert.equal(scan.options.length, 3);
+  assert.equal((scan.view.peaks as unknown[]).length, 3);
+  assert.equal(scan.correct.length, 1);
   const exploit = gen('exploit', SAMPLES.exploit ?? {}, { contourComplexity: 5 });
   assert.equal(exploit.view.contourComplexity, 5);
   const crypto = gen('crypto', SAMPLES.crypto ?? {}, { rotorCount: 2, hintCount: 3 });
@@ -77,4 +78,20 @@ void test('scan opens Radar Echo and only resolves node after a correct answer',
   state = E.hypothesize(content, state, 'wifi', 'SL-02');
   assert.equal(state.activePuzzle?.archetype, 'brute');
   assert.equal(state.activePuzzle?.attemptsLeft, 6);
+});
+
+void test('scan misses cost nothing and leaving the scan raises alarm', () => {
+  const difficulty = content.campaign.levels[0]?.difficulty;
+  if (!difficulty) throw new Error('no level 1');
+  const opened = E.scan(content, E.startCase(content, E.createGame(content, 'L1C1', difficulty, 5)), 'wifi');
+  const puzzle = opened.activePuzzle;
+  if (!puzzle) throw new Error('no scan puzzle');
+  const wrong = puzzle.options.find((option) => !puzzle.correct.includes(option.id))?.id ?? '';
+  const missed = E.submitPuzzle(content, opened, [wrong]);
+  assert.equal(missed.activePuzzle?.attemptsLeft, puzzle.attemptsLeft);
+  assert.deepEqual(missed.noise, opened.noise);
+  const left = E.cancelPuzzle(content, missed);
+  assert.equal(left.activePuzzle, null);
+  assert.ok((left.noise.wifi ?? 0) > (missed.noise.wifi ?? 0));
+  assert.equal(left.nodes.wifi?.scanned, false);
 });

@@ -313,7 +313,15 @@ export function hypothesize(content: Content, state: GameState, nodeId: string, 
 
 export function cancelPuzzle(content: Content, state: GameState): GameState {
   const s = clone(state);
+  const inst = s.activePuzzle;
   s.activePuzzle = null;
+  // scan has no attempt limit, so walking away is its only way to fail
+  if (inst?.archetype === 'scan' && s.phase === 'playing') {
+    const label = node(getCase(content, s), inst.nodeId)?.label ?? inst.nodeId;
+    nodeRt(s, inst.nodeId).alertLevel = 'detected';
+    s.log.push({ t: `✗ ${label}: скан брошен, узел насторожился.`, kind: 'bad' });
+    stepAlarm(s, s.difficulty.wrongGuessNoise, inst.nodeId);
+  }
   return s;
 }
 
@@ -325,6 +333,10 @@ export function submitPuzzle(content: Content, state: GameState, selected: strin
   const n = node(c, inst.nodeId);
   if (!n) return s;
   const result = checkPuzzle(inst, selected);
+  if (!result.solved && inst.archetype === 'scan') {
+    s.log.push({ t: `✗ ${puzzleLogic(inst.archetype).explainMismatch(inst)}`, kind: 'bad' });
+    return s;
+  }
   if (!result.solved) {
     const left = inst.attemptsLeft - 1;
     s.activePuzzle = left > 0 ? { ...inst, attemptsLeft: left } : null;

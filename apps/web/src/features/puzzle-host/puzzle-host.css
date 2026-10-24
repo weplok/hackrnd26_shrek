@@ -109,3 +109,48 @@
   .puzzle-actions .zd-button,
   .tool-lab__tools .zd-button { width: auto; }
 }
+.scan-tuner {
+  display: grid;
+  gap: var(--space-2);
+}
+.scan-tuner__graph {
+  width: 100%;
+  height: 10rem;
+  border: 1px solid rgb(59 156 255 / 45%);
+  background:
+    repeating-linear-gradient(0deg, transparent 0 1.9rem, rgb(59 156 255 / 12%) 1.9rem 2rem),
+    #000;
+}
+.scan-tuner__area {
+  fill: rgb(59 156 255 / 28%);
+  stroke: #3b9cff;
+  stroke-width: 0.6;
+  vector-effect: non-scaling-stroke;
+}
+.scan-tuner__cursor {
+  stroke: var(--color-green-bright);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.scan-tuner__labels {
+  position: relative;
+  height: 1.4rem;
+}
+.scan-tuner__label {
+  position: absolute;
+  transform: translateX(-50%);
+  color: #cfe6ff;
+  font: 0.75rem/1.4 var(--font-mono);
+  white-space: nowrap;
+}
+.scan-tuner__label--locked {
+  color: var(--color-green-bright);
+}
+.scan-tuner__label--missed {
+  color: var(--color-muted);
+  text-decoration: line-through;
+}
+.scan-tuner__slider {
+  width: 100%;
+  accent-color: var(--color-green-bright);
+}
