@@ -1,5 +1,10 @@
 {
   "enabledPlugins": {
     "caveman@caveman": true
+  },
+  "includeCoAuthoredBy": false,
+  "attribution": {
+    "commit": "",
+    "pr": ""
   }
 }

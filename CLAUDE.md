@@ -29,3 +29,20 @@ Boundaries: Write code, comments, commits, and docs in normal style.
 - Do not run failure-test cycles or extra checks. Run only smallest relevant check when needed.
 - Ask developer about clarifications, disputes, or unsolvable problems.
 - Preserve existing behavior unless request or applicable project document requires change.
+
+# Task tracking
+
+- Task tracker: `docs/ZERO_DAY_Задачи.md`. Exception to spec rule: update task status and progress there without asking. Change task scope, IDs, or dependencies only with developer approval.
+- Before work, find matching task ID. Check its dependencies are done. Mark it `в работе: <owner>`.
+- After every work session, update progress, even if task is unfinished. Never end a session without it.
+- Unfinished task: keep `- [ ]` and add sub-line `  - Прогресс: сделано …; осталось …`.
+- Finished task: switch to `- [x]` and remove progress sub-line. Done means Definition of Done from TZ section 13.4.
+- Work outside any task: tell developer and propose a new task line. Do not add it silently.
+- Commit tracker changes together with related code.
+
+# Authorship and style
+
+- Never mention AI, assistants, models, or tools as author. No `Co-Authored-By`, no "Generated with", no AI signatures in commits, PRs, code, comments, or docs.
+- Write commits and PRs like a team developer: short Conventional Commit message, no AI phrasing.
+- Keep comments minimal. Comment only non-obvious "why". No comments restating code.
+- No emoji in code, comments, commits, PRs, or docs.
