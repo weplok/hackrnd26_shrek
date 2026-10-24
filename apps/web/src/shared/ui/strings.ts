@@ -89,6 +89,24 @@ export const ru = {
     back: 'Назад',
     close: 'Закрыть',
   },
+  hud: {
+    objectives: 'ЦЕЛИ',
+    objectiveDone: 'Выполнено',
+    flipper: 'ФЛИППЕР',
+    flipperReady: 'На связи. Следим за обстановкой.',
+    moods: {
+      sleeping: 'спит спокойно',
+      alert: 'насторожен',
+      growling: 'рычит',
+      barking: 'лает',
+    },
+    spriteAlt: {
+      sleeping: 'Флиппер спит спокойно.',
+      alert: 'Флиппер настороженно нюхает след.',
+      growling: 'Флиппер рычит.',
+      barking: 'Флиппер лает.',
+    },
+  },
   errors: {
     length: 'Никнейм должен содержать от 2 до 16 символов.',
     characters: 'Используй только буквы, цифры, _ и -.',

@@ -25,6 +25,7 @@ const content = {
       objectives: [],
       ranks: [],
       report: { findings: [] },
+      checkpoints: [],
     },
   },
   npcs: {},
