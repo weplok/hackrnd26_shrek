@@ -127,7 +127,7 @@ const N = {
 const CRIT = new Set(['A1','A3','B1','B3','B5','C5','D4','B10','D2','G3','G7']);
 // Task status: keep in sync with docs/ZERO_DAY_Задачи.md.
 const DONE = new Set(['A1', 'A3']);
-const WIP = {};
+const WIP = { G8: 'misterEugene', D1: 'misterEugene' };
 // t(id, after, extra-name, continued)
 const t = (id, after, x, cont) => ({ id, after, x, cont });
 const c = (id, x) => t(id, '', x, true);
