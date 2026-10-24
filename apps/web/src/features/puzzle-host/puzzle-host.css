@@ -262,6 +262,17 @@
   touch-action: manipulation;
 }
 .ddos-storm__stage:not(.ddos-storm__stage--run) .ddos-storm__ball { cursor: default; }
+.ddos-storm__key {
+  display: none;
+  fill: var(--color-text);
+  font: 700 3.5px var(--font-mono);
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .ddos-storm__key { display: inline; }
+}
 .ddos-storm__ball--hit { stroke: #ffd400; fill: rgb(255 212 0 / 22%); }
 .ddos-storm__core {
   fill: #08140f;
