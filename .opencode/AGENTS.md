@@ -59,6 +59,18 @@ Floor: code, commands, paths, numbers and error strings verbatim; never drop not
 - Never commit conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`). Check status files for them before every commit.
 - Before a commit, read `git diff` of status files. Every changed status line must belong to your current task or to an explicit developer request.
 
+# Push procedure
+
+Every `git push` follows these steps, in order. No exceptions, including small or docs-only pushes.
+
+1. `git status`: commit only intended files. Never commit secrets or unrelated changes.
+2. Check status files for conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`).
+3. Read `git diff --cached` of status files. Every changed status line must belong to your current task or to an explicit developer request.
+4. Commit with a short Conventional Commit message. Tracker changes go together with related code. No AI attribution.
+5. `git pull --rebase`. Resolve conflicts by Status protection rules. Repeat steps 2-3 after resolving.
+6. Rerun the smallest relevant check if code changed during rebase.
+7. `git push`. Never use `--force` or `--force-with-lease` on `main` without explicit developer approval.
+
 # Authorship and style
 
 - Never mention AI, assistants, models, or tools as author. No `Co-Authored-By`, no "Generated with", no AI signatures in commits, PRs, code, comments, or docs.
