@@ -17,10 +17,14 @@ export {
   confirmScope,
   wait,
   answerReport,
+  restoreCheckpoint,
+  alarmLevel,
+  noiseSources,
   computeRank,
   recompute,
   profileStyle,
 } from './engine.ts';
+export type { AlarmLevel } from './engine.ts';
 export { generatePuzzle, verifyPuzzle } from './puzzles.ts';
 export { apply, validate } from './commands.ts';
 export type { Command, GameEvent, RejectReason, StepResult } from './commands.ts';

@@ -1,16 +1,24 @@
 // Command pipeline (TZ 7.2–7.3): validate → handler → events derived from the state diff.
 import type { Content, GameState } from './types.ts';
-import { scan, hypothesize, submitPuzzle, cancelPuzzle, DEFAULT_FAIL_HINT } from './engine.ts';
+import { scan, hypothesize, submitPuzzle, cancelPuzzle, restoreCheckpoint, DEFAULT_FAIL_HINT } from './engine.ts';
 import { verifyPuzzle } from './puzzles.ts';
 
 export type Command =
   | { type: 'ScanNode'; node: string }
   | { type: 'ProposeHypothesis'; node: string; vuln: string }
   | { type: 'SubmitPuzzle'; answer: string[] }
-  | { type: 'CancelPuzzle' };
+  | { type: 'CancelPuzzle' }
+  | { type: 'RestoreCheckpoint' };
 
 export type RejectReason =
-  'not-playing' | 'unknown-node' | 'node-hidden' | 'puzzle-active' | 'no-puzzle' | 'not-scanned' | 'not-exploitable';
+  | 'not-playing'
+  | 'unknown-node'
+  | 'node-hidden'
+  | 'puzzle-active'
+  | 'no-puzzle'
+  | 'not-scanned'
+  | 'not-exploitable'
+  | 'not-caught';
 
 export type GameEvent =
   | { type: 'CommandRejected'; reason: RejectReason }
@@ -31,6 +39,7 @@ export type GameEvent =
   | { type: 'ObjectiveCompleted'; objective: string }
   | { type: 'Ticked'; tick: number }
   | { type: 'Caught' }
+  | { type: 'CheckpointRestored'; checkpoint: string }
   | { type: 'TargetReached' };
 
 export interface StepResult {
@@ -39,6 +48,8 @@ export interface StepResult {
 }
 
 export function validate(content: Content, s: GameState, cmd: Command): RejectReason | null {
+  // TZ 7.1: in caught only RestoreCheckpoint is accepted.
+  if (cmd.type === 'RestoreCheckpoint') return s.phase === 'caught' && s.checkpoint ? null : 'not-caught';
   if (s.phase !== 'playing') return 'not-playing';
   switch (cmd.type) {
     case 'ScanNode':
@@ -76,6 +87,8 @@ function run(content: Content, s: GameState, cmd: Command): GameState {
       return submitPuzzle(content, s, cmd.answer);
     case 'CancelPuzzle':
       return cancelPuzzle(content, s);
+    case 'RestoreCheckpoint':
+      return restoreCheckpoint(content, s);
   }
 }
 
@@ -88,6 +101,8 @@ function primaryEvents(content: Content, prev: GameState, next: GameState, cmd: 
       return [{ type: 'PuzzleOpened', node: cmd.node, vuln: cmd.vuln }];
     case 'CancelPuzzle':
       return [{ type: 'PuzzleCancelled', node: prev.activePuzzle?.nodeId ?? '' }];
+    case 'RestoreCheckpoint':
+      return [{ type: 'CheckpointRestored', checkpoint: next.checkpoint?.id ?? '' }];
     case 'SubmitPuzzle': {
       const inst = prev.activePuzzle;
       if (!inst) return [];

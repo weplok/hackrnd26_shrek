@@ -104,6 +104,12 @@ export interface LogEntry {
   kind: string;
 }
 
+/** State saved at the start of a case step (Q-7); restored after caught. */
+export interface CheckpointSnapshot {
+  id: string;
+  state: GameState; // stored with checkpoint: null
+}
+
 export interface GameState {
   caseId: string;
   phase: Phase;
@@ -118,6 +124,9 @@ export interface GameState {
   flags: Record<string, boolean>;
   tracks: Record<string, number>;
   maxAlarm: number;
+  noise: Record<string, number>; // alarm added per source since last checkpoint, for the caught debrief
+  checkpointsReached: Record<string, boolean>;
+  checkpoint: CheckpointSnapshot | null;
   codex: Record<string, boolean>;
   npc: Record<string, NpcRuntime>;
   sockets: Record<string, Record<string, boolean>>; // nodeId -> socketId -> filled

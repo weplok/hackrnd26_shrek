@@ -63,6 +63,9 @@ export function createGame(content: Content, caseId: string, difficulty: Difficu
     flags: {},
     tracks,
     maxAlarm: 0,
+    noise: {},
+    checkpointsReached: {},
+    checkpoint: null,
     codex: {},
     npc,
     sockets,
@@ -84,16 +87,52 @@ function clone(s: GameState): GameState {
   return structuredClone(s);
 }
 
-function stepAlarm(s: GameState, rawAdd: number): void {
+// FR-070 thresholds 30/60/85 drive the alarm colour and Flipper pose.
+export type AlarmLevel = 'calm' | 'alert' | 'growl' | 'bark';
+export function alarmLevel(alarm: number): AlarmLevel {
+  if (alarm >= 85) return 'bark';
+  if (alarm >= 60) return 'growl';
+  if (alarm >= 30) return 'alert';
+  return 'calm';
+}
+
+// source = node id that made the noise; feeds the caught debrief (FR-071).
+function stepAlarm(s: GameState, rawAdd: number, source: string): void {
   const d = s.difficulty;
   const add = Math.max(0, rawAdd) * d.noiseMultiplier;
-  const next = clamp((s.tracks.alarm ?? 0) + add - d.alarmDecayPerTick);
-  s.tracks.alarm = next;
-  s.maxAlarm = Math.max(s.maxAlarm, next);
+  if (add > 0) s.noise[source] = (s.noise[source] ?? 0) + add;
+  s.tracks.alarm = clamp((s.tracks.alarm ?? 0) + add - d.alarmDecayPerTick);
   s.tick += 1;
-  if (next >= 100 && s.phase === 'playing') {
+  caughtCheck(s);
+}
+
+function caughtCheck(s: GameState): void {
+  const alarm = s.tracks.alarm ?? 0;
+  s.maxAlarm = Math.max(s.maxAlarm, alarm);
+  if (alarm >= 100 && s.phase === 'playing') {
     s.phase = 'caught';
+    s.activePuzzle = null;
+    s.activeChat = null;
+    s.pendingScope = null;
     s.log.push({ t: '!! Тревога 100% — тебя вычислили.', kind: 'bad' });
+  }
+}
+
+/** Noise sources since the last checkpoint, loudest first. */
+export function noiseSources(s: GameState): { source: string; noise: number }[] {
+  return Object.entries(s.noise)
+    .map(([source, noise]) => ({ source, noise: Math.round(noise) }))
+    .sort((a, b) => b.noise - a.noise);
+}
+
+// Checkpoint = start of the current case step (Q-7): snapshot when its condition first holds.
+function checkpoints(c: Case, s: GameState): void {
+  if (s.phase !== 'briefing' && s.phase !== 'playing') return;
+  for (const cp of c.checkpoints) {
+    if (s.checkpointsReached[cp.id] || !evalCondition(cp.when, s)) continue;
+    s.checkpointsReached[cp.id] = true;
+    s.noise = {};
+    s.checkpoint = { id: cp.id, state: structuredClone({ ...s, checkpoint: null }) };
   }
 }
 
@@ -116,6 +155,8 @@ export function recompute(content: Content, s: GameState): void {
   for (const o of c.objectives) {
     if (!s.objectives[o.id] && evalCondition(o.doneWhen, s)) s.objectives[o.id] = true;
   }
+  caughtCheck(s);
+  checkpoints(c, s);
   // win → report phase
   const tgt = targetNode(c);
   if (tgt && nodeRt(s, tgt.id).compromised && s.phase === 'playing') {
@@ -159,7 +200,7 @@ export function scan(content: Content, state: GameState, nodeId: string): GameSt
   if (nodeRt(s, nodeId).scanned) {
     // FR-030: repeat scan yields nothing new but still makes noise
     s.log.push({ t: `[scan] ${n.label}: нового нет, только шум.`, kind: 'bad' });
-    stepAlarm(s, n.scanNoise);
+    stepAlarm(s, n.scanNoise, nodeId);
     recompute(content, s);
     return s;
   }
@@ -176,7 +217,7 @@ export function scan(content: Content, state: GameState, nodeId: string): GameSt
   }
   const sl = n.exploits[0]?.vuln;
   if (sl) s.log.push({ t: `[scan] ${n.label}: слабость ${sl}.`, kind: 'sys' });
-  stepAlarm(s, n.scanNoise);
+  stepAlarm(s, n.scanNoise, nodeId);
   recompute(content, s);
   return s;
 }
@@ -234,7 +275,7 @@ export function submitPuzzle(content: Content, state: GameState, selected: strin
   s.activePuzzle = null;
   if (!solved) {
     s.log.push({ t: '✗ головоломка не решена.', kind: 'bad' });
-    stepAlarm(s, s.difficulty.wrongGuessNoise);
+    stepAlarm(s, s.difficulty.wrongGuessNoise, n.id);
     return s;
   }
   const ex = n.exploits.find((e) => e.vuln === inst.vuln);
@@ -244,11 +285,11 @@ export function submitPuzzle(content: Content, state: GameState, selected: strin
     const noise = NOISE[vulnInfo?.noiseProfile ?? 'moderate'] ?? 9;
     applyEffects(ex.effects, s, compromiser(content, s));
     compromise(content, s, n);
-    stepAlarm(s, noise);
+    stepAlarm(s, noise, n.id);
   } else {
     const hint = n.failHints[inst.vuln] ?? DEFAULT_FAIL_HINT;
     s.log.push({ t: `✗ не та слабость. ${hint}`, kind: 'bad' });
-    stepAlarm(s, s.difficulty.wrongGuessNoise);
+    stepAlarm(s, s.difficulty.wrongGuessNoise, n.id);
   }
   recompute(content, s);
   return s;
@@ -289,7 +330,7 @@ export function fillSocket(content: Content, state: GameState, nodeId: string, s
   }
   s.sockets[nodeId] = { ...s.sockets[nodeId], [socketId]: true };
   s.log.push({ t: `гнездо заполнено: ${sock.label}`, kind: 'ok' });
-  stepAlarm(s, 3);
+  stepAlarm(s, 3, nodeId);
   recompute(content, s);
   return s;
 }
@@ -338,9 +379,9 @@ export function present(
   if (rt.suspicion >= cfg.suspicion.fail_at) {
     rt.locked = true;
     s.log.push({ t: `${cfg.role} закрылся — путь через него потерян.`, kind: 'bad' });
-    stepAlarm(s, 15);
+    stepAlarm(s, 15, pnode.id);
   } else {
-    stepAlarm(s, out.suspicionDelta > 0 ? out.suspicionDelta * 0.5 : 2);
+    stepAlarm(s, out.suspicionDelta > 0 ? out.suspicionDelta * 0.5 : 2, pnode.id);
   }
   recompute(content, s);
   return s;
@@ -354,7 +395,7 @@ export function confirmScope(content: Content, state: GameState, go: boolean): G
   if (go) {
     s.flags.scope_violated = true;
     s.log.push({ t: '!! Выход за рамки договора. Заказчик это увидит.', kind: 'bad' });
-    stepAlarm(s, 30);
+    stepAlarm(s, 30, nodeId);
   } else {
     s.log.push({ t: 'Отступил. Остаёмся в рамках договора.', kind: 'ok' });
   }
@@ -368,6 +409,22 @@ export function wait(content: Content, state: GameState): GameState {
   s.tracks.alarm = clamp((s.tracks.alarm ?? 0) - 14 - s.difficulty.alarmDecayPerTick);
   s.tick += 1;
   s.log.push({ t: '[жду] вслушиваюсь в эфир, тревога спадает.', kind: 'sys' });
+  return s;
+}
+
+// FR-071: back to the start of the current step; Codex cards, tick and RNG keep moving forward.
+export function restoreCheckpoint(content: Content, state: GameState): GameState {
+  const cp = state.checkpoint;
+  if (state.phase !== 'caught' || !cp) return clone(state);
+  const label = getCase(content, state).checkpoints.find((x) => x.id === cp.id)?.label ?? cp.id;
+  const s = structuredClone(cp.state);
+  s.phase = 'playing';
+  s.tick = state.tick;
+  s.rng = state.rng;
+  s.maxAlarm = state.maxAlarm;
+  s.codex = { ...s.codex, ...state.codex };
+  s.checkpoint = structuredClone(cp);
+  s.log = [...state.log, { t: `<< откат к чекпоинту: ${label}`, kind: 'sys' }];
   return s;
 }
 
