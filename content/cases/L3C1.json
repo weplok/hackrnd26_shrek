@@ -1,0 +1,632 @@
+{
+  "schemaVersion": 1,
+  "id": "L3C1",
+  "title": "Городской архив",
+  "brief": {
+    "client": "«Редут» → администрация города",
+    "text": "Заказ от администрации: проверить сеть городского музея-архива. Сеть большая и разбита на зоны, часть доступа берётся только на объекте. Дойди до архивного ядра, покажи, что им можно управлять, и закрой дыры. Ядро заперто на двойной замок: технический ключ и подтверждение хранителя фондов."
+  },
+  "scope": {
+    "text": "Городская сеть музея-архива, служебные сервисы и один объект с физическим доступом по договору.",
+    "rules": [
+      "Работать можно с сетью, служебными сервисами и сотрудниками по списку.",
+      "Персональные данные посетителей — вне договора."
+    ],
+    "consequence": "oos_personal_data"
+  },
+  "segments": [
+    {
+      "id": "public",
+      "label": "Публичная зона",
+      "openAtStart": true
+    },
+    {
+      "id": "corp",
+      "label": "Служебная зона",
+      "openAtStart": false
+    },
+    {
+      "id": "mgmt",
+      "label": "Управляющая зона",
+      "openAtStart": false
+    }
+  ],
+  "nodes": [
+    {
+      "id": "museum_wifi",
+      "kind": "machine",
+      "label": "Wi-Fi для посетителей",
+      "segment": "public",
+      "position": { "x": 6, "y": 46 },
+      "inScope": true,
+      "scanNoise": 6,
+      "exploits": [
+        {
+          "vuln": "SL-02",
+          "puzzleParams": {
+            "answer": "muzey1905",
+            "clues": ["wifi_name", "founded_year"],
+            "decoys": ["museum2024", "welcome1", "guest1234", "exhibit01"]
+          },
+          "knobs": { "attempts": 4, "decoys": 4, "towerHeight": 3, "junkShare": 55 }
+        }
+      ],
+      "failHints": {
+        "SL-04": "Это вход по паролю, а не дырявый сервис — ищи слабый пароль."
+      },
+      "onCompromise": [{ "unlockCodex": "SL-02" }]
+    },
+    {
+      "id": "portal",
+      "kind": "machine",
+      "label": "Портал музея",
+      "segment": "public",
+      "position": { "x": 8, "y": 74 },
+      "inScope": true,
+      "scanNoise": 9,
+      "exploits": [
+        {
+          "vuln": "SL-04",
+          "puzzleParams": {
+            "shape": "Контур portal-core",
+            "shapes": ["Контур auth-lib", "Контур media-render", "Контур search-idx"]
+          },
+          "knobs": { "attempts": 4, "decoys": 3 }
+        }
+      ],
+      "failHints": {
+        "SL-02": "У портала проблема не в пароле, а в старой непропатченной версии."
+      },
+      "onCompromise": [
+        { "grantClues": ["staff_list", "gateway_gap"] },
+        { "unlockCodex": "SL-04" }
+      ],
+      "revealedBy": { "nodeState": { "node": "museum_wifi", "state": "scanned" } }
+    },
+    {
+      "id": "vera",
+      "kind": "person",
+      "label": "Экскурсовод Вера",
+      "segment": "public",
+      "position": { "x": 26, "y": 60 },
+      "inScope": true,
+      "scanNoise": 4,
+      "exploits": [],
+      "failHints": {},
+      "onCompromise": [{ "grantClues": ["vera_tip"] }],
+      "npc": "vera",
+      "revealedBy": { "nodeState": { "node": "museum_wifi", "state": "scanned" } }
+    },
+    {
+      "id": "service_gateway",
+      "kind": "machine",
+      "label": "Служебный шлюз",
+      "segment": "corp",
+      "position": { "x": 32, "y": 34 },
+      "inScope": true,
+      "scanNoise": 11,
+      "exploits": [
+        {
+          "vuln": "SL-08",
+          "puzzleParams": {
+            "ownLines": [
+              "gateway: учебный маршрут",
+              "proxy: разрешённый тест",
+              "audit: контрольный след"
+            ],
+            "systemLines": [
+              "kernel: плановая задача",
+              "dns: кэш обновлён",
+              "backup: контрольная точка"
+            ]
+          },
+          "requires": { "hasClue": "gateway_gap" },
+          "knobs": { "attempts": 3, "decoys": 3, "ownLines": 3, "errorPenalty": 4 },
+          "effects": [{ "addTrack": { "track": "alarm", "delta": -28 } }]
+        }
+      ],
+      "failHints": {
+        "SL-06": "Шлюз проходят не доверием, а щелью в правилах межсетевого экрана."
+      },
+      "onCompromise": [
+        { "openSegment": "corp" },
+        { "unlockCodex": "SL-08" }
+      ],
+      "revealedBy": { "nodeState": { "node": "portal", "state": "scanned" } }
+    },
+    {
+      "id": "staff_mail",
+      "kind": "machine",
+      "label": "Служебная почта",
+      "segment": "corp",
+      "position": { "x": 48, "y": 26 },
+      "inScope": true,
+      "scanNoise": 8,
+      "exploits": [
+        {
+          "vuln": "SL-05",
+          "puzzleParams": {
+            "blocks": [
+              "Легенда: подрядчик администрации",
+              "Зацепка: договор на проверку сети",
+              "Тон: спокойно и по делу"
+            ]
+          },
+          "knobs": { "attempts": 4, "decoys": 3, "blockCount": 3, "trustSensitivity": 4 }
+        }
+      ],
+      "failHints": {
+        "SL-07": "Почта не про забытую учётку — она просто слишком много рассказывает о себе."
+      },
+      "onCompromise": [
+        { "grantClues": ["mail_format"] },
+        { "unlockCodex": "SL-05" }
+      ],
+      "revealedBy": { "segmentOpen": "corp" }
+    },
+    {
+      "id": "log_server",
+      "kind": "machine",
+      "label": "Сервер логов",
+      "segment": "corp",
+      "position": { "x": 50, "y": 54 },
+      "inScope": true,
+      "scanNoise": 10,
+      "exploits": [
+        {
+          "vuln": "SL-11",
+          "puzzleParams": {
+            "ownLines": [
+              "session: моя проверка",
+              "trace: мой разведзапрос",
+              "probe: контрольная метка"
+            ],
+            "systemLines": [
+              "cron: ротация логов",
+              "siem: правило корреляции",
+              "backup: выгрузка индекса"
+            ]
+          },
+          "knobs": { "attempts": 3, "decoys": 3, "ownLines": 3, "errorPenalty": 4 },
+          "effects": [{ "addTrack": { "track": "alarm", "delta": -18 } }]
+        }
+      ],
+      "failHints": {
+        "SL-08": "Здесь не сегментация, а болтливые логи — вычисти свой след, не задев систему."
+      },
+      "onCompromise": [
+        { "grantClues": ["log_token"] },
+        { "unlockCodex": "SL-11" }
+      ],
+      "revealedBy": { "segmentOpen": "corp" }
+    },
+    {
+      "id": "kiosk",
+      "kind": "machine",
+      "label": "Сервисный киоск (объект)",
+      "segment": "corp",
+      "position": { "x": 48, "y": 80 },
+      "inScope": true,
+      "scanNoise": 7,
+      "exploits": [
+        {
+          "vuln": "SL-10",
+          "puzzleParams": {
+            "ports": ["7000/tcp"],
+            "target": "сервисный киоск у входа"
+          },
+          "requires": { "hasClue": "vera_tip" },
+          "knobs": { "attempts": 4, "decoys": 2, "falseEchoes": 3, "fadeSteps": 2 }
+        }
+      ],
+      "failHints": {
+        "SL-04": "Это открытый сервисный порт на объекте, а не дырявый сервис в сети."
+      },
+      "onCompromise": [
+        { "grantClues": ["object_key"] },
+        { "unlockCodex": "SL-10" }
+      ],
+      "revealedBy": { "segmentOpen": "corp" }
+    },
+    {
+      "id": "cabinet",
+      "kind": "decoy",
+      "label": "Шкаф оборудования (объект)",
+      "segment": "corp",
+      "position": { "x": 66, "y": 78 },
+      "inScope": true,
+      "scanNoise": 5,
+      "exploits": [],
+      "failHints": {},
+      "onCompromise": [],
+      "revealedBy": { "segmentOpen": "corp" }
+    },
+    {
+      "id": "visitor_data",
+      "kind": "machine",
+      "label": "База посетителей",
+      "segment": "corp",
+      "position": { "x": 32, "y": 84 },
+      "inScope": false,
+      "scanNoise": 7,
+      "exploits": [],
+      "failHints": {},
+      "onCompromise": [],
+      "revealedBy": { "segmentOpen": "corp" }
+    },
+    {
+      "id": "mgmt_gateway",
+      "kind": "machine",
+      "label": "Шлюз в управляющую зону",
+      "segment": "corp",
+      "position": { "x": 66, "y": 48 },
+      "inScope": true,
+      "scanNoise": 12,
+      "exploits": [
+        {
+          "vuln": "SL-08",
+          "puzzleParams": {
+            "ownLines": [
+              "route: мой тестовый путь",
+              "proxy: согласованный прокси",
+              "audit: мой контрольный след"
+            ],
+            "systemLines": [
+              "kernel: плановая задача",
+              "ntp: синхронизация времени",
+              "backup: контрольная точка",
+              "dns: кэш обновлён"
+            ]
+          },
+          "requires": { "hasClue": "log_token" },
+          "knobs": { "attempts": 3, "decoys": 4, "ownLines": 3, "errorPenalty": 5 },
+          "effects": [{ "addTrack": { "track": "alarm", "delta": -28 } }]
+        }
+      ],
+      "failHints": {
+        "SL-06": "В управляющую зону ведёт сетевой путь по утёкшему токену, а не доверие узла."
+      },
+      "onCompromise": [
+        { "openSegment": "mgmt" },
+        { "unlockCodex": "SL-08" }
+      ],
+      "revealedBy": { "nodeState": { "node": "log_server", "state": "scanned" } }
+    },
+    {
+      "id": "pavel",
+      "kind": "person",
+      "label": "Хранитель фондов Павел",
+      "segment": "mgmt",
+      "position": { "x": 82, "y": 30 },
+      "inScope": true,
+      "scanNoise": 5,
+      "exploits": [],
+      "failHints": {},
+      "onCompromise": [{ "grantClues": ["pavel_vouch"] }],
+      "npc": "pavel",
+      "revealedBy": { "segmentOpen": "mgmt" }
+    },
+    {
+      "id": "curator_pc",
+      "kind": "machine",
+      "label": "ПК хранителя",
+      "segment": "mgmt",
+      "position": { "x": 84, "y": 56 },
+      "inScope": true,
+      "scanNoise": 9,
+      "exploits": [
+        {
+          "vuln": "SL-06",
+          "puzzleParams": {
+            "trustPath": ["curator_pc", "archive_core"]
+          },
+          "requires": { "hasClue": "pavel_vouch" },
+          "knobs": { "attempts": 4, "decoys": 2, "beamCount": 5, "gapWidth": 1 }
+        }
+      ],
+      "failHints": {
+        "SL-07": "Сюда заходят по доверенной связи с ПК хранителя, а не через забытый аккаунт."
+      },
+      "onCompromise": [
+        { "grantClues": ["core_fragment"] },
+        { "unlockCodex": "SL-06" }
+      ],
+      "revealedBy": { "segmentOpen": "mgmt" }
+    },
+    {
+      "id": "archive_core",
+      "kind": "target",
+      "label": "Архивное ядро",
+      "segment": "mgmt",
+      "position": { "x": 94, "y": 64 },
+      "inScope": true,
+      "scanNoise": 12,
+      "exploits": [],
+      "failHints": {},
+      "onCompromise": [{ "unlockCodex": "SL-03" }],
+      "revealedBy": { "segmentOpen": "mgmt" },
+      "lock": {
+        "sockets": [
+          {
+            "id": "sock_tech",
+            "accepts": "key:core_tech",
+            "label": "Технический ключ (объект + ПК хранителя)"
+          },
+          {
+            "id": "sock_human",
+            "accepts": "key:core_human",
+            "label": "Подтверждение хранителя"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    { "from": "museum_wifi", "to": "portal" },
+    { "from": "museum_wifi", "to": "vera" },
+    { "from": "portal", "to": "service_gateway" },
+    { "from": "service_gateway", "to": "staff_mail" },
+    { "from": "service_gateway", "to": "log_server" },
+    { "from": "service_gateway", "to": "kiosk" },
+    { "from": "kiosk", "to": "cabinet" },
+    { "from": "service_gateway", "to": "visitor_data" },
+    { "from": "log_server", "to": "mgmt_gateway" },
+    { "from": "mgmt_gateway", "to": "pavel" },
+    { "from": "mgmt_gateway", "to": "curator_pc" },
+    { "from": "curator_pc", "to": "archive_core" },
+    { "from": "pavel", "to": "archive_core" }
+  ],
+  "clues": [
+    {
+      "id": "wifi_name",
+      "type": "name",
+      "text": "Имя гостевой сети: muzey-guest.",
+      "foundOn": "museum_wifi"
+    },
+    {
+      "id": "founded_year",
+      "type": "phrase",
+      "text": "Год основания музея виден на вывеске: 1905.",
+      "foundOn": "museum_wifi"
+    },
+    {
+      "id": "staff_list",
+      "type": "name",
+      "text": "Список отделов и кто за что отвечает.",
+      "foundOn": "portal"
+    },
+    {
+      "id": "gateway_gap",
+      "type": "config",
+      "text": "В правилах служебного шлюза есть перепутанное правило — щель.",
+      "foundOn": "portal"
+    },
+    {
+      "id": "mail_format",
+      "type": "config",
+      "text": "Формат служебной почты: фамилия@arhiv.city.",
+      "foundOn": "staff_mail"
+    },
+    {
+      "id": "log_token",
+      "type": "token",
+      "text": "В болтливых логах утёк токен к управляющей зоне.",
+      "foundOn": "log_server"
+    },
+    {
+      "id": "object_key",
+      "type": "token",
+      "text": "С сервисного киоска снят ключ доступа на объекте.",
+      "foundOn": "kiosk"
+    },
+    {
+      "id": "vera_tip",
+      "type": "phrase",
+      "text": "Вера подсказала, где сервисный киоск и как к нему подойти.",
+      "foundOn": "vera"
+    },
+    {
+      "id": "core_fragment",
+      "type": "token",
+      "text": "Технический фрагмент доступа с ПК хранителя.",
+      "foundOn": "curator_pc"
+    },
+    {
+      "id": "pavel_vouch",
+      "type": "phrase",
+      "text": "Павел подтвердил тебя как подрядчика администрации.",
+      "foundOn": "pavel"
+    },
+    {
+      "id": "cabinet_decoy",
+      "type": "file",
+      "text": "В шкафу оборудования только старые инструкции — к цели не ведёт.",
+      "foundOn": "cabinet"
+    }
+  ],
+  "keyRecipes": [
+    {
+      "inputs": ["staff_list", "mail_format"],
+      "output": "legend_city",
+      "label": "Легенда: подрядчик администрации"
+    },
+    {
+      "inputs": ["object_key", "core_fragment"],
+      "output": "core_tech",
+      "label": "Технический ключ к архивному ядру"
+    },
+    {
+      "inputs": ["pavel_vouch", "legend_city"],
+      "output": "core_human",
+      "label": "Человеческая половина замка (подтверждение под легендой)"
+    }
+  ],
+  "npcs": ["vera", "pavel"],
+  "objectives": [
+    {
+      "id": "obj_enter",
+      "title": "Войти в публичную зону",
+      "doneWhen": {
+        "any": [
+          { "nodeState": { "node": "museum_wifi", "state": "compromised" } },
+          { "nodeState": { "node": "portal", "state": "compromised" } }
+        ]
+      },
+      "checkpoint": true
+    },
+    {
+      "id": "obj_corp",
+      "title": "Пройти в служебную зону",
+      "doneWhen": { "segmentOpen": "corp" },
+      "checkpoint": true
+    },
+    {
+      "id": "obj_legend",
+      "title": "Собрать легенду",
+      "doneWhen": { "hasKey": "legend_city" }
+    },
+    {
+      "id": "obj_object",
+      "title": "Снять доступ на объекте",
+      "doneWhen": { "hasClue": "object_key" }
+    },
+    {
+      "id": "obj_mgmt",
+      "title": "Пройти в управляющую зону",
+      "doneWhen": { "segmentOpen": "mgmt" },
+      "checkpoint": true
+    },
+    {
+      "id": "obj_tech",
+      "title": "Собрать технический ключ",
+      "doneWhen": { "hasKey": "core_tech" }
+    },
+    {
+      "id": "obj_human",
+      "title": "Получить подтверждение хранителя",
+      "doneWhen": { "hasKey": "core_human" }
+    },
+    {
+      "id": "obj_goal",
+      "title": "Открыть архивное ядро",
+      "doneWhen": { "nodeState": { "node": "archive_core", "state": "compromised" } },
+      "checkpoint": true
+    },
+    {
+      "id": "obj_secure",
+      "title": "Закрыть дыры и отчитаться",
+      "doneWhen": { "nodeState": { "node": "archive_core", "state": "secured" } }
+    }
+  ],
+  "tracks": [
+    { "id": "alarm", "label": "Тревога", "start": 0 }
+  ],
+  "systems": ["tracks", "npcCooldown", "objectives", "flipper", "caughtCheck"],
+  "report": {
+    "findings": [
+      {
+        "id": "f_wifi",
+        "vuln": "SL-02",
+        "node": "museum_wifi",
+        "options": [
+          { "id": "o1", "text": "Задать длинный уникальный пароль и отделить гостевую сеть от служебной.", "correct": true },
+          { "id": "o2", "text": "Оставить простой пароль, он же «для посетителей».", "correct": false }
+        ],
+        "explanation": "Простой гостевой пароль — вход во всю сеть. Нужен сильный пароль и изоляция гостевого сегмента."
+      },
+      {
+        "id": "f_portal",
+        "vuln": "SL-04",
+        "node": "portal",
+        "options": [
+          { "id": "o1", "text": "Обновить движок портала и наладить регулярный патч-менеджмент.", "correct": true },
+          { "id": "o2", "text": "Закрыть портал от поисковиков.", "correct": false }
+        ],
+        "explanation": "Известная уязвимость старой версии закрывается обновлением и инвентаризацией компонентов."
+      },
+      {
+        "id": "f_gateway",
+        "vuln": "SL-08",
+        "node": "service_gateway",
+        "options": [
+          { "id": "o1", "text": "Исправить правила шлюзов и усилить сегментацию между зонами.", "correct": true },
+          { "id": "o2", "text": "Добавить ещё один гостевой Wi-Fi.", "correct": false }
+        ],
+        "explanation": "Щель в правилах позволила переходить между зонами. Сегментацию чинят правилами и аудитом."
+      },
+      {
+        "id": "f_logs",
+        "vuln": "SL-11",
+        "node": "log_server",
+        "options": [
+          { "id": "o1", "text": "Убрать секреты из логов и настроить корреляцию в SIEM.", "correct": true },
+          { "id": "o2", "text": "Отключить логирование совсем.", "correct": false }
+        ],
+        "explanation": "Болтливые логи отдали токен. Секреты не пишут в логи, а события связывают корреляцией."
+      },
+      {
+        "id": "f_kiosk",
+        "vuln": "SL-10",
+        "node": "kiosk",
+        "options": [
+          { "id": "o1", "text": "Закрыть сервисный порт на объекте и ограничить физический доступ к киоску.", "correct": true },
+          { "id": "o2", "text": "Повесить табличку «не трогать».", "correct": false }
+        ],
+        "explanation": "Открытый сервисный порт на объекте — физвектор доступа. Порт закрывают, доступ ограничивают."
+      },
+      {
+        "id": "f_curator",
+        "vuln": "SL-06",
+        "node": "curator_pc",
+        "options": [
+          { "id": "o1", "text": "Включить MFA на ядро и урезать доверенные связи (least privilege).", "correct": true },
+          { "id": "o2", "text": "Переименовать ПК хранителя.", "correct": false }
+        ],
+        "explanation": "По доверенной связи можно было дойти до ядра. Помогают MFA, сегментация и минимальные права."
+      }
+    ]
+  },
+  "ranks": [
+    {
+      "id": "rank_ghost",
+      "title": "Призрак",
+      "when": { "maxAlarmBelow": 30 }
+    },
+    {
+      "id": "rank_fast",
+      "title": "Молния",
+      "when": { "not": { "tickAtLeast": 30 } }
+    },
+    {
+      "id": "rank_cleaner",
+      "title": "Чистильщик",
+      "when": { "scansBelow": 9 }
+    },
+    {
+      "id": "rank_pro",
+      "title": "Пентестер «Редут»"
+    }
+  ],
+  "checkpoints": [
+    {
+      "id": "cp_start",
+      "label": "Начало кейса",
+      "when": { "tickAtLeast": 0 }
+    },
+    {
+      "id": "cp_corp",
+      "label": "Вошёл в служебную зону",
+      "when": { "segmentOpen": "corp" }
+    },
+    {
+      "id": "cp_mgmt",
+      "label": "Вошёл в управляющую зону",
+      "when": { "segmentOpen": "mgmt" }
+    },
+    {
+      "id": "cp_goal",
+      "label": "Ядро открыто",
+      "when": { "nodeState": { "node": "archive_core", "state": "compromised" } }
+    }
+  ]
+}

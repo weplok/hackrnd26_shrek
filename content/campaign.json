@@ -133,6 +133,72 @@
       "cases": [
         "L2C1"
       ]
+    },
+    {
+      "id": "L3",
+      "title": "Городской",
+      "accent": "#5b7a99",
+      "difficulty": {
+        "noiseMultiplier": 1.1,
+        "alarmDecayPerTick": 1,
+        "wrongGuessNoise": 16,
+        "hints": {
+          "frequency": "low",
+          "depth": "nudge"
+        },
+        "flipperPreWarn": false,
+        "puzzleKnobs": {
+          "scan": {
+            "attempts": 3,
+            "falseEchoes": 4,
+            "fadeSteps": 2
+          },
+          "brute": {
+            "attempts": 3,
+            "decoys": 4,
+            "towerHeight": 4,
+            "junkShare": 65
+          },
+          "exploit": {
+            "attempts": 3,
+            "decoys": 3,
+            "contourComplexity": 5
+          },
+          "phish": {
+            "attempts": 3,
+            "decoys": 4,
+            "blockCount": 3,
+            "trustSensitivity": 5
+          },
+          "evasion": {
+            "attempts": 3,
+            "decoys": 3,
+            "beamCount": 6,
+            "gapWidth": 1
+          },
+          "crypto": {
+            "attempts": 3,
+            "decoys": 4,
+            "rotorCount": 5,
+            "hintCount": 1
+          },
+          "rootkit": {
+            "attempts": 3,
+            "decoys": 4,
+            "parameterCount": 4,
+            "edrThreshold": 88
+          },
+          "wipe": {
+            "attempts": 3,
+            "decoys": 4,
+            "ownLines": 3,
+            "errorPenalty": 5
+          }
+        }
+      },
+      "cases": [
+        "L3C1"
+      ]
     }
   ],
   "interludes": [

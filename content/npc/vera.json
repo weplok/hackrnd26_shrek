@@ -1,0 +1,65 @@
+{
+  "npc": "vera",
+  "role": "Экскурсовод",
+  "archetype": "naive",
+  "holds": [
+    "vera_tip"
+  ],
+  "suspicion": {
+    "start": 10,
+    "fail_at": 100
+  },
+  "requires": {
+    "legend": [],
+    "clues": [
+      "staff_list"
+    ]
+  },
+  "tones": [
+    "friendly",
+    "business",
+    "urgent",
+    "flattery"
+  ],
+  "replies": {
+    "greeting": "Здравствуйте! Экскурсия через десять минут, а вы по какому вопросу?",
+    "gives": "А, вы из подрядчиков по договору с городом… Павел Сергеевич у нас хранитель, он отвечает за фонды. Он всегда просит сначала позвонить в канцелярию.",
+    "suspicious": "Ой, я в технике не разбираюсь, давайте лучше с администрацией.",
+    "closed": "Извините, у меня группа ждёт."
+  },
+  "rules": [
+    {
+      "if": {
+        "tone": "friendly",
+        "has_clue": "staff_list"
+      },
+      "then": {
+        "suspicion": -5,
+        "reply": "gives",
+        "grant": [
+          "vera_tip"
+        ]
+      }
+    },
+    {
+      "if": {
+        "tone": "business"
+      },
+      "then": {
+        "suspicion": 10,
+        "reply": "suspicious"
+      }
+    },
+    {
+      "if": {
+        "tone": "urgent"
+      },
+      "then": {
+        "suspicion": 35,
+        "reply": "closed",
+        "flipper": "growl"
+      }
+    }
+  ],
+  "codex": "SL-05"
+}
