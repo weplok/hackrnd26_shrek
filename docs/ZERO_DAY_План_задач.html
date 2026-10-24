@@ -126,9 +126,9 @@ const N = {
 };
 const CRIT = new Set(['A1','A3','B1','B3','B5','C5','D4','B10','D2','G3','G7']);
 // Task status: keep in sync with docs/ZERO_DAY_Задачи.md.
-const DONE = new Set(['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A11', 'D3', 'D8']);
-const DONE_BY = { A4: 'misterEugene', A5: 'weplok', A6: 'Android', A11: 'weplok', D3: 'Lolik' };
-const WIP = { D4: 'misterEugene', D2: 'misterEugene', B1: 'misterEugene', D1: 'misterEugene', G8: 'misterEugene', A7: 'weplok', A8: 'weplok', A10: 'weplok', E1: 'weplok', G1: 'weplok' };
+const DONE = new Set(['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A11', 'D1', 'D3', 'D8']);
+const DONE_BY = { A4: 'misterEugene', D1: 'misterEugene', A5: 'weplok', A6: 'Android', A11: 'weplok', D3: 'Lolik' };
+const WIP = { D4: 'misterEugene', D2: 'misterEugene', B1: 'misterEugene', G8: 'misterEugene', A7: 'weplok', A8: 'weplok', A10: 'weplok', E1: 'weplok', G1: 'weplok' };
 // t(id, after, extra-name, continued)
 const t = (id, after, x, cont) => ({ id, after, x, cont });
 const c = (id, x) => t(id, '', x, true);

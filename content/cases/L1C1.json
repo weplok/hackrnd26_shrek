@@ -233,7 +233,6 @@
   "systems": [
     "tracks",
     "objectives",
-    "flipper",
     "caughtCheck"
   ],
   "report": {
