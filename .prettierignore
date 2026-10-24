@@ -22,3 +22,6 @@ apps/web/src/profile.ts
 apps/web/src/ui.css
 apps/web/storybook-static/
 packages/ui/storybook-static/
+.lighthouseci/
+e2e/test-results/
+e2e/playwright-report/

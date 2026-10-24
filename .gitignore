@@ -9,3 +9,6 @@ __pycache__/
 .env
 .idea/
 apps/web/storybook-static/
+.lighthouseci/
+e2e/test-results/
+e2e/playwright-report/
