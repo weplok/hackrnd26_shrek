@@ -36,7 +36,7 @@
 - [x] **T-A8** · CI-пайплайн (lint → types → контент → тесты → сборка → смоук) · INF · M · P0 · *после:* T-A7 · готово: weplok
 - [x] **T-A9** · Дизайн-система shared/ui + Storybook · WEB · M · P0 · *после:* T-A6
 - [ ] **T-A10** · VPS: Caddy на хосте, домен, Let's Encrypt, reverse proxy на localhost (проверить /ws и /mcp) · INF · S · P0 · *после:* T-A7 · в работе: misterEugene
-  - Прогресс: сделано infra/Caddyfile.host, web на 127.0.0.1, /healthz через web, инструкция в README; осталось развернуть на VPS (домен, Caddy, compose) и проверить /healthz, /ws, /mcp
+  - Прогресс: сделано infra/Caddyfile.host, web на 127.0.0.1, инструкция в README; развёрнуто на game.matedoc.ru (Caddy + Let's Encrypt, compose), /healthz 200 по HTTPS, /ws и /mcp проксируются до api; осталось подтвердить /ws и /mcp после появления эндпоинтов в api
 - [x] **T-A11** · LICENSE (MIT), .env.example, gitleaks, README «запуск за 5 минут» · INF · S · P0 · *после:* T-A1
 
 ### EPIC B — Движок (M1–M2)
