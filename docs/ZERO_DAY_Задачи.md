@@ -29,7 +29,7 @@
 - [x] **T-A1** · Монорепо: pnpm workspaces + uv, структура папок, Makefile · INF · M · P0 · *после:* —
 - [x] **T-A2** · Линтеры/форматтеры/strict-типы, pre-commit · INF · S · P0 · *после:* T-A1
 - [x] **T-A3** · JSON Schema контента (v1) + кодоген TS и Pydantic · CNT · L · P0 · *после:* T-A1
-- [ ] **T-A4** · content-tools: валидатор схем + линтер ссылок + стоп-словарь · CNT · M · P0 · *после:* T-A3 · в работе: misterEugene
+- [x] **T-A4** · content-tools: валидатор схем + линтер ссылок + стоп-словарь · CNT · M · P0 · *после:* T-A3
 - [x] **T-A5** · Расширить `backend_api`: config, JSON-логи/request_id, ошибки, `GET /healthz`, `POST /api/v1/sessions`, локальный rate limit с `429`/`Retry-After`, тесты контрактов · API · L · P0 · *после:* T-A1
 - [x] **T-A6** · Каркас SPA: роутинг, тема/токены, ErrorBoundary, экран никнейма, загрузчик контента · WEB · L · P0 · *после:* T-A1
 - [ ] **T-A7** · Docker Compose (web на Caddy + api + redis + postgres + migrate) + профиль offline · INF · L · P0 · *после:* T-A5, T-A6 · в работе: weplok
