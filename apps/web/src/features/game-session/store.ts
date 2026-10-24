@@ -14,6 +14,7 @@ export type GameSessionStore = {
   caseRun: GameState | null;
   clear: () => void;
   dispatch: (command: Command) => StepResult | undefined;
+  resume: (content: Content, caseRun: GameState) => void;
   start: (input: StartCaseInput) => GameState;
 };
 
@@ -36,6 +37,10 @@ export function createGameSessionStore() {
         gameSessionEffects.emit('engine-event', { event, state: result.state });
       }
       return result;
+    },
+    resume: (nextContent, caseRun) => {
+      content = nextContent;
+      set({ caseRun });
     },
     start: (input) => {
       content = input.content;

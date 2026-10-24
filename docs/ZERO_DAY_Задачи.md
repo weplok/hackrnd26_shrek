@@ -65,9 +65,7 @@
 - [ ] **T-C7** · chat: мессенджер, сборщик реплики, DialogueProvider (scripted) · WEB · M · P0 · *после:* T-C1, T-B8
 - [ ] **T-C8** · scope-диалог и карта последствий · WEB · S · P0 · *после:* T-C1, T-B7
 - [ ] **T-C9** · report + codex + экспорт PNG · WEB · M · P0 · *после:* T-C1, T-B9
-- [ ] **T-C10** · persistence: SaveRepository, чекпоинты, миграции, fallback без localStorage · WEB · M · P0 · *после:* T-C1
-  - в работе: Lolik
-  - Прогресс: назначено Lolik; осталось реализовать persistence.
+- [x] **T-C10** · persistence: SaveRepository, чекпоинты, миграции, fallback без localStorage · WEB · M · P0 · *после:* T-C1
 - [ ] **T-C11** · Мобильная раскладка экрана «Игра» (шторки) · WEB · M · P0 · *после:* T-C2 … T-C7
 - [ ] **T-C12** · Аудио: AudioService, музыка по уровням, UI-звуки и звуки Флиппера, выключатель и громкость · WEB · M · P1 · *после:* T-C1
 

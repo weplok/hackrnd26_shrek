@@ -13,6 +13,7 @@ import { content } from '../content';
 import { GameHud } from '../features/hud';
 import { useCaseStore } from '../features/game-session';
 import { Terminal } from '../features/terminal';
+import { SaveRepository, startAutosave } from '../features/persistence';
 
 type CampaignStart = {
   caseData: Case;
@@ -34,6 +35,7 @@ function getCampaignStart(gameContent: Content): CampaignStart {
 
 const gameContent = content;
 const campaignStart = getCampaignStart(gameContent);
+const saveRepository = new SaveRepository(gameContent.campaign.contentVersion);
 
 type ContentState = { status: 'loading' } | { status: 'ready'; summary: ContentSummary } | { status: 'offline' };
 
@@ -175,6 +177,11 @@ function PageLayout({ children }: { children: ReactNode }): ReactNode {
         </Link>
         <span className="session-status">{nickname ? ru.localProfile(nickname) : ru.localMode}</span>
       </header>
+      {!saveRepository.persistent && (
+        <p className="fine-print" role="status">
+          {ru.storageUnavailable}
+        </p>
+      )}
       {children}
     </main>
   );
@@ -399,14 +406,26 @@ function GamePage(): ReactNode {
   const { caseData, caseId, level } = campaignStart;
   const caseRun = useCaseStore((state) => state.caseRun);
   const start = useCaseStore((state) => state.start);
+  const resume = useCaseStore((state) => state.resume);
+  const [loaded] = useState(() => saveRepository.load());
 
   useEffect(() => {
     if (caseRun?.caseId === caseId) return;
+    if (loaded.save.caseRun?.caseId === caseId) {
+      resume(gameContent, loaded.save.caseRun);
+      return;
+    }
     start({ caseId, content: gameContent, difficulty: level.difficulty });
-  }, [caseId, caseRun?.caseId, level, start]);
+  }, [caseId, caseRun?.caseId, level, loaded, resume, start]);
+
+  useEffect(() => startAutosave(saveRepository, () => useCaseStore.getState().caseRun), []);
 
   if (!caseRun || caseRun.caseId !== caseId) {
-    return <Panel className="page-panel" title={ru.appName}>{ru.contentLoading}</Panel>;
+    return (
+      <Panel className="page-panel" title={ru.appName}>
+        {ru.contentLoading}
+      </Panel>
+    );
   }
 
   const levelNumber = gameContent.campaign.levels.indexOf(level) + 1;
@@ -414,6 +433,11 @@ function GamePage(): ReactNode {
   return (
     <section className="game-screen" aria-label={ru.campaign}>
       <GameHud caseData={caseData} caseRun={caseRun} flipper={gameContent.flipper} level={levelNumber} />
+      {(loaded.status === 'case-reset' || loaded.status === 'corrupt') && (
+        <p className="fine-print" role="status">
+          {ru.saveCaseReset}
+        </p>
+      )}
       <p className="copy">{caseData.brief.text}</p>
       <Terminal vulns={Object.values(gameContent.vulnerabilities)} />
       <Link className="zd-button button-link" to="/">
