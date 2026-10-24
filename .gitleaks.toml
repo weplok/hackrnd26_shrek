@@ -1,0 +1,12 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Ignore vendored developer tooling and archived beta prototypes"
+paths = [
+  '''^\.agents/skills/''',
+  '''^\.claude/plugins/(cache|marketplaces)/''',
+  '''^\.codex/skills/''',
+  '''^\.opencode/skills/''',
+  '''^beta/''',
+]

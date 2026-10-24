@@ -1,0 +1,68 @@
+{
+  "npc": "anton",
+  "role": "Сисадмин колледжа",
+  "archetype": "vain_cautious",
+  "holds": [
+    "anton_vouch"
+  ],
+  "suspicion": {
+    "start": 15,
+    "fail_at": 100
+  },
+  "requires": {
+    "legend": [
+      "legend_it"
+    ],
+    "clues": [
+      "admin_is_anton"
+    ]
+  },
+  "tones": [
+    "friendly",
+    "business",
+    "urgent",
+    "flattery"
+  ],
+  "replies": {
+    "greeting": "Антон. Сеть колледжа держу я. Вы по какому вопросу?",
+    "proud": "Ну да, тут без меня ничего не крутится. Раз вы подрядчик — подскажу, куда смотреть.",
+    "doubt": "Подрядчик? А почему я про вас не слышал? Назовите, с кем из наших работаете.",
+    "guarded": "Так, мне это не нравится. Разговор окончен."
+  },
+  "rules": [
+    {
+      "if": {
+        "tone": "flattery",
+        "has_clue": "admin_is_anton",
+        "has_key": "legend_it"
+      },
+      "then": {
+        "suspicion": -15,
+        "reply": "proud",
+        "grant": [
+          "anton_vouch"
+        ]
+      }
+    },
+    {
+      "if": {
+        "missing_key": "legend_it"
+      },
+      "then": {
+        "suspicion": 25,
+        "reply": "doubt"
+      }
+    },
+    {
+      "if": {
+        "tone": "urgent"
+      },
+      "then": {
+        "suspicion": 40,
+        "reply": "guarded",
+        "flipper": "growl"
+      }
+    }
+  ],
+  "codex": "SL-06"
+}

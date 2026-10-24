@@ -6,10 +6,47 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "pnpm -r --parallel --if-present run dev",
+    "dev": "concurrently --kill-others-on-fail --names web,api \"pnpm -r --parallel --if-present run dev\" \"pnpm run dev:api\"",
+    "dev:api": "uv run --project backend_api uvicorn backend_api.app:app --reload --host 0.0.0.0 --port 8000",
     "build": "pnpm -r --if-present run build",
-    "test": "pnpm -r --if-present run test",
-    "lint": "pnpm -r --if-present run lint",
+    "test": "pnpm run test:ts && pnpm run test:python",
+    "test:ts": "pnpm -r --if-present run test",
+    "test:python": "uv run --project backend_api pytest backend_api/tests",
+    "lint": "pnpm run lint:ts && pnpm run lint:python",
+    "lint:ts": "eslint .",
+    "lint:python": "uv run --project backend_api ruff check --config backend_api/pyproject.toml backend_api",
+    "format": "pnpm run format:ts && pnpm run format:python",
+    "format:ts": "prettier --write .",
+    "format:python": "uv run --project backend_api ruff format --config backend_api/pyproject.toml backend_api",
+    "format:check": "pnpm run format:check:ts && pnpm run format:check:python",
+    "format:check:ts": "prettier --check .",
+    "format:check:python": "uv run --project backend_api ruff format --check --config backend_api/pyproject.toml backend_api",
+    "typecheck": "pnpm run typecheck:ts && pnpm run typecheck:python",
+    "typecheck:ts": "pnpm -r --if-present run typecheck",
+    "typecheck:python": "uv run --project backend_api mypy --config-file backend_api/pyproject.toml backend_api",
+    "hooks:install": "uv run --project backend_api pre-commit install",
+    "hooks:run": "uv run --project backend_api pre-commit run --all-files",
     "content-check": "pnpm --filter @zero-day/content-tools --if-present run check"
+  },
+  "lint-staged": {
+    "*.{js,mjs,cjs,ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,yml,yaml,md,css,html}": "prettier --write"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "@types/node": "26.6.5",
+    "concurrently": "10.0.6",
+    "eslint": "9.39.5",
+    "eslint-plugin-boundaries": "7.2.1",
+    "eslint-plugin-jsx-a11y": "6.10.2",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.13.0",
+    "lint-staged": "17.6.0",
+    "prettier": "3.9.10",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.72.0"
   }
 }

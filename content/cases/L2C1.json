@@ -1,0 +1,850 @@
+{
+  "schemaVersion": 1,
+  "id": "L2C1",
+  "title": "Колледж",
+  "brief": {
+    "client": "«Редут» → местный колледж",
+    "text": "Первый официальный заказ от «Редут». Колледж по договору просит проверить сеть и студенческий портал. Дойди до базы «Деканат», покажи, что к ней можно подобраться, и закрой дыры. База заперта на двойной замок: нужен и технический ключ, и фраза от секретаря."
+  },
+  "scope": {
+    "text": "Сеть колледжа, студенческий портал и внутренние сервисы.",
+    "rules": [
+      "Работать можно с сетью, порталом и сотрудниками по списку.",
+      "Персональные данные студентов и камеры наблюдения — вне договора."
+    ],
+    "consequence": "oos_college"
+  },
+  "segments": [
+    {
+      "id": "student",
+      "label": "Студенческий сегмент",
+      "openAtStart": true
+    },
+    {
+      "id": "admin",
+      "label": "Админский сегмент",
+      "openAtStart": false
+    }
+  ],
+  "nodes": [
+    {
+      "id": "guest_wifi",
+      "kind": "machine",
+      "label": "Гостевой Wi-Fi",
+      "segment": "student",
+      "position": {
+        "x": 8,
+        "y": 45
+      },
+      "inScope": true,
+      "scanNoise": 5,
+      "exploits": [
+        {
+          "vuln": "SL-02",
+          "puzzleParams": {
+            "answer": "college2021",
+            "clues": [
+              "net_name",
+              "intake_year"
+            ],
+            "decoys": [
+              "welcome1",
+              "student123",
+              "guestpass"
+            ]
+          },
+          "knobs": {
+            "attempts": 4,
+            "decoys": 3
+          }
+        }
+      ],
+      "failHints": {
+        "SL-04": "Это точка входа по паролю, а не дырявый сервис — ищи слабый пароль."
+      },
+      "onCompromise": [
+        {
+          "unlockCodex": "SL-02"
+        }
+      ]
+    },
+    {
+      "id": "portal",
+      "kind": "machine",
+      "label": "Студенческий портал",
+      "segment": "student",
+      "position": {
+        "x": 8,
+        "y": 72
+      },
+      "inScope": true,
+      "scanNoise": 8,
+      "exploits": [
+        {
+          "vuln": "SL-04",
+          "puzzleParams": {
+            "component": "portal-cms",
+            "versionBehindBulletin": true
+          },
+          "knobs": {
+            "attempts": 4,
+            "decoys": 2
+          }
+        }
+      ],
+      "failHints": {
+        "SL-02": "У портала проблема не в пароле, а в старой непропатченной версии."
+      },
+      "onCompromise": [
+        {
+          "grantClues": [
+            "dept_list"
+          ]
+        },
+        {
+          "unlockCodex": "SL-04"
+        }
+      ],
+      "revealedBy": {
+        "nodeState": {
+          "node": "guest_wifi",
+          "state": "scanned"
+        }
+      }
+    },
+    {
+      "id": "mail",
+      "kind": "machine",
+      "label": "Почтовый сервер",
+      "segment": "student",
+      "position": {
+        "x": 28,
+        "y": 30
+      },
+      "inScope": true,
+      "scanNoise": 7,
+      "exploits": [
+        {
+          "vuln": "SL-05",
+          "puzzleParams": {
+            "sources": [
+              "about_page",
+              "mail_headers",
+              "dept_pages"
+            ]
+          },
+          "knobs": {
+            "attempts": 4,
+            "decoys": 3
+          }
+        }
+      ],
+      "failHints": {
+        "SL-07": "Сервер не про забытую учётку — он просто слишком много рассказывает о себе."
+      },
+      "onCompromise": [
+        {
+          "grantClues": [
+            "mail_format",
+            "dept_list"
+          ]
+        },
+        {
+          "unlockCodex": "SL-05"
+        }
+      ],
+      "revealedBy": {
+        "nodeState": {
+          "node": "guest_wifi",
+          "state": "scanned"
+        }
+      }
+    },
+    {
+      "id": "kostya",
+      "kind": "person",
+      "label": "Староста Костя",
+      "segment": "student",
+      "position": {
+        "x": 28,
+        "y": 58
+      },
+      "inScope": true,
+      "scanNoise": 4,
+      "exploits": [],
+      "failHints": {},
+      "onCompromise": [
+        {
+          "grantClues": [
+            "admin_is_anton",
+            "dept_list"
+          ]
+        }
+      ],
+      "npc": "kostya",
+      "revealedBy": {
+        "nodeState": {
+          "node": "guest_wifi",
+          "state": "scanned"
+        }
+      }
+    },
+    {
+      "id": "teacher_pc",
+      "kind": "machine",
+      "label": "ПК преподавателя",
+      "segment": "student",
+      "position": {
+        "x": 46,
+        "y": 44
+      },
+      "inScope": true,
+      "scanNoise": 7,
+      "exploits": [
+        {
+          "vuln": "SL-07",
+          "puzzleParams": {
+            "accounts": [
+              "ivanova",
+              "test_svc",
+              "temp_backup"
+            ],
+            "forgotten": "test_svc"
+          },
+          "knobs": {
+            "attempts": 4,
+            "decoys": 3
+          }
+        }
+      ],
+      "failHints": {
+        "SL-06": "Тут не доверие соседних узлов, а конкретная забытая учётка в списке."
+      },
+      "onCompromise": [
+        {
+          "grantClues": [
+            "teacher_testacc",
+            "gateway_gap"
+          ]
+        },
+        {
+          "unlockCodex": "SL-07"
+        }
+      ],
+      "revealedBy": {
+        "nodeState": {
+          "node": "guest_wifi",
+          "state": "scanned"
+        }
+      }
+    },
+    {
+      "id": "printer",
+      "kind": "decoy",
+      "label": "Сетевой принтер",
+      "segment": "student",
+      "position": {
+        "x": 46,
+        "y": 74
+      },
+      "inScope": true,
+      "scanNoise": 4,
+      "exploits": [],
+      "failHints": {},
+      "onCompromise": [],
+      "revealedBy": {
+        "nodeState": {
+          "node": "guest_wifi",
+          "state": "scanned"
+        }
+      }
+    },
+    {
+      "id": "cameras",
+      "kind": "machine",
+      "label": "Камеры наблюдения",
+      "segment": "student",
+      "position": {
+        "x": 28,
+        "y": 84
+      },
+      "inScope": false,
+      "scanNoise": 6,
+      "exploits": [],
+      "failHints": {},
+      "onCompromise": [],
+      "revealedBy": {
+        "nodeState": {
+          "node": "guest_wifi",
+          "state": "scanned"
+        }
+      }
+    },
+    {
+      "id": "gateway",
+      "kind": "machine",
+      "label": "Внутренний шлюз",
+      "segment": "admin",
+      "position": {
+        "x": 60,
+        "y": 50
+      },
+      "inScope": true,
+      "scanNoise": 9,
+      "exploits": [
+        {
+          "vuln": "SL-08",
+          "puzzleParams": {
+            "ruleset": "firewall-grid",
+            "gap": "rule-14-misorder"
+          },
+          "requires": {
+            "hasClue": "gateway_gap"
+          },
+          "knobs": {
+            "attempts": 3,
+            "decoys": 3
+          }
+        }
+      ],
+      "failHints": {
+        "SL-06": "Шлюз проходят не доверием, а щелью в правилах межсетевого экрана."
+      },
+      "onCompromise": [
+        {
+          "openSegment": "admin"
+        },
+        {
+          "unlockCodex": "SL-08"
+        }
+      ],
+      "revealedBy": {
+        "nodeState": {
+          "node": "teacher_pc",
+          "state": "scanned"
+        }
+      }
+    },
+    {
+      "id": "anton",
+      "kind": "person",
+      "label": "Сисадмин Антон",
+      "segment": "admin",
+      "position": {
+        "x": 76,
+        "y": 30
+      },
+      "inScope": true,
+      "scanNoise": 5,
+      "exploits": [],
+      "failHints": {},
+      "onCompromise": [
+        {
+          "grantClues": [
+            "anton_vouch"
+          ]
+        },
+        {
+          "unlockCodex": "SL-06"
+        }
+      ],
+      "npc": "anton",
+      "revealedBy": {
+        "segmentOpen": "admin"
+      }
+    },
+    {
+      "id": "controller",
+      "kind": "machine",
+      "label": "Контроллер домена",
+      "segment": "admin",
+      "position": {
+        "x": 80,
+        "y": 56
+      },
+      "inScope": true,
+      "scanNoise": 8,
+      "exploits": [
+        {
+          "vuln": "SL-06",
+          "puzzleParams": {
+            "trustPath": [
+              "anton_pc",
+              "controller"
+            ]
+          },
+          "requires": {
+            "hasClue": "controller_tech"
+          },
+          "knobs": {
+            "attempts": 4,
+            "decoys": 2
+          }
+        }
+      ],
+      "failHints": {
+        "SL-07": "Сюда заходят по доверенной связи с ПК Антона, а не через забытый аккаунт."
+      },
+      "onCompromise": [
+        {
+          "grantClues": [
+            "controller_token"
+          ]
+        }
+      ],
+      "revealedBy": {
+        "segmentOpen": "admin"
+      }
+    },
+    {
+      "id": "marina",
+      "kind": "person",
+      "label": "Секретарь Марина",
+      "segment": "admin",
+      "position": {
+        "x": 94,
+        "y": 38
+      },
+      "inScope": true,
+      "scanNoise": 4,
+      "exploits": [],
+      "failHints": {},
+      "onCompromise": [
+        {
+          "grantClues": [
+            "marina_phrase"
+          ]
+        }
+      ],
+      "npc": "marina",
+      "revealedBy": {
+        "segmentOpen": "admin"
+      }
+    },
+    {
+      "id": "base_dean",
+      "kind": "target",
+      "label": "База «Деканат»",
+      "segment": "admin",
+      "position": {
+        "x": 94,
+        "y": 64
+      },
+      "inScope": true,
+      "scanNoise": 10,
+      "exploits": [],
+      "failHints": {},
+      "onCompromise": [
+        {
+          "unlockCodex": "SL-03"
+        }
+      ],
+      "revealedBy": {
+        "segmentOpen": "admin"
+      },
+      "lock": {
+        "sockets": [
+          {
+            "id": "sock_tech",
+            "accepts": "key:deanbase_tech",
+            "label": "Технический ключ (контроллер)"
+          },
+          {
+            "id": "sock_human",
+            "accepts": "key:deanbase_human",
+            "label": "Фраза секретаря"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "guest_wifi",
+      "to": "portal"
+    },
+    {
+      "from": "guest_wifi",
+      "to": "mail"
+    },
+    {
+      "from": "guest_wifi",
+      "to": "kostya"
+    },
+    {
+      "from": "mail",
+      "to": "kostya"
+    },
+    {
+      "from": "guest_wifi",
+      "to": "teacher_pc"
+    },
+    {
+      "from": "teacher_pc",
+      "to": "printer"
+    },
+    {
+      "from": "guest_wifi",
+      "to": "cameras"
+    },
+    {
+      "from": "teacher_pc",
+      "to": "gateway"
+    },
+    {
+      "from": "gateway",
+      "to": "anton"
+    },
+    {
+      "from": "gateway",
+      "to": "controller"
+    },
+    {
+      "from": "anton",
+      "to": "controller"
+    },
+    {
+      "from": "controller",
+      "to": "base_dean"
+    },
+    {
+      "from": "gateway",
+      "to": "marina"
+    },
+    {
+      "from": "marina",
+      "to": "base_dean"
+    }
+  ],
+  "clues": [
+    {
+      "id": "net_name",
+      "type": "name",
+      "text": "Имя гостевой сети: college-guest.",
+      "foundOn": "guest_wifi"
+    },
+    {
+      "id": "intake_year",
+      "type": "phrase",
+      "text": "Год набора виден на стендах: 2021.",
+      "foundOn": "guest_wifi"
+    },
+    {
+      "id": "mail_format",
+      "type": "config",
+      "text": "Формат почты сотрудников: фамилия@college.local.",
+      "foundOn": "mail"
+    },
+    {
+      "id": "dept_list",
+      "type": "name",
+      "text": "Список кафедр и кто за что отвечает.",
+      "foundOn": "mail"
+    },
+    {
+      "id": "admin_is_anton",
+      "type": "name",
+      "text": "Админ сети — Антон; любит, когда хвалят его работу.",
+      "foundOn": "kostya"
+    },
+    {
+      "id": "teacher_testacc",
+      "type": "password-fragment",
+      "text": "Забытая учётка test_svc на ПК преподавателя.",
+      "foundOn": "teacher_pc"
+    },
+    {
+      "id": "gateway_gap",
+      "type": "config",
+      "text": "В правилах шлюза есть перепутанное правило — щель.",
+      "foundOn": "teacher_pc"
+    },
+    {
+      "id": "controller_token",
+      "type": "token",
+      "text": "Технический токен с контроллера домена.",
+      "foundOn": "controller"
+    },
+    {
+      "id": "anton_vouch",
+      "type": "phrase",
+      "text": "Антон подтвердил тебя как «своего подрядчика».",
+      "foundOn": "anton"
+    },
+    {
+      "id": "marina_phrase",
+      "type": "phrase",
+      "text": "Фраза-подтверждение от секретаря деканата.",
+      "foundOn": "marina"
+    },
+    {
+      "id": "printer_decoy",
+      "type": "file",
+      "text": "На принтере старый список рассылки — к цели не ведёт.",
+      "foundOn": "printer"
+    }
+  ],
+  "keyRecipes": [
+    {
+      "inputs": [
+        "mail_format",
+        "dept_list"
+      ],
+      "output": "legend_it",
+      "label": "Легенда: IT-подрядчик колледжа"
+    },
+    {
+      "inputs": [
+        "controller_token",
+        "anton_vouch"
+      ],
+      "output": "deanbase_tech",
+      "label": "Технический ключ к базе «Деканат»"
+    },
+    {
+      "inputs": [
+        "marina_phrase",
+        "legend_it"
+      ],
+      "output": "deanbase_human",
+      "label": "Человеческая половина замка (фраза под легендой)"
+    }
+  ],
+  "npcs": [
+    "kostya",
+    "anton",
+    "marina"
+  ],
+  "objectives": [
+    {
+      "id": "obj_enter",
+      "title": "Войти в студенческий сегмент",
+      "doneWhen": {
+        "any": [
+          {
+            "nodeState": {
+              "node": "guest_wifi",
+              "state": "compromised"
+            }
+          },
+          {
+            "nodeState": {
+              "node": "portal",
+              "state": "compromised"
+            }
+          }
+        ]
+      },
+      "checkpoint": true
+    },
+    {
+      "id": "obj_legend",
+      "title": "Собрать легенду",
+      "doneWhen": {
+        "hasKey": "legend_it"
+      }
+    },
+    {
+      "id": "obj_cross",
+      "title": "Пройти в админский сегмент",
+      "doneWhen": {
+        "segmentOpen": "admin"
+      },
+      "checkpoint": true
+    },
+    {
+      "id": "obj_tech",
+      "title": "Собрать технический ключ",
+      "doneWhen": {
+        "hasKey": "deanbase_tech"
+      }
+    },
+    {
+      "id": "obj_human",
+      "title": "Получить фразу секретаря",
+      "doneWhen": {
+        "hasKey": "deanbase_human"
+      }
+    },
+    {
+      "id": "obj_goal",
+      "title": "Открыть базу «Деканат»",
+      "doneWhen": {
+        "nodeState": {
+          "node": "base_dean",
+          "state": "compromised"
+        }
+      },
+      "checkpoint": true
+    },
+    {
+      "id": "obj_secure",
+      "title": "Закрыть дыры и отчитаться",
+      "doneWhen": {
+        "nodeState": {
+          "node": "base_dean",
+          "state": "secured"
+        }
+      }
+    }
+  ],
+  "tracks": [
+    {
+      "id": "alarm",
+      "label": "Тревога",
+      "start": 0
+    }
+  ],
+  "systems": [
+    "tracks",
+    "npcCooldown",
+    "objectives",
+    "flipper",
+    "caughtCheck"
+  ],
+  "report": {
+    "findings": [
+      {
+        "id": "f_wifi",
+        "vuln": "SL-02",
+        "node": "guest_wifi",
+        "options": [
+          {
+            "id": "o1",
+            "text": "Задать длинный уникальный пароль гостевой сети и отделить её от внутренней.",
+            "correct": true
+          },
+          {
+            "id": "o2",
+            "text": "Оставить простой пароль, он же «для удобства».",
+            "correct": false
+          }
+        ],
+        "explanation": "Простой гостевой пароль — вход во всю сеть. Нужен сильный пароль и изоляция гостевого сегмента."
+      },
+      {
+        "id": "f_portal",
+        "vuln": "SL-04",
+        "node": "portal",
+        "options": [
+          {
+            "id": "o1",
+            "text": "Обновить CMS портала и наладить регулярный патч-менеджмент.",
+            "correct": true
+          },
+          {
+            "id": "o2",
+            "text": "Закрыть портал от поисковиков.",
+            "correct": false
+          }
+        ],
+        "explanation": "Известная уязвимость старой версии закрывается обновлением и инвентаризацией компонентов."
+      },
+      {
+        "id": "f_teacher",
+        "vuln": "SL-07",
+        "node": "teacher_pc",
+        "options": [
+          {
+            "id": "o1",
+            "text": "Удалить забытые тестовые учётки и ввести аудит аккаунтов.",
+            "correct": true
+          },
+          {
+            "id": "o2",
+            "text": "Сменить обои на рабочем столе.",
+            "correct": false
+          }
+        ],
+        "explanation": "Забытая учётка test_svc давала доступ в обе зоны. Такие аккаунты удаляют и регулярно проверяют."
+      },
+      {
+        "id": "f_gateway",
+        "vuln": "SL-08",
+        "node": "gateway",
+        "options": [
+          {
+            "id": "o1",
+            "text": "Исправить правила шлюза и усилить сегментацию сети.",
+            "correct": true
+          },
+          {
+            "id": "o2",
+            "text": "Добавить ещё один гостевой Wi-Fi.",
+            "correct": false
+          }
+        ],
+        "explanation": "Щель в правилах позволила перейти в админскую зону. Сегментацию чинят правилами и аудитом."
+      },
+      {
+        "id": "f_controller",
+        "vuln": "SL-06",
+        "node": "controller",
+        "options": [
+          {
+            "id": "o1",
+            "text": "Включить MFA на контроллер и урезать доверенные связи (least privilege).",
+            "correct": true
+          },
+          {
+            "id": "o2",
+            "text": "Переименовать контроллер домена.",
+            "correct": false
+          }
+        ],
+        "explanation": "По доверенной связи можно было дойти до ядра. Помогают MFA, сегментация и минимальные права."
+      }
+    ]
+  },
+  "ranks": [
+    {
+      "id": "rank_ghost",
+      "title": "Призрак",
+      "when": {
+        "trackBelow": {
+          "track": "alarm",
+          "value": 30
+        }
+      }
+    },
+    {
+      "id": "rank_fast",
+      "title": "Молния",
+      "when": {
+        "not": {
+          "tickAtLeast": 22
+        }
+      }
+    },
+    {
+      "id": "rank_pro",
+      "title": "Пентестер «Редут»"
+    }
+  ],
+  "checkpoints": [
+    {
+      "id": "cp_start",
+      "label": "Начало кейса",
+      "when": {
+        "tickAtLeast": 0
+      }
+    },
+    {
+      "id": "cp_admin",
+      "label": "Вошёл в админский сегмент",
+      "when": {
+        "segmentOpen": "admin"
+      }
+    },
+    {
+      "id": "cp_goal",
+      "label": "База открыта",
+      "when": {
+        "nodeState": {
+          "node": "base_dean",
+          "state": "compromised"
+        }
+      }
+    }
+  ]
+}

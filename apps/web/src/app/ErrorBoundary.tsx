@@ -9,17 +9,17 @@ type Props = {
 type State = { error: Error | null };
 
 export class ErrorBoundary extends Component<Props, State> {
-  public state: State = { error: null };
+  public override state: State = { error: null };
 
   public static getDerivedStateFromError(error: Error): State {
     return { error };
   }
 
-  public componentDidCatch(error: Error, info: ErrorInfo): void {
+  public override componentDidCatch(error: Error, info: ErrorInfo): void {
     console.error(error, info);
   }
 
-  public componentDidUpdate(previousProps: Props): void {
+  public override componentDidUpdate(previousProps: Props): void {
     if (this.state.error && previousProps.resetKey !== this.props.resetKey) {
       this.setState({ error: null });
     }
@@ -29,7 +29,7 @@ export class ErrorBoundary extends Component<Props, State> {
     this.setState({ error: null });
   };
 
-  public render(): ReactNode {
+  public override render(): ReactNode {
     if (this.state.error) {
       return this.props.fallback(this.state.error, this.retry);
     }

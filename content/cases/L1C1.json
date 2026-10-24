@@ -1,0 +1,333 @@
+{
+  "schemaVersion": 1,
+  "id": "L1C1",
+  "title": "Сосед: «вскрыл Wi-Fi и научил защищаться»",
+  "brief": {
+    "client": "Сосед Петрович",
+    "text": "Сосед раззадорился: «спорим, мой Wi-Fi ты не вскроешь?» — и сам дал согласие. Осмотри его домашнюю сеть, подбери пароль, покажи, как это просто, и помоги закрыться."
+  },
+  "scope": {
+    "text": "Только домашняя сеть соседа, с его разрешения.",
+    "rules": [
+      "Трогать можно лишь узлы домашней сети соседа.",
+      "Чужие сети и устройства — не наше дело."
+    ]
+  },
+  "segments": [
+    {
+      "id": "home",
+      "label": "Домашняя сеть",
+      "openAtStart": true
+    }
+  ],
+  "nodes": [
+    {
+      "id": "wifi",
+      "kind": "target",
+      "label": "Домашний Wi-Fi (BarsNet)",
+      "segment": "home",
+      "position": {
+        "x": 20,
+        "y": 50
+      },
+      "inScope": true,
+      "scanNoise": 4,
+      "exploits": [
+        {
+          "vuln": "SL-02",
+          "puzzleParams": {
+            "answer": "barsik123",
+            "clues": [
+              "ssid_barsnet",
+              "cat_barsik"
+            ],
+            "decoys": [
+              "qwerty123",
+              "admin1234",
+              "12345678"
+            ]
+          },
+          "knobs": {
+            "attempts": 6,
+            "decoys": 3
+          }
+        }
+      ],
+      "failHints": {
+        "SL-01": "Тут не заводской пароль, а просто слабый. Смотри на кличку кота из названия сети."
+      },
+      "onCompromise": [
+        {
+          "unlockCodex": "SL-02"
+        }
+      ]
+    },
+    {
+      "id": "router",
+      "kind": "machine",
+      "label": "Админка роутера",
+      "segment": "home",
+      "position": {
+        "x": 55,
+        "y": 28
+      },
+      "inScope": true,
+      "scanNoise": 6,
+      "exploits": [
+        {
+          "vuln": "SL-01",
+          "puzzleParams": {
+            "credentials": "admin/admin",
+            "source": "sticker"
+          },
+          "requires": {
+            "hasClue": "router_sticker"
+          },
+          "knobs": {
+            "attempts": 4,
+            "decoys": 1
+          }
+        }
+      ],
+      "failHints": {
+        "SL-02": "Админку не подбирают словарём — пароль прямо на заводской наклейке."
+      },
+      "onCompromise": [
+        {
+          "grantClues": [
+            "wifi_pass_seen"
+          ]
+        },
+        {
+          "unlockCodex": "SL-01"
+        }
+      ],
+      "revealedBy": {
+        "nodeState": {
+          "node": "wifi",
+          "state": "scanned"
+        }
+      }
+    },
+    {
+      "id": "speaker",
+      "kind": "object",
+      "label": "Умная колонка",
+      "segment": "home",
+      "position": {
+        "x": 55,
+        "y": 72
+      },
+      "inScope": true,
+      "scanNoise": 3,
+      "exploits": [],
+      "failHints": {},
+      "onCompromise": [],
+      "revealedBy": {
+        "nodeState": {
+          "node": "wifi",
+          "state": "scanned"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "wifi",
+      "to": "router"
+    },
+    {
+      "from": "wifi",
+      "to": "speaker"
+    },
+    {
+      "from": "router",
+      "to": "speaker"
+    }
+  ],
+  "clues": [
+    {
+      "id": "ssid_barsnet",
+      "type": "name",
+      "text": "Название сети: BarsNet (намёк на кличку кота).",
+      "foundOn": "wifi"
+    },
+    {
+      "id": "cat_barsik",
+      "type": "phrase",
+      "text": "Кота хозяина зовут Барсик.",
+      "foundOn": "speaker"
+    },
+    {
+      "id": "router_sticker",
+      "type": "physkey",
+      "text": "Заводская наклейка роутера: логин/пароль admin.",
+      "foundOn": "speaker"
+    },
+    {
+      "id": "router_model",
+      "type": "config",
+      "text": "Модель роутера видна по колонке.",
+      "foundOn": "speaker"
+    },
+    {
+      "id": "wifi_pass_seen",
+      "type": "password-fragment",
+      "text": "В настройках роутера виден пароль Wi-Fi.",
+      "foundOn": "router"
+    }
+  ],
+  "keyRecipes": [],
+  "npcs": [],
+  "objectives": [
+    {
+      "id": "obj_recon",
+      "title": "Осмотреть домашнюю сеть",
+      "doneWhen": {
+        "nodeState": {
+          "node": "wifi",
+          "state": "scanned"
+        }
+      },
+      "checkpoint": true
+    },
+    {
+      "id": "obj_access",
+      "title": "Подобрать пароль Wi-Fi",
+      "doneWhen": {
+        "any": [
+          {
+            "nodeState": {
+              "node": "wifi",
+              "state": "compromised"
+            }
+          },
+          {
+            "nodeState": {
+              "node": "router",
+              "state": "compromised"
+            }
+          }
+        ]
+      },
+      "checkpoint": true
+    },
+    {
+      "id": "obj_secure",
+      "title": "Закрыть дыру и отчитаться",
+      "doneWhen": {
+        "nodeState": {
+          "node": "wifi",
+          "state": "secured"
+        }
+      }
+    }
+  ],
+  "tracks": [
+    {
+      "id": "alarm",
+      "label": "Тревога",
+      "start": 0
+    }
+  ],
+  "systems": [
+    "tracks",
+    "objectives",
+    "flipper",
+    "caughtCheck"
+  ],
+  "report": {
+    "findings": [
+      {
+        "id": "f_wifi",
+        "vuln": "SL-02",
+        "node": "wifi",
+        "options": [
+          {
+            "id": "o_pass",
+            "text": "Сменить пароль на длинную парольную фразу из несвязанных слов.",
+            "correct": true
+          },
+          {
+            "id": "o_hint",
+            "text": "Оставить пароль, но добавить к нему год.",
+            "correct": false
+          }
+        ],
+        "explanation": "Слабый пароль из клички и цифр подбирается мгновенно. Нужна длинная уникальная парольная фраза."
+      },
+      {
+        "id": "f_router",
+        "vuln": "SL-01",
+        "node": "router",
+        "options": [
+          {
+            "id": "o_admin",
+            "text": "Сменить заводской пароль админки роутера.",
+            "correct": true
+          },
+          {
+            "id": "o_ssid",
+            "text": "Просто переименовать сеть.",
+            "correct": false
+          }
+        ],
+        "explanation": "Заводские admin/admin знают все. Первым делом меняют пароль администратора устройства."
+      }
+    ]
+  },
+  "ranks": [
+    {
+      "id": "rank_ghost",
+      "title": "Призрак",
+      "when": {
+        "trackBelow": {
+          "track": "alarm",
+          "value": 25
+        }
+      }
+    },
+    {
+      "id": "rank_fast",
+      "title": "Молния",
+      "when": {
+        "not": {
+          "tickAtLeast": 10
+        }
+      }
+    },
+    {
+      "id": "rank_done",
+      "title": "Специалист"
+    }
+  ],
+  "checkpoints": [
+    {
+      "id": "cp_start",
+      "label": "Начало кейса",
+      "when": {
+        "tickAtLeast": 0
+      }
+    },
+    {
+      "id": "cp_access",
+      "label": "Пароль найден",
+      "when": {
+        "any": [
+          {
+            "nodeState": {
+              "node": "wifi",
+              "state": "compromised"
+            }
+          },
+          {
+            "nodeState": {
+              "node": "router",
+              "state": "compromised"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

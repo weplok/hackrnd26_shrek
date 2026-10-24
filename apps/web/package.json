@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
     "react": "18.3.1",

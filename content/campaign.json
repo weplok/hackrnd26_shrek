@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "contentVersion": "0.1.0",
+  "levels": [
+    {
+      "id": "L1",
+      "title": "Сам по себе",
+      "accent": "#f0b429",
+      "difficulty": {
+        "noiseMultiplier": 0.6,
+        "alarmDecayPerTick": 3,
+        "wrongGuessNoise": 6,
+        "hints": {
+          "frequency": "high",
+          "depth": "answer"
+        },
+        "flipperPreWarn": true,
+        "puzzleKnobs": {
+          "password-wheel": {
+            "attempts": 6,
+            "decoys": 2
+          },
+          "sticker": {
+            "attempts": 4,
+            "decoys": 1
+          },
+          "open-door": {
+            "attempts": 4,
+            "decoys": 2
+          },
+          "legend-mosaic": {
+            "attempts": 5,
+            "decoys": 2
+          },
+          "trust-path": {
+            "attempts": 5,
+            "decoys": 1
+          }
+        }
+      },
+      "cases": [
+        "L1C1"
+      ]
+    },
+    {
+      "id": "L2",
+      "title": "По компаниям",
+      "accent": "#c27a12",
+      "difficulty": {
+        "noiseMultiplier": 1.0,
+        "alarmDecayPerTick": 1,
+        "wrongGuessNoise": 12,
+        "hints": {
+          "frequency": "medium",
+          "depth": "direction"
+        },
+        "flipperPreWarn": true,
+        "puzzleKnobs": {
+          "password-wheel": {
+            "attempts": 4,
+            "decoys": 3
+          },
+          "expired-patch": {
+            "attempts": 4,
+            "decoys": 2
+          },
+          "legend-mosaic": {
+            "attempts": 4,
+            "decoys": 3
+          },
+          "forgotten-key": {
+            "attempts": 4,
+            "decoys": 3
+          },
+          "wall": {
+            "attempts": 3,
+            "decoys": 3
+          },
+          "trust-path": {
+            "attempts": 4,
+            "decoys": 2
+          }
+        }
+      },
+      "cases": [
+        "L2C1"
+      ]
+    }
+  ],
+  "interludes": [
+    {
+      "afterCase": "L1C1",
+      "interlude": "into_redut"
+    },
+    {
+      "afterCase": "L2C1",
+      "interlude": "recognition"
+    }
+  ]
+}
