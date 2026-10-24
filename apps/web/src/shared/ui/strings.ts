@@ -143,6 +143,7 @@ export const ru = {
     notice: (attack: string, node: string, ok: boolean) =>
       `Вид атаки ${attack} ${ok ? 'подошёл' : 'не подошёл'} (${node}).`,
     attackOf: {
+      scan: 'сканирования',
       brute: 'брутфорса',
       virus: 'заражения вирусом',
       ddos: 'DDoS',
