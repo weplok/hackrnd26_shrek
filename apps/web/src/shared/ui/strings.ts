@@ -192,6 +192,7 @@ export const ru = {
     objectiveDone: 'Выполнено',
     flipper: 'ФЛИППЕР',
     flipperReady: 'На связи. Следим за обстановкой.',
+    achievement: 'АЧИВКА',
     moods: {
       sleeping: 'спит спокойно',
       alert: 'насторожен',

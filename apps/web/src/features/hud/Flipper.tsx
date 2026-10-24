@@ -3,6 +3,7 @@ import type { Flipper as FlipperContent, GameState } from '@zero-day/engine';
 import { subscribeToGameEvents } from '../game-session';
 import { ru } from '../../shared/ui/strings';
 import { findFlipperLine, getFlipperMood, getFlipperText } from './logic';
+import { useAchievements, type Achievement } from './achievements';
 
 import './hud.css';
 
@@ -19,6 +20,19 @@ export function Flipper({ caseId, level, lines, tracks }: FlipperProps): ReactNo
   const [line, setLine] = useState<{ caseId: string; text: string } | null>(null);
   const lastSpoken = useRef<{ caseId: string; tick: number } | undefined>(undefined);
   const mood = getFlipperMood(tracks);
+  const latestAchievement = useAchievements((state) => state.latest);
+  const [badge, setBadge] = useState<Achievement | null>(null);
+
+  useEffect(() => {
+    if (!latestAchievement) return;
+    setBadge(latestAchievement);
+    const id = window.setTimeout(() => {
+      setBadge(null);
+    }, 6000);
+    return () => {
+      window.clearTimeout(id);
+    };
+  }, [latestAchievement]);
 
   useEffect(() => {
     return subscribeToGameEvents(({ event, state }) => {
@@ -51,6 +65,13 @@ export function Flipper({ caseId, level, lines, tracks }: FlipperProps): ReactNo
           {line?.caseId === caseId ? line.text : ru.hud.flipperReady}
         </p>
       </div>
+      {badge && (
+        <div className="flipper__achievement" role="status" aria-live="polite">
+          <span className="flipper__achievement-tag">{ru.hud.achievement}</span>
+          <strong className="flipper__achievement-title">{badge.title}</strong>
+          <span className="flipper__achievement-desc">{badge.desc}</span>
+        </div>
+      )}
     </aside>
   );
 }

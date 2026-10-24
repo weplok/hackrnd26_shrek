@@ -4,7 +4,7 @@ import { Button, Panel } from '@zero-day/ui';
 import { answerReport, closeChat, noiseSources, openChat, present, profileStyle, wait } from '@zero-day/engine';
 import type { Case, Command, Content, GameState } from '@zero-day/engine';
 import { useCaseStore } from '../features/game-session';
-import { HudBar, ObjectiveTracker, Flipper, hasFlipperJoined } from '../features/hud';
+import { HudBar, ObjectiveTracker, Flipper, hasFlipperJoined, startAchievements } from '../features/hud';
 import { AttackNotice, AttackTable } from '../features/attack-log';
 import { NetworkMap } from '../features/network-map/NetworkMap';
 import { startAutosave, withCaseRun, type SaveRepository } from '../features/persistence';
@@ -73,6 +73,7 @@ export function MissionPage({
   }, [caseRun?.phase]);
 
   useEffect(() => startAutosave(repository, () => useCaseStore.getState().caseRun), [repository]);
+  useEffect(() => startAchievements(repository), [repository]);
 
   // Chat, wait and report steps are engine calls outside the command pipeline, so autosave never sees the win.
   useEffect(() => {

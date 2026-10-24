@@ -12,6 +12,8 @@ export interface SaveData {
   caseRun: GameState | null;
   /** Codex cards opened across the campaign. */
   codex: string[];
+  /** Achievement ids unlocked across the campaign (announced once by Flipper). */
+  achievements: string[];
   /** Successes across completed cases; used for the career profile. */
   profile: CareerProfile;
 }
@@ -41,6 +43,7 @@ export function emptySave(contentVersion: string): SaveData {
     completedCases: [],
     caseRun: null,
     codex: [],
+    achievements: [],
     profile: { technicalSuccesses: 0, socialSuccesses: 0 },
   };
 }
@@ -131,6 +134,7 @@ export class SaveRepository {
       ...empty,
       completedCases: stringList(data.completedCases),
       codex: stringList(data.codex),
+      achievements: stringList(data.achievements),
       profile: careerProfile(data.profile),
     };
     const caseRun = data.caseRun;

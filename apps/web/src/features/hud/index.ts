@@ -4,3 +4,5 @@ export { HudBar } from './HudBar';
 export { ObjectiveTracker } from './ObjectiveTracker';
 export { findFlipperLine, getFlipperMood, getFlipperText, getTrackStatus, hasFlipperJoined } from './logic';
 export type { FlipperMood } from './logic';
+export { ACHIEVEMENTS, startAchievements, useAchievements } from './achievements';
+export type { Achievement } from './achievements';
