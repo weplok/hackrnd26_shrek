@@ -9,6 +9,8 @@ import {
   failHint,
   combine,
   fillSocket,
+  confirmScope,
+  needsScopeConfirm,
 } from './engine.ts';
 import { verifyPuzzle } from './puzzles/index.ts';
 
@@ -19,6 +21,8 @@ export type Command =
   | { type: 'CancelPuzzle' }
   | { type: 'CombineClues'; a: string; b: string }
   | { type: 'FillSocket'; node: string; socket: string; key: string }
+  | { type: 'ConfirmOutOfScope'; node: string }
+  | { type: 'DeclineOutOfScope' }
   | { type: 'RestoreCheckpoint' };
 
 export type RejectReason =
@@ -28,6 +32,8 @@ export type RejectReason =
   | 'node-dim'
   | 'no-socket'
   | 'socket-filled'
+  | 'scope-pending'
+  | 'no-scope-pending'
   | 'puzzle-active'
   | 'no-puzzle'
   | 'not-scanned'
@@ -47,6 +53,9 @@ export type GameEvent =
   | { type: 'SocketRejected'; node: string; socket: string; key: string }
   | { type: 'LockOpened'; node: string }
   | { type: 'ScopeWarning'; node: string }
+  | { type: 'ScopeViolated'; node: string }
+  | { type: 'ScopeDeclined'; node: string }
+  | { type: 'ConsequenceShown'; consequence: string; reputationDelta: number }
   | { type: 'PuzzleOpened'; node: string; vuln: string }
   | { type: 'PuzzleCancelled'; node: string }
   | { type: 'PuzzleSolved'; node: string }
@@ -71,6 +80,10 @@ export function validate(content: Content, s: GameState, cmd: Command): RejectRe
   // TZ 7.1: in caught only RestoreCheckpoint is accepted.
   if (cmd.type === 'RestoreCheckpoint') return s.phase === 'caught' && s.checkpoint ? null : 'not-caught';
   if (s.phase !== 'playing') return 'not-playing';
+  if (cmd.type === 'ConfirmOutOfScope') return s.pendingScope === cmd.node ? null : 'no-scope-pending';
+  if (cmd.type === 'DeclineOutOfScope') return s.pendingScope ? null : 'no-scope-pending';
+  // The out-of-scope dialog is modal: it must be answered first.
+  if (s.pendingScope) return 'scope-pending';
   switch (cmd.type) {
     case 'ScanNode':
     case 'ProposeHypothesis': {
@@ -80,7 +93,7 @@ export function validate(content: Content, s: GameState, cmd: Command): RejectRe
       if (isDim(n, s)) return 'node-dim';
       if (s.activePuzzle) return 'puzzle-active';
       if (cmd.type === 'ScanNode') return null;
-      if (!n.inScope) return null;
+      if (needsScopeConfirm(s, n)) return null;
       if (n.kind === 'person' || n.lock) return 'not-exploitable';
       if (!s.nodes[cmd.node]?.scanned) return 'not-scanned';
       return null;
@@ -133,6 +146,10 @@ function run(content: Content, s: GameState, cmd: Command): GameState {
       return combine(content, s, [cmd.a, cmd.b]);
     case 'FillSocket':
       return fillSocket(content, s, cmd.node, cmd.socket, cmd.key);
+    case 'ConfirmOutOfScope':
+      return confirmScope(content, s, true);
+    case 'DeclineOutOfScope':
+      return confirmScope(content, s, false);
   }
 }
 
@@ -148,6 +165,15 @@ function primaryEvents(content: Content, prev: GameState, next: GameState, cmd: 
       return [{ type: 'PuzzleCancelled', node: prev.activePuzzle?.nodeId ?? '' }];
     case 'RestoreCheckpoint':
       return [{ type: 'CheckpointRestored', checkpoint: next.checkpoint?.id ?? '' }];
+    case 'ConfirmOutOfScope': {
+      const ev: GameEvent[] = [{ type: 'ScopeViolated', node: cmd.node }];
+      const id = content.cases[prev.caseId]?.scope.consequence;
+      const cons = id ? content.consequences[id] : undefined;
+      if (cons) ev.push({ type: 'ConsequenceShown', consequence: cons.id, reputationDelta: cons.reputationDelta });
+      return ev;
+    }
+    case 'DeclineOutOfScope':
+      return [{ type: 'ScopeDeclined', node: prev.pendingScope ?? '' }];
     case 'CombineClues': {
       const keys = added(prev.keys, next.keys);
       if (!keys.length) return [{ type: 'CombineFailed', a: cmd.a, b: cmd.b }];

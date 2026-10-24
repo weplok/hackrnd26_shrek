@@ -26,6 +26,10 @@ function nodeRt(s: GameState, id: string): NodeRuntime {
   if (!rt) throw new Error(`unknown node ${id}`);
   return rt;
 }
+// FR-090: only the first action on an out-of-scope node asks; a confirmed node stays open.
+export function needsScopeConfirm(s: GameState, n: ContentNode): boolean {
+  return !n.inScope && !s.flags[`scope_ok:${n.id}`];
+}
 function targetNode(c: Case): ContentNode | undefined {
   return c.nodes.find((n) => n.kind === 'target');
 }
@@ -211,7 +215,7 @@ export function scan(content: Content, state: GameState, nodeId: string): GameSt
   const c = getCase(content, s);
   const n = node(c, nodeId);
   if (!n || !nodeRt(s, nodeId).revealed) return s;
-  if (!n.inScope) {
+  if (needsScopeConfirm(s, n)) {
     s.pendingScope = nodeId;
     return s;
   }
@@ -280,7 +284,7 @@ export function hypothesize(content: Content, state: GameState, nodeId: string, 
   const c = getCase(content, s);
   const n = node(c, nodeId);
   if (!n || !nodeRt(s, nodeId).revealed) return s;
-  if (!n.inScope) {
+  if (needsScopeConfirm(s, n)) {
     s.pendingScope = nodeId;
     return s;
   }
@@ -406,7 +410,7 @@ export function openChat(content: Content, state: GameState, npcId: string): Gam
   const s = clone(state);
   const c = getCase(content, s);
   const n = c.nodes.find((x) => x.npc === npcId);
-  if (n && !n.inScope) {
+  if (n && needsScopeConfirm(s, n)) {
     s.pendingScope = n.id;
     return s;
   }
@@ -462,6 +466,7 @@ export function confirmScope(content: Content, state: GameState, go: boolean): G
   if (!nodeId) return s;
   if (go) {
     s.flags.scope_violated = true;
+    s.flags[`scope_ok:${nodeId}`] = true;
     s.log.push({ t: '!! Выход за рамки договора. Заказчик это увидит.', kind: 'bad' });
     stepAlarm(s, 30, nodeId);
   } else {
@@ -491,6 +496,8 @@ export function restoreCheckpoint(content: Content, state: GameState): GameState
   s.rng = state.rng;
   s.maxAlarm = state.maxAlarm;
   s.codex = { ...s.codex, ...state.codex };
+  // FR-092: a violation survives a rollback; only a replay of the case is clean.
+  if (state.flags.scope_violated) s.flags.scope_violated = true;
   s.checkpoint = structuredClone(cp);
   s.log = [...state.log, { t: `<< откат к чекпоинту: ${label}`, kind: 'sys' }];
   return s;
