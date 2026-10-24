@@ -123,8 +123,16 @@
 }
 
 .network-map__node-kind {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--color-green);
   font: 1.125rem/1 var(--font-mono);
+}
+
+.network-map__device-icon {
+  width: 1.75rem;
+  height: 1.75rem;
 }
 
 .network-map__node-label {

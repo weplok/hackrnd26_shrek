@@ -46,6 +46,12 @@ export const ru = {
   campaign: 'КАМПАНИЯ',
   campaignCopy: 'Здесь появятся карта кейсов и выбор задания.',
   briefTitle: (client: string) => `ЗАКАЗЧИК: ${client}`,
+  briefing: {
+    lead: 'НОВЫЙ ЗАКАЗ',
+    scopeTitle: 'Рамки договора',
+    start: 'Взяться за дело',
+    dismissLabel: 'Закрыть бриф',
+  },
   networkMap: {
     title: 'КАРТА СЕТИ',
     count: (count: number) => `открыто узлов: ${count}`,

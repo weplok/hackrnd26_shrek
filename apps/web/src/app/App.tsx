@@ -4,6 +4,7 @@ import { Button, Panel } from '@zero-day/ui';
 import type { Campaign, Case, Content, GameState } from '@zero-day/engine';
 import { ErrorBoundary } from './ErrorBoundary';
 import { content } from '../content';
+import { BriefingModal } from '../features/briefing';
 import { useCaseStore } from '../features/game-session';
 import { GameHud } from '../features/hud';
 import { NetworkMap } from '../features/network-map/NetworkMap';
@@ -471,6 +472,7 @@ function GamePage(): ReactNode {
   const resume = useCaseStore((state) => state.resume);
   const [loaded] = useState(() => saveRepository.load());
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [briefingOpen, setBriefingOpen] = useState(true);
 
   useEffect(() => {
     if (caseRun?.caseId === caseId) return;
@@ -495,6 +497,14 @@ function GamePage(): ReactNode {
 
   return (
     <section className="game-screen" aria-label={ru.campaign}>
+      {briefingOpen ? (
+        <BriefingModal
+          caseData={caseData}
+          onClose={() => {
+            setBriefingOpen(false);
+          }}
+        />
+      ) : null}
       <GameHud caseData={caseData} caseRun={caseRun} flipper={gameContent.flipper} level={levelNumber} />
       <div className="game-screen__map">
         <NetworkMap
