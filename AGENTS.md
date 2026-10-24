@@ -23,12 +23,8 @@ Floor: code, commands, paths, numbers and error strings verbatim; never drop not
 
 # Project rules
 
-- Read `docs/ZERO DAY — Техническое задание.md` first. Treat it as source of truth.
-- Read task-specific `.md` files in `docs/` when needed. Filenames describe their scope.
-- Before work, identify affected requirements and relevant `docs/*.md` specifications.
 - Before implementation, discuss any conflict between developer request and specifications with developer.
 - After agreement, clarify specifications with developer. Change them only with explicit developer approval, then begin work.
-- Never modify specification `.md` files in `docs/` without explicit developer approval.
 - Optimize for token use first. Read only relevant files and avoid repeated context.
 - Optimize for time second. Make shortest viable change and stop when request is met.
 - Do not add over-engineering, speculative features, or unrelated cleanup.
