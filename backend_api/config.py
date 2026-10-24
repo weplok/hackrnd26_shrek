@@ -42,6 +42,8 @@ class Settings:
     dialogue_rate_limit: int = 20
     telemetry_retention_days: int = 30
     redis_url: str = ""
+    llm_timeout_seconds: int = 30
+    llm_max_retries: int = 1
 
     def require_llm(self) -> None:
         values = {
