@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CodexCard",
+  "description": "content/catalog/codex/SL-xx.json: one Codex card.",
+  "type": "object",
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/definitions/SchemaVersion" },
+    "id": { "$ref": "common.schema.json#/definitions/VulnId" },
+    "realTerm": { "$ref": "common.schema.json#/definitions/Text" },
+    "whyItWorks": { "$ref": "common.schema.json#/definitions/Text" },
+    "defense": { "$ref": "common.schema.json#/definitions/Text" },
+    "realCase": { "$ref": "common.schema.json#/definitions/Text" },
+    "law": { "$ref": "common.schema.json#/definitions/Text" },
+    "learnMore": {
+      "description": "Legal training resources only.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": { "$ref": "common.schema.json#/definitions/Text" },
+          "url": { "type": "string", "pattern": "^https://" }
+        },
+        "required": ["title", "url"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["schemaVersion", "id", "realTerm", "whyItWorks", "defense", "realCase", "law", "learnMore"],
+  "additionalProperties": false
+}
