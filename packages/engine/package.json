@@ -10,7 +10,7 @@
     "./load": "./src/load.ts"
   },
   "scripts": {
-    "test": "node --experimental-strip-types test/playthrough.ts",
+    "test": "node --experimental-strip-types --test test/core.ts && node --experimental-strip-types test/playthrough.ts",
     "typecheck": "tsc --project tsconfig.json --noEmit"
   }
 }

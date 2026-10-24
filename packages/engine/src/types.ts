@@ -1,12 +1,32 @@
 // ZERO DAY engine — runtime types. Framework-agnostic.
 import type {
-  Case, Node as ContentNode, Exploit, Condition, Effect, Difficulty,
-  CodexCard, Vulnerability, Consequence, Campaign, Interludes, Flipper,
-} from "./content/types.gen.ts";
+  Case,
+  Node as ContentNode,
+  Exploit,
+  Condition,
+  Effect,
+  Difficulty,
+  CodexCard,
+  Vulnerability,
+  Consequence,
+  Campaign,
+  Interludes,
+  Flipper,
+} from './content/types.gen.ts';
 
 export type {
-  Case, ContentNode, Exploit, Condition, Effect, Difficulty,
-  CodexCard, Vulnerability, Consequence, Campaign, Interludes, Flipper,
+  Case,
+  ContentNode,
+  Exploit,
+  Condition,
+  Effect,
+  Difficulty,
+  CodexCard,
+  Vulnerability,
+  Consequence,
+  Campaign,
+  Interludes,
+  Flipper,
 };
 
 /** Scripted NPC config (content/npc/<id>.json). No JSON-schema; shape per ИИ-диалоги diz-doc. */
@@ -51,7 +71,7 @@ export interface Content {
   interludes: Interludes;
 }
 
-export type TrackId = "alarm" | "logs" | "antifraud" | "attention";
+export type TrackId = 'alarm' | 'logs' | 'antifraud' | 'attention';
 
 export interface NodeRuntime {
   revealed: boolean;
@@ -66,7 +86,7 @@ export interface NpcRuntime {
   yielded: boolean;
 }
 
-export type Phase = "briefing" | "playing" | "report" | "won" | "caught";
+export type Phase = 'briefing' | 'playing' | 'report' | 'won' | 'caught';
 
 export interface PuzzleInstance {
   nodeId: string;
@@ -75,11 +95,14 @@ export interface PuzzleInstance {
   title: string;
   prompt: string;
   options: { id: string; label: string }[];
-  multi: boolean;          // select multiple (legend-mosaic)
-  correct: string[];       // option ids that are correct
+  multi: boolean; // select multiple (legend-mosaic)
+  correct: string[]; // option ids that are correct
 }
 
-export interface LogEntry { t: string; kind: string; }
+export interface LogEntry {
+  t: string;
+  kind: string;
+}
 
 export interface GameState {
   caseId: string;
@@ -99,11 +122,11 @@ export interface GameState {
   npc: Record<string, NpcRuntime>;
   sockets: Record<string, Record<string, boolean>>; // nodeId -> socketId -> filled
   objectives: Record<string, boolean>;
-  report: Record<string, boolean>;       // findingId -> answeredCorrectly
-  rng: number;                            // mutable RNG state
+  report: Record<string, boolean>; // findingId -> answeredCorrectly
+  rng: number; // mutable RNG state
   activePuzzle: PuzzleInstance | null;
   activeChat: string | null;
-  pendingScope: string | null;           // node id awaiting out-of-scope confirm
+  pendingScope: string | null; // node id awaiting out-of-scope confirm
   rank: string | null;
   log: LogEntry[];
   difficulty: Difficulty;

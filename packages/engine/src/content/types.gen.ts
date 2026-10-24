@@ -28,7 +28,8 @@ export type Effect =
   | EffectAddTrack
   | EffectUnlockCodex
   | EffectFlipperSay
-  | EffectCompleteObjective;
+  | EffectCompleteObjective
+  | EffectCompromiseNode;
 /**
  * @minItems 1
  */
@@ -289,6 +290,12 @@ export interface EffectFlipperSay {
 }
 export interface EffectCompleteObjective {
   completeObjective: string;
+}
+/**
+ * Take a node as if the player broke it, running its onCompromise; for alternative paths to the same result.
+ */
+export interface EffectCompromiseNode {
+  compromiseNode: string;
 }
 export interface Lock {
   /**

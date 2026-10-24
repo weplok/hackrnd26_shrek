@@ -233,6 +233,8 @@ for (const [caseId, { file, data: c }] of cases) {
           return flagsRead.push({ where, flag: v });
         case 'setFlag':
           return flagsSet.add(v);
+        case 'compromiseNode':
+          return ref(file, where, 'node', v, nodes);
         case 'revealNodes':
           return v.forEach((/** @type {string} */ n) => ref(file, where, 'node', n, nodes));
         case 'grantClues':

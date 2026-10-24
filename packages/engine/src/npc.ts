@@ -1,5 +1,5 @@
 // Scripted NPC dialogue resolution (MVP offline path; same design as live npc_api).
-import type { NpcConfig, NpcRule, GameState } from "./types.ts";
+import type { NpcConfig, NpcRule, GameState } from './types.ts';
 
 export interface NpcOutcome {
   suspicionDelta: number;
@@ -9,12 +9,7 @@ export interface NpcOutcome {
   matched: boolean;
 }
 
-export function resolveNpcTurn(
-  cfg: NpcConfig,
-  s: GameState,
-  tone: string,
-  selected: string[],
-): NpcOutcome {
+export function resolveNpcTurn(cfg: NpcConfig, s: GameState, tone: string, selected: string[]): NpcOutcome {
   const has = (id: string) => !!s.clues[id] || !!s.keys[id] || selected.includes(id);
   for (const rule of cfg.rules) {
     if (matches(rule, tone, has)) {
@@ -22,12 +17,12 @@ export function resolveNpcTurn(
         suspicionDelta: rule.then.suspicion,
         replyKey: rule.then.reply,
         grant: rule.then.grant ?? [],
-        flipper: rule.then.flipper,
+        ...(rule.then.flipper !== undefined && { flipper: rule.then.flipper }),
         matched: true,
       };
     }
   }
-  return { suspicionDelta: 8, replyKey: "nervous", grant: [], matched: false };
+  return { suspicionDelta: 8, replyKey: 'nervous', grant: [], matched: false };
 }
 
 function matches(rule: NpcRule, tone: string, has: (id: string) => boolean): boolean {
