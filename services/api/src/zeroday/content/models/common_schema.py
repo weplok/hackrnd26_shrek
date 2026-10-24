@@ -97,14 +97,6 @@ class NodeStateValue(StrEnum):
     scanned = 'scanned'
 
 
-class Tone(StrEnum):
-    friendly = 'friendly'
-    business = 'business'
-    urgent = 'urgent'
-    flattery = 'flattery'
-    pushy = 'pushy'
-
-
 class EventType(StrEnum):
     CaseStarted = 'CaseStarted'
     NodeScanned = 'NodeScanned'

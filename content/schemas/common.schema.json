@@ -43,7 +43,6 @@
       "type": "string",
       "enum": ["hidden", "dim", "visible", "untouched", "compromised", "secured", "calm", "alerted", "detected", "scanned"]
     },
-    "Tone": { "type": "string", "enum": ["friendly", "business", "urgent", "flattery", "pushy"] },
     "EventType": {
       "type": "string",
       "enum": [

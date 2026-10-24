@@ -42,7 +42,6 @@ export interface Content {
   consequences?: Consequences;
   flipper?: Flipper;
   interludes?: Interludes;
-  npc?: Npc;
   puzzles?: Puzzles;
   vulnerabilities?: Vulnerabilities;
 }
@@ -487,71 +486,6 @@ export interface Interlude {
     illustration?: string;
   }[];
   effects?: Effects;
-}
-/**
- * content/npc/<id>.json: persona, suspicion, facts and the scripted rule table.
- */
-export interface Npc {
-  schemaVersion: 1;
-  id: string;
-  name: string;
-  persona: {
-    role: string;
-    character: string;
-    speechStyle: string;
-  };
-  suspicion: {
-    start: number;
-    lockAt: number;
-    cooldownTicks?: number;
-  };
-  greeting: string;
-  facts: Fact[];
-  /**
-   * @minItems 1
-   */
-  rules: Rule[];
-  /**
-   * @minItems 1
-   */
-  scriptedLines: Line[];
-  llm?: {
-    systemPromptRef: string;
-    allowedFactIds: string[];
-  };
-}
-export interface Fact {
-  id: string;
-  text: string;
-  grantsClue?: string;
-}
-/**
- * Rules are checked in order; the first matching rule fires.
- */
-export interface Rule {
-  id: string;
-  intent?: string;
-  /**
-   * @minItems 1
-   */
-  tones?: ("friendly" | "business" | "urgent" | "flattery" | "pushy")[];
-  /**
-   * Clue or key ids the player must attach to the line.
-   */
-  presented?: string[];
-  /**
-   * Clue or key ids that must not be attached.
-   */
-  missing?: string[];
-  when?: Condition;
-  suspicion: number;
-  reply: string;
-  revealFacts?: string[];
-  effects?: Effects;
-}
-export interface Line {
-  id: string;
-  text: string;
 }
 /**
  * content/catalog/puzzles.json: puzzle archetype registry.
