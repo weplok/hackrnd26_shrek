@@ -74,12 +74,15 @@ export interface Content {
 
 export type TrackId = 'alarm' | 'logs' | 'antifraud' | 'attention';
 
+export type NodeAlertLevel = 'calm' | 'alerted' | 'detected';
+
 export interface NodeRuntime {
   segment: string;
   revealed: boolean;
   scanned: boolean;
   compromised: boolean;
   secured: boolean;
+  alertLevel: NodeAlertLevel;
 }
 
 export interface NpcRuntime {

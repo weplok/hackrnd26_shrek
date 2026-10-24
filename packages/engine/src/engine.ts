@@ -35,7 +35,14 @@ export function createGame(content: Content, caseId: string, difficulty: Difficu
   if (!c) throw new Error(`unknown case ${caseId}`);
   const nodes: GameState['nodes'] = {};
   for (const n of c.nodes) {
-    nodes[n.id] = { segment: n.segment, revealed: !n.revealedBy, scanned: false, compromised: false, secured: false };
+    nodes[n.id] = {
+      segment: n.segment,
+      revealed: !n.revealedBy,
+      scanned: false,
+      compromised: false,
+      secured: false,
+      alertLevel: 'calm',
+    };
   }
   const segmentsOpen: Record<string, boolean> = {};
   for (const seg of c.segments) segmentsOpen[seg.id] = seg.openAtStart;
@@ -204,6 +211,7 @@ export function scan(content: Content, state: GameState, nodeId: string): GameSt
   }
   if (nodeRt(s, nodeId).scanned) {
     // FR-030: repeat scan yields nothing new but still makes noise
+    nodeRt(s, nodeId).alertLevel = 'detected';
     s.log.push({ t: `[scan] ${n.label}: нового нет, только шум.`, kind: 'bad' });
     stepAlarm(s, n.scanNoise, nodeId);
     recompute(content, s);
@@ -232,6 +240,7 @@ function completeScan(content: Content, s: GameState, nodeId: string): void {
   const n = node(c, nodeId);
   if (!n || nodeRt(s, nodeId).scanned) return;
   nodeRt(s, nodeId).scanned = true;
+  nodeRt(s, nodeId).alertLevel = 'alerted';
   s.scans += 1;
   s.techActions += 1;
   // recon surfaces clues foundOn this node, except those granted on compromise
@@ -310,6 +319,7 @@ export function submitPuzzle(content: Content, state: GameState, selected: strin
       t: left > 0 ? `✗ не вышло, попыток осталось: ${String(left)}.` : '✗ головоломка не решена.',
       kind: 'bad',
     });
+    nodeRt(s, n.id).alertLevel = 'detected';
     stepAlarm(s, s.difficulty.wrongGuessNoise * puzzleLogic(inst.archetype).noise(result, inst.knobs), n.id);
     return s;
   }
@@ -327,6 +337,7 @@ export function submitPuzzle(content: Content, state: GameState, selected: strin
     compromise(content, s, n);
     stepAlarm(s, noise, n.id);
   } else {
+    nodeRt(s, n.id).alertLevel = 'detected';
     const hint = failHint(n, inst);
     s.log.push({ t: `✗ не та слабость. ${hint}`, kind: 'bad' });
     stepAlarm(s, s.difficulty.wrongGuessNoise, n.id);

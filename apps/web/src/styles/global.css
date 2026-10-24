@@ -237,6 +237,26 @@ a {
   width: 100%;
   max-width: none;
 }
+.campaign-map {
+  margin-top: 1.5rem;
+}
+.campaign-map__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: 0.75rem;
+}
+.campaign-map__selection,
+.campaign-map__warning {
+  margin: 0;
+  color: var(--color-muted);
+  font: 0.6875rem/1.5 var(--font-mono);
+}
+.campaign-map__warning {
+  margin-bottom: 0.75rem;
+  color: var(--color-amber);
+}
 .page-panel h1 {
   margin: 0 0 0.75rem;
   font-size: clamp(1.875rem, 6vw, 3.375rem);
@@ -290,6 +310,10 @@ a {
     padding-top: 1rem;
   }
   .form-actions {
+    flex-direction: column;
+  }
+  .campaign-map__actions {
+    align-items: stretch;
     flex-direction: column;
   }
 }

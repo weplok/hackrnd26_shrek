@@ -1,20 +1,21 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Button, Panel } from '@zero-day/ui';
-import type { Campaign, Case, Content } from '@zero-day/engine';
+import type { Campaign, Case, Content, GameState } from '@zero-day/engine';
 import { ErrorBoundary } from './ErrorBoundary';
+import { content } from '../content';
+import { useCaseStore } from '../features/game-session';
+import { GameHud } from '../features/hud';
+import { NetworkMap } from '../features/network-map/NetworkMap';
+import { SaveRepository, startAutosave } from '../features/persistence';
+import { PuzzleHost, ToolLab } from '../features/puzzle-host';
+import { Terminal } from '../features/terminal';
 import { loadContentSummary, type ContentSummary } from '../shared/content/loadContent';
 import { readNickname, saveNickname } from '../shared/profile/storage';
 import { validateNickname, type NicknameError } from '../shared/profile/nickname';
 import { createAnonymousSession, type SessionState } from '../shared/session/createSession';
 import { ru } from '../shared/ui/strings';
 import { TelemetryClient } from '../telemetry';
-import { content } from '../content';
-import { GameHud } from '../features/hud';
-import { useCaseStore } from '../features/game-session';
-import { Terminal } from '../features/terminal';
-import { SaveRepository, startAutosave } from '../features/persistence';
-import { PuzzleHost, ToolLab } from '../features/puzzle-host';
 
 type CampaignStart = {
   caseData: Case;
@@ -407,6 +408,51 @@ function ContentStatusPanel({
   );
 }
 
+function NetworkMapPanel({ caseData, caseRun }: { caseData: Case; caseRun: GameState }): ReactNode {
+  const dispatch = useCaseStore((state) => state.dispatch);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [scopeWarning, setScopeWarning] = useState(false);
+
+  const selectedNode = selectedNodeId ? caseData.nodes.find((node) => node.id === selectedNodeId) : undefined;
+  const selectedRuntime = selectedNode ? caseRun.nodes[selectedNode.id] : undefined;
+
+  return (
+    <section className="campaign-map">
+      <div className="campaign-map__actions">
+        <p aria-live="polite" className="campaign-map__selection">
+          {selectedNode ? ru.networkMap.currentNode(selectedNode.label) : ru.networkMap.selectNode}
+        </p>
+        <Button
+          disabled={!selectedNode || !selectedRuntime || selectedRuntime.secured}
+          onClick={() => {
+            if (!selectedNode) return;
+            const result = dispatch({ type: 'ScanNode', node: selectedNode.id });
+            setScopeWarning(Boolean(result?.state.pendingScope));
+          }}
+          type="button"
+          variant="primary"
+        >
+          {ru.networkMap.scan}
+        </Button>
+      </div>
+      {scopeWarning ? (
+        <p className="campaign-map__warning" role="status">
+          {ru.networkMap.scopeWarning}
+        </p>
+      ) : null}
+      <NetworkMap
+        caseData={caseData}
+        gameState={caseRun}
+        onSelectNode={(nodeId) => {
+          setScopeWarning(false);
+          setSelectedNodeId(nodeId);
+        }}
+        selectedNodeId={selectedNodeId}
+      />
+    </section>
+  );
+}
+
 function PlaceholderPage({ title, copy }: { title: string; copy: string }): ReactNode {
   return (
     <Panel className="page-panel" title={ru.appName}>
@@ -450,6 +496,7 @@ function GamePage(): ReactNode {
   return (
     <section className="game-screen" aria-label={ru.campaign}>
       <GameHud caseData={caseData} caseRun={caseRun} flipper={gameContent.flipper} level={levelNumber} />
+      <NetworkMapPanel caseData={caseData} caseRun={caseRun} />
       {(loaded.status === 'case-reset' || loaded.status === 'corrupt') && (
         <p className="fine-print" role="status">
           {ru.saveCaseReset}

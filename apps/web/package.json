@@ -13,6 +13,7 @@
     "storybook:build": "storybook build"
   },
   "dependencies": {
+    "@xyflow/react": "12.12.0",
     "@zero-day/engine": "workspace:*",
     "@zero-day/ui": "workspace:*",
     "mitt": "^3.0.1",

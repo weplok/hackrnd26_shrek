@@ -37,6 +37,7 @@ void test('scan reveals neighbours and clues; repeat scan only adds noise', () =
   const r = E.apply(content, opened.state, { type: 'SubmitPuzzle', answer: opened.state.activePuzzle?.correct ?? [] });
   const scanned = r.events.find((event) => event.type === 'NodeScanned');
   assert.deepEqual(scanned, { type: 'NodeScanned', node: 'wifi', repeat: false });
+  assert.equal(r.state.nodes.wifi?.alertLevel, 'alerted');
   const revealed = r.events.find((e) => e.type === 'NodesRevealed');
   assert.deepEqual(revealed, { type: 'NodesRevealed', nodes: ['router', 'speaker'] });
   assert.ok(types(r.events).includes('CluesFound'));
@@ -46,6 +47,7 @@ void test('scan reveals neighbours and clues; repeat scan only adds noise', () =
   assert.ok(!types(again.events).includes('CluesFound'));
   assert.equal(again.state.tick, r.state.tick + 1);
   assert.ok((again.state.tracks.alarm ?? 0) >= (r.state.tracks.alarm ?? 0));
+  assert.equal(again.state.nodes.wifi?.alertLevel, 'detected');
 });
 
 void test('hypothesis needs a scanned node and a single active puzzle', () => {
@@ -95,6 +97,7 @@ void test('solved puzzle for the wrong vuln reports mismatch with failHint', () 
   const hint = content.cases.L1C1?.nodes.find((n) => n.id === 'wifi')?.failHints['SL-01'];
   assert.deepEqual(r.events[1], { type: 'ExploitMismatched', node: 'wifi', vuln: 'SL-01', failHint: hint });
   assert.equal(r.state.nodes.wifi?.compromised, false);
+  assert.equal(r.state.nodes.wifi?.alertLevel, 'detected');
 });
 
 void test('wrong answer costs an attempt and makes noise; last attempt closes the puzzle', () => {
@@ -108,6 +111,7 @@ void test('wrong answer costs an attempt and makes noise; last attempt closes th
   assert.deepEqual(r.events[0], { type: 'PuzzleFailed', node: 'wifi', attemptsLeft: attempts - 1 });
   assert.ok(types(r.events).includes('Ticked'));
   assert.equal(r.state.activePuzzle?.attemptsLeft, attempts - 1);
+  assert.equal(r.state.nodes.wifi?.alertLevel, 'detected');
   s = r.state;
   for (let i = 1; i < attempts; i++) s = E.apply(content, s, { type: 'SubmitPuzzle', answer: [wrong] }).state;
   assert.equal(s.activePuzzle, null);
