@@ -81,7 +81,7 @@
 ### EPIC E — Живые NPC (M4)
 
 - [ ] **T-E1** · Порт LlmClient + адаптер OpenAI-совместимый (основной) + FakeLlm + circuit breaker · API · M · P2 · *после:* T-A5
-- [ ] **T-E2** · Конвейер POST /npc/turn: судья → правила (Py) → актёр → фильтры · API · L · P2 · *после:* T-E1, T-B8
+- [ ] **T-E2** · Конвейер `POST /dialogue`: судья инъекций → NPC → судья доверия → SQLite-сессия · API · L · P2 · *после:* T-E1, T-B8
 - [ ] **T-E3** · Бюджеты/лимиты LLM + метрики + moderation_incidents · API · M · P2 · *после:* T-E2
 - [ ] **T-E4** · LlmProvider на клиенте + fallback на scripted · WEB · S · P2 · *после:* T-E2, T-C7
 - [ ] **T-E5** · Eval-набор NPC + golden-фикстуры правил TS↔Py · QA · M · P2 · *после:* T-E2
