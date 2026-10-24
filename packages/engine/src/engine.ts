@@ -181,6 +181,12 @@ function compromise(content: Content, s: GameState, n: ContentNode): void {
   if (nodeRt(s, n.id).compromised) return;
   nodeRt(s, n.id).compromised = true;
   s.log.push({ t: `✓ узел взят: ${n.label}`, kind: 'ok' });
+  // Pivoting: a taken node exposes its links; neighbours of a closed segment stay dim (FR-024).
+  for (const e of getCase(content, s).edges) {
+    const other = e.from === n.id ? e.to : e.to === n.id ? e.from : null;
+    const rt = other ? s.nodes[other] : undefined;
+    if (rt) rt.revealed = true;
+  }
   applyEffects(n.onCompromise, s, compromiser(content, s));
 }
 
@@ -366,7 +372,14 @@ export function combine(content: Content, state: GameState, selected: string[]):
   return s;
 }
 
-export function fillSocket(content: Content, state: GameState, nodeId: string, socketId: string): GameState {
+// keyId omitted = use the key the socket accepts; a wrong or missing key makes noise.
+export function fillSocket(
+  content: Content,
+  state: GameState,
+  nodeId: string,
+  socketId: string,
+  keyId?: string,
+): GameState {
   const s = clone(state);
   if (s.phase !== 'playing') return s;
   const c = getCase(content, s);
@@ -374,9 +387,12 @@ export function fillSocket(content: Content, state: GameState, nodeId: string, s
   if (!n || !n.lock || !nodeRt(s, nodeId).revealed) return s;
   const sock = n.lock.sockets.find((x) => x.id === socketId);
   if (!sock) return s;
-  const keyId = sock.accepts.replace(/^key:/, '');
-  if (!s.keys[keyId]) {
-    s.log.push({ t: `Нет ключа для гнезда «${sock.label}».`, kind: 'bad' });
+  const accepted = sock.accepts.replace(/^key:/, '');
+  const key = keyId ?? accepted;
+  if (key !== accepted || !s.keys[key]) {
+    s.log.push({ t: `Ключ не подходит к гнезду «${sock.label}».`, kind: 'bad' });
+    stepAlarm(s, 3, nodeId);
+    recompute(content, s);
     return s;
   }
   s.sockets[nodeId] = { ...s.sockets[nodeId], [socketId]: true };

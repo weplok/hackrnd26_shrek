@@ -1,6 +1,15 @@
 // Command pipeline (TZ 7.2–7.3): validate → handler → events derived from the state diff.
-import type { Content, GameState } from './types.ts';
-import { scan, hypothesize, submitPuzzle, cancelPuzzle, restoreCheckpoint, failHint } from './engine.ts';
+import type { Content, ContentNode, GameState } from './types.ts';
+import {
+  scan,
+  hypothesize,
+  submitPuzzle,
+  cancelPuzzle,
+  restoreCheckpoint,
+  failHint,
+  combine,
+  fillSocket,
+} from './engine.ts';
 import { verifyPuzzle } from './puzzles/index.ts';
 
 export type Command =
@@ -8,12 +17,17 @@ export type Command =
   | { type: 'ProposeHypothesis'; node: string; vuln: string }
   | { type: 'SubmitPuzzle'; answer: string[] }
   | { type: 'CancelPuzzle' }
+  | { type: 'CombineClues'; a: string; b: string }
+  | { type: 'FillSocket'; node: string; socket: string; key: string }
   | { type: 'RestoreCheckpoint' };
 
 export type RejectReason =
   | 'not-playing'
   | 'unknown-node'
   | 'node-hidden'
+  | 'node-dim'
+  | 'no-socket'
+  | 'socket-filled'
   | 'puzzle-active'
   | 'no-puzzle'
   | 'not-scanned'
@@ -27,6 +41,11 @@ export type GameEvent =
   | { type: 'NodesRevealed'; nodes: string[] }
   | { type: 'CluesFound'; clues: string[] }
   | { type: 'TrackChanged'; track: string; from: number; to: number }
+  | { type: 'KeyAssembled'; key: string }
+  | { type: 'CombineFailed'; a: string; b: string }
+  | { type: 'SocketFilled'; node: string; socket: string }
+  | { type: 'SocketRejected'; node: string; socket: string; key: string }
+  | { type: 'LockOpened'; node: string }
   | { type: 'ScopeWarning'; node: string }
   | { type: 'PuzzleOpened'; node: string; vuln: string }
   | { type: 'PuzzleCancelled'; node: string }
@@ -58,6 +77,7 @@ export function validate(content: Content, s: GameState, cmd: Command): RejectRe
       const n = content.cases[s.caseId]?.nodes.find((x) => x.id === cmd.node);
       if (!n) return 'unknown-node';
       if (!s.nodes[cmd.node]?.revealed) return 'node-hidden';
+      if (isDim(n, s)) return 'node-dim';
       if (s.activePuzzle) return 'puzzle-active';
       if (cmd.type === 'ScanNode') return null;
       if (!n.inScope) return null;
@@ -68,7 +88,26 @@ export function validate(content: Content, s: GameState, cmd: Command): RejectRe
     case 'SubmitPuzzle':
     case 'CancelPuzzle':
       return s.activePuzzle ? null : 'no-puzzle';
+    case 'CombineClues':
+      return s.activePuzzle ? 'puzzle-active' : null;
+    case 'FillSocket': {
+      const n = content.cases[s.caseId]?.nodes.find((x) => x.id === cmd.node);
+      if (!n) return 'unknown-node';
+      if (!s.nodes[cmd.node]?.revealed) return 'node-hidden';
+      if (isDim(n, s)) return 'node-dim';
+      if (s.activePuzzle) return 'puzzle-active';
+      if (!n.lock?.sockets.some((x) => x.id === cmd.socket)) return 'no-socket';
+      if (s.sockets[cmd.node]?.[cmd.socket]) return 'socket-filled';
+      return null;
+    }
   }
+}
+
+// FR-024 / TZ 7.1: a node of a closed segment is dim and takes no actions,
+// except the gateway itself: the node whose compromise opens its own segment.
+function isDim(n: ContentNode, s: GameState): boolean {
+  if (s.segmentsOpen[n.segment] !== false) return false;
+  return !n.onCompromise.some((e) => 'openSegment' in e && e.openSegment === n.segment);
 }
 
 export function apply(content: Content, state: GameState, cmd: Command): StepResult {
@@ -90,6 +129,10 @@ function run(content: Content, s: GameState, cmd: Command): GameState {
       return cancelPuzzle(content, s);
     case 'RestoreCheckpoint':
       return restoreCheckpoint(content, s);
+    case 'CombineClues':
+      return combine(content, s, [cmd.a, cmd.b]);
+    case 'FillSocket':
+      return fillSocket(content, s, cmd.node, cmd.socket, cmd.key);
   }
 }
 
@@ -105,13 +148,30 @@ function primaryEvents(content: Content, prev: GameState, next: GameState, cmd: 
       return [{ type: 'PuzzleCancelled', node: prev.activePuzzle?.nodeId ?? '' }];
     case 'RestoreCheckpoint':
       return [{ type: 'CheckpointRestored', checkpoint: next.checkpoint?.id ?? '' }];
+    case 'CombineClues': {
+      const keys = added(prev.keys, next.keys);
+      if (!keys.length) return [{ type: 'CombineFailed', a: cmd.a, b: cmd.b }];
+      return keys.map((key) => ({ type: 'KeyAssembled', key }));
+    }
+    case 'FillSocket': {
+      if (!next.sockets[cmd.node]?.[cmd.socket])
+        return [{ type: 'SocketRejected', node: cmd.node, socket: cmd.socket, key: cmd.key }];
+      const ev: GameEvent[] = [{ type: 'SocketFilled', node: cmd.node, socket: cmd.socket }];
+      if (next.nodes[cmd.node]?.compromised && !prev.nodes[cmd.node]?.compromised)
+        ev.push({ type: 'LockOpened', node: cmd.node });
+      return ev;
+    }
     case 'SubmitPuzzle': {
       const inst = prev.activePuzzle;
       if (!inst) return [];
       const node = inst.nodeId;
       if (!verifyPuzzle(inst, cmd.answer))
         return [{ type: 'PuzzleFailed', node, attemptsLeft: next.activePuzzle?.attemptsLeft ?? 0 }];
-      if (inst.action === 'scan') return [{ type: 'PuzzleSolved', node }, { type: 'NodeScanned', node, repeat: false }];
+      if (inst.action === 'scan')
+        return [
+          { type: 'PuzzleSolved', node },
+          { type: 'NodeScanned', node, repeat: false },
+        ];
       if (next.nodes[node]?.compromised && !prev.nodes[node]?.compromised)
         return [
           { type: 'PuzzleSolved', node },
