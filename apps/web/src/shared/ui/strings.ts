@@ -139,8 +139,13 @@ export const ru = {
     title: 'УЗЕЛ',
     label: (node: string) => `Действия с узлом ${node}`,
     scan: 'Сканировать',
-    exploit: 'Применить слабость',
-    back: 'Назад',
+    attacks: {
+      brute: 'Брутфорс',
+      virus: 'Заражение вирусом',
+      ddos: 'DDoS-атака',
+      social: 'Социальная инженерия',
+      injection: 'Инъекции',
+    },
     close: 'Закрыть',
   },
   hud: {

@@ -297,6 +297,7 @@ function NodeInspector({
           node={node.id}
           label={node.label}
           vulns={Object.values(content.vulnerabilities)}
+          nodeVulns={node.exploits?.map((exploit) => exploit.vuln)}
           onScan={(id) => dispatch({ type: 'ScanNode', node: id })}
           onHypothesis={(id, vuln) => dispatch({ type: 'ProposeHypothesis', node: id, vuln })}
           onClose={onClose}
