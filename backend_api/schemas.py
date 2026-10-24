@@ -25,6 +25,7 @@ class DialogueRequest(BaseModel):
 class DialogueResponse(BaseModel):
     answer: str
     verdict: Literal["continue", "ended", "noticed"]
+    trust_points: int
 
 
 class HealthResponse(BaseModel):

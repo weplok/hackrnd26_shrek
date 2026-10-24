@@ -30,17 +30,17 @@ class DialogueService:
 
     async def reply(self, npc_id: str, user_uuid: str, message: str) -> DialogueResponse:
         permitted = await self._check_injection(message)
-        if not permitted:
-            return DialogueResponse(
-                answer=INJECTION_BLOCK_MESSAGE,
-                verdict="continue",
-            )
-
         profile = self.characters.get(npc_id)
         initial_trust = self._trust_value(profile, "начальный_уровень")
         lock = self._locks.setdefault((npc_id, user_uuid), asyncio.Lock())
         async with lock:
             session = self.sessions.get_or_create(npc_id, user_uuid, initial_trust)
+            if not permitted:
+                return DialogueResponse(
+                    answer=INJECTION_BLOCK_MESSAGE,
+                    verdict="continue",
+                    trust_points=session.trust_level,
+                )
             npc_response = await self._generate_npc_response(profile, session.history, message)
             verdict = await self._judge_trust(profile, session.trust_level, message, npc_response)
             return self._apply_verdict(session, verdict.verdict, verdict.trust_change, message, npc_response, profile)
@@ -184,6 +184,7 @@ class DialogueService:
             return DialogueResponse(
                 answer=SECURITY_CLOSED_MESSAGE if security_reported else CLOSED_MESSAGE,
                 verdict="noticed" if security_reported else "ended",
+                trust_points=trust_level,
             )
 
         self.sessions.save(
@@ -201,6 +202,7 @@ class DialogueService:
         return DialogueResponse(
             answer=npc_response,
             verdict="continue",
+            trust_points=trust_level,
         )
 
     @staticmethod
