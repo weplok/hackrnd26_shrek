@@ -10,7 +10,10 @@
     "./load": "./src/load.ts"
   },
   "scripts": {
-    "test": "node --experimental-strip-types --test test/core.ts test/commands.ts && node --experimental-strip-types test/playthrough.ts",
+    "test": "node --experimental-strip-types --test",
     "typecheck": "tsc --project tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5"
   }
 }

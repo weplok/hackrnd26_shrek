@@ -33,6 +33,7 @@ Floor: code, commands, paths, numbers and error strings verbatim; never drop not
 - Optimize for time second. Make shortest viable change and stop when request is met.
 - Do not add over-engineering, speculative features, or unrelated cleanup.
 - Do not run failure-test cycles or extra checks. Run only smallest relevant check when needed.
+- After completing a task and adding tests, ensure they run in GitHub Actions. Prefer existing discovery commands; add or update CI only when discovery does not cover them.
 - Ask developer about clarifications, disputes, or unsolvable problems.
 - Preserve existing behavior unless request or applicable project document requires change.
 

@@ -33,7 +33,7 @@
 - [x] **T-A5** · Расширить `backend_api`: config, JSON-логи/request_id, ошибки, `GET /healthz`, `POST /api/v1/sessions`, локальный rate limit с `429`/`Retry-After`, тесты контрактов · API · L · P0 · *после:* T-A1
 - [x] **T-A6** · Каркас SPA: роутинг, тема/токены, ErrorBoundary, экран никнейма, загрузчик контента · WEB · L · P0 · *после:* T-A1
 - [x] **T-A7** · Docker Compose (web на Caddy + api + redis + postgres + migrate) + профиль offline · INF · L · P0 · *после:* T-A5, T-A6
-- [ ] **T-A8** · CI-пайплайн (lint → types → контент → тесты → сборка → смоук) · INF · M · P0 · *после:* T-A7 · в работе: weplok
+- [x] **T-A8** · CI-пайплайн (lint → types → контент → тесты → сборка → смоук) · INF · M · P0 · *после:* T-A7 · готово: weplok
 - [x] **T-A9** · Дизайн-система shared/ui + Storybook · WEB · M · P0 · *после:* T-A6
 - [ ] **T-A10** · VPS: Caddy на хосте, домен, Let's Encrypt, reverse proxy на localhost (проверить /ws и /mcp) · INF · S · P0 · *после:* T-A7 · в работе: weplok
 - [x] **T-A11** · LICENSE (MIT), .env.example, gitleaks, README «запуск за 5 минут» · INF · S · P0 · *после:* T-A1

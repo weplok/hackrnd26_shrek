@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.3
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: 0.9.6
+          enable-cache: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pnpm install --frozen-lockfile
+          uv sync --frozen --project backend_api --group dev
+
+      - name: Secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Lint
+        run: pnpm lint && pnpm format:check
+
+      - name: Types
+        run: pnpm typecheck
+
+      - name: Content
+        run: pnpm content-check
+
+      - name: Tests
+        run: pnpm test
+
+      - name: Build
+        run: |
+          pnpm build
+          docker compose --profile online build
+
+      - name: Smoke
+        env:
+          WEB_PORT: '8080'
+        run: |
+          cp .env.example .env
+          docker compose --profile online up --detach --wait --no-build
+          curl --fail --retry 5 http://127.0.0.1:8080/
+          curl --fail --retry 5 --request POST http://127.0.0.1:8080/api/v1/sessions
+
+      - name: Stop smoke stack
+        if: always()
+        run: docker compose --profile online down --volumes --remove-orphans
