@@ -136,17 +136,20 @@ export function buildNetworkMap(caseData: Case, gameState: GameState, selectedNo
       if (!from || !to) throw new Error(`Missing runtime state for edge ${edge.from}:${edge.to}.`);
       const active = from.compromised || to.compromised;
       const locked = !gameState.segmentsOpen[from.segment] || !gameState.segmentsOpen[to.segment];
+      // Blink only toward a reachable node that is not compromised yet.
+      const frontier = !locked && from.compromised !== to.compromised;
 
       return {
         id: `${edge.from}:${edge.to}`,
         source: edge.from,
         target: edge.to,
-        type: 'smoothstep',
-        animated: active && !locked,
+        type: 'straight',
+        animated: frontier,
         selectable: false,
         style: {
           stroke: locked ? 'var(--color-green-dim)' : active ? 'var(--color-green-bright)' : 'var(--color-line)',
           strokeWidth: active ? 2 : 1.25,
+          strokeDasharray: '6 4',
         },
       };
     });
