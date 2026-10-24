@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Consequences",
+  "description": "content/consequences.json: consequence maps for out-of-scope actions.",
+  "type": "object",
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/definitions/SchemaVersion" },
+    "items": { "type": "array", "items": { "$ref": "#/definitions/Consequence" }, "minItems": 1 }
+  },
+  "required": ["schemaVersion", "items"],
+  "additionalProperties": false,
+  "definitions": {
+    "Consequence": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "common.schema.json#/definitions/Id" },
+        "title": { "$ref": "common.schema.json#/definitions/Text" },
+        "facts": { "type": "array", "items": { "$ref": "common.schema.json#/definitions/Text" }, "minItems": 1 },
+        "reputationDelta": { "type": "integer" }
+      },
+      "required": ["id", "title", "facts", "reputationDelta"],
+      "additionalProperties": false
+    }
+  }
+}

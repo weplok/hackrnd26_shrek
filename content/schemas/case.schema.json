@@ -1,0 +1,255 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Case",
+  "description": "One case of the campaign: content/cases/<id>.json.",
+  "type": "object",
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/definitions/SchemaVersion" },
+    "id": { "$ref": "common.schema.json#/definitions/CaseId" },
+    "title": { "$ref": "common.schema.json#/definitions/Text" },
+    "brief": { "$ref": "#/definitions/Brief" },
+    "scope": { "$ref": "#/definitions/Scope" },
+    "difficulty": { "$ref": "common.schema.json#/definitions/DifficultyOverride" },
+    "segments": { "type": "array", "items": { "$ref": "#/definitions/Segment" }, "minItems": 1 },
+    "nodes": { "type": "array", "items": { "$ref": "#/definitions/Node" }, "minItems": 1 },
+    "edges": { "type": "array", "items": { "$ref": "#/definitions/Edge" } },
+    "clues": { "type": "array", "items": { "$ref": "#/definitions/Clue" } },
+    "keyRecipes": { "type": "array", "items": { "$ref": "#/definitions/KeyRecipe" } },
+    "npcs": { "type": "array", "items": { "$ref": "common.schema.json#/definitions/Id" }, "uniqueItems": true },
+    "objectives": { "type": "array", "items": { "$ref": "#/definitions/Objective" }, "minItems": 1 },
+    "tracks": { "type": "array", "items": { "$ref": "#/definitions/TrackConfig" }, "minItems": 1 },
+    "systems": { "type": "array", "items": { "$ref": "common.schema.json#/definitions/SystemId" }, "uniqueItems": true },
+    "report": { "$ref": "#/definitions/Report" },
+    "ranks": { "type": "array", "items": { "$ref": "#/definitions/Rank" }, "minItems": 1 },
+    "checkpoints": { "type": "array", "items": { "$ref": "#/definitions/Checkpoint" } }
+  },
+  "required": [
+    "schemaVersion",
+    "id",
+    "title",
+    "brief",
+    "scope",
+    "segments",
+    "nodes",
+    "edges",
+    "clues",
+    "keyRecipes",
+    "npcs",
+    "objectives",
+    "tracks",
+    "systems",
+    "report",
+    "ranks",
+    "checkpoints"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "Brief": {
+      "type": "object",
+      "properties": {
+        "client": { "$ref": "common.schema.json#/definitions/Text" },
+        "text": { "$ref": "common.schema.json#/definitions/Text" },
+        "illustration": { "type": "string" }
+      },
+      "required": ["client", "text"],
+      "additionalProperties": false
+    },
+    "Scope": {
+      "type": "object",
+      "properties": {
+        "text": { "$ref": "common.schema.json#/definitions/Text" },
+        "rules": { "type": "array", "items": { "$ref": "common.schema.json#/definitions/Text" } },
+        "consequence": {
+          "description": "Consequence shown when the player confirms an out-of-scope action.",
+          "$ref": "common.schema.json#/definitions/Id"
+        }
+      },
+      "required": ["text"],
+      "additionalProperties": false
+    },
+    "Segment": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "common.schema.json#/definitions/Id" },
+        "label": { "$ref": "common.schema.json#/definitions/Text" },
+        "openAtStart": { "type": "boolean" }
+      },
+      "required": ["id", "label", "openAtStart"],
+      "additionalProperties": false
+    },
+    "Node": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "common.schema.json#/definitions/Id" },
+        "kind": { "type": "string", "enum": ["machine", "person", "object", "target", "decoy"] },
+        "label": { "$ref": "common.schema.json#/definitions/Text" },
+        "segment": { "$ref": "common.schema.json#/definitions/Id" },
+        "position": { "$ref": "common.schema.json#/definitions/Position" },
+        "inScope": { "type": "boolean" },
+        "revealedBy": { "$ref": "common.schema.json#/definitions/Condition" },
+        "scanNoise": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "npc": {
+          "description": "NPC behind a person node.",
+          "$ref": "common.schema.json#/definitions/Id"
+        },
+        "exploits": { "type": "array", "items": { "$ref": "#/definitions/Exploit" } },
+        "failHints": {
+          "description": "Hint per wrong vulnerability guess, keyed by SL-xx.",
+          "type": "object",
+          "propertyNames": { "$ref": "common.schema.json#/definitions/VulnId" },
+          "additionalProperties": { "$ref": "common.schema.json#/definitions/Text" }
+        },
+        "lock": { "$ref": "#/definitions/Lock" },
+        "onCompromise": { "$ref": "common.schema.json#/definitions/Effects" }
+      },
+      "required": ["id", "kind", "label", "segment", "position", "inScope", "scanNoise", "exploits", "failHints", "onCompromise"],
+      "additionalProperties": false
+    },
+    "Exploit": {
+      "type": "object",
+      "properties": {
+        "vuln": { "$ref": "common.schema.json#/definitions/VulnId" },
+        "requires": { "$ref": "common.schema.json#/definitions/Condition" },
+        "puzzleParams": {
+          "description": "Archetype-specific generator data; the puzzle plugin validates it.",
+          "type": "object"
+        },
+        "knobs": { "$ref": "common.schema.json#/definitions/Knobs" },
+        "effects": { "$ref": "common.schema.json#/definitions/Effects" }
+      },
+      "required": ["vuln", "puzzleParams"],
+      "additionalProperties": false
+    },
+    "Lock": {
+      "type": "object",
+      "properties": {
+        "sockets": { "type": "array", "items": { "$ref": "#/definitions/Socket" }, "minItems": 1 }
+      },
+      "required": ["sockets"],
+      "additionalProperties": false
+    },
+    "Socket": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "common.schema.json#/definitions/Id" },
+        "accepts": { "$ref": "common.schema.json#/definitions/KeyRef" },
+        "label": { "$ref": "common.schema.json#/definitions/Text" }
+      },
+      "required": ["id", "accepts", "label"],
+      "additionalProperties": false
+    },
+    "Edge": {
+      "type": "object",
+      "properties": {
+        "from": { "$ref": "common.schema.json#/definitions/Id" },
+        "to": { "$ref": "common.schema.json#/definitions/Id" },
+        "revealedBy": { "$ref": "common.schema.json#/definitions/Condition" }
+      },
+      "required": ["from", "to"],
+      "additionalProperties": false
+    },
+    "Clue": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "common.schema.json#/definitions/Id" },
+        "type": {
+          "type": "string",
+          "enum": ["password-fragment", "file", "name", "phrase", "config", "token", "physkey", "legend"]
+        },
+        "text": { "$ref": "common.schema.json#/definitions/Text" },
+        "foundOn": { "$ref": "common.schema.json#/definitions/Id" }
+      },
+      "required": ["id", "type", "text", "foundOn"],
+      "additionalProperties": false
+    },
+    "KeyRecipe": {
+      "type": "object",
+      "properties": {
+        "inputs": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/definitions/Id" },
+          "minItems": 2,
+          "uniqueItems": true
+        },
+        "output": { "$ref": "common.schema.json#/definitions/Id" },
+        "label": { "$ref": "common.schema.json#/definitions/Text" }
+      },
+      "required": ["inputs", "output", "label"],
+      "additionalProperties": false
+    },
+    "Objective": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "common.schema.json#/definitions/Id" },
+        "title": { "$ref": "common.schema.json#/definitions/Text" },
+        "doneWhen": { "$ref": "common.schema.json#/definitions/Condition" },
+        "parent": { "$ref": "common.schema.json#/definitions/Id" },
+        "checkpoint": { "type": "boolean" }
+      },
+      "required": ["id", "title", "doneWhen"],
+      "additionalProperties": false
+    },
+    "TrackConfig": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "common.schema.json#/definitions/TrackId" },
+        "label": { "$ref": "common.schema.json#/definitions/Text" },
+        "start": { "type": "integer", "minimum": 0, "maximum": 100 }
+      },
+      "required": ["id", "label", "start"],
+      "additionalProperties": false
+    },
+    "Report": {
+      "type": "object",
+      "properties": {
+        "findings": { "type": "array", "items": { "$ref": "#/definitions/Finding" }, "minItems": 1 }
+      },
+      "required": ["findings"],
+      "additionalProperties": false
+    },
+    "Finding": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "common.schema.json#/definitions/Id" },
+        "vuln": { "$ref": "common.schema.json#/definitions/VulnId" },
+        "node": { "$ref": "common.schema.json#/definitions/Id" },
+        "options": { "type": "array", "items": { "$ref": "#/definitions/RemediationOption" }, "minItems": 2 },
+        "explanation": { "$ref": "common.schema.json#/definitions/Text" }
+      },
+      "required": ["id", "vuln", "node", "options", "explanation"],
+      "additionalProperties": false
+    },
+    "RemediationOption": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "common.schema.json#/definitions/Id" },
+        "text": { "$ref": "common.schema.json#/definitions/Text" },
+        "correct": { "type": "boolean" }
+      },
+      "required": ["id", "text", "correct"],
+      "additionalProperties": false
+    },
+    "Rank": {
+      "description": "Ranks are checked in order; the first matching one wins. A rank without when is the fallback.",
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "common.schema.json#/definitions/Id" },
+        "title": { "$ref": "common.schema.json#/definitions/Text" },
+        "when": { "$ref": "common.schema.json#/definitions/Condition" }
+      },
+      "required": ["id", "title"],
+      "additionalProperties": false
+    },
+    "Checkpoint": {
+      "description": "Start of a case step; restore point after caught.",
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "common.schema.json#/definitions/Id" },
+        "label": { "$ref": "common.schema.json#/definitions/Text" },
+        "when": { "$ref": "common.schema.json#/definitions/Condition" }
+      },
+      "required": ["id", "label", "when"],
+      "additionalProperties": false
+    }
+  }
+}

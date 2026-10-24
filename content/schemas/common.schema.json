@@ -1,0 +1,334 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Common",
+  "description": "Shared definitions for ZERO DAY content, schemaVersion 1.",
+  "definitions": {
+    "SchemaVersion": { "type": "integer", "const": 1 },
+    "Id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+    "IdList": { "type": "array", "items": { "$ref": "#/definitions/Id" }, "minItems": 1, "uniqueItems": true },
+    "VulnId": { "type": "string", "pattern": "^SL-[0-9]{2}$" },
+    "CaseId": { "type": "string", "pattern": "^L[1-9]C[1-9]$" },
+    "LevelId": { "type": "string", "pattern": "^L[1-9]$" },
+    "KeyRef": {
+      "description": "Key reference in a lock socket, for example key:domain_admin.",
+      "type": "string",
+      "pattern": "^key:[a-z][a-z0-9_]*$"
+    },
+    "Text": { "type": "string", "minLength": 1 },
+    "Archetype": {
+      "type": "string",
+      "enum": [
+        "sticker",
+        "password-wheel",
+        "open-door",
+        "expired-patch",
+        "legend-mosaic",
+        "trust-path",
+        "forgotten-key",
+        "wall",
+        "tired-guard",
+        "open-port",
+        "chatty-logs",
+        "code-intercept",
+        "blind-spot"
+      ]
+    },
+    "TrackId": { "type": "string", "enum": ["alarm", "logs", "antifraud", "attention"] },
+    "SystemId": {
+      "description": "Case systems; the engine runs them in a fixed order.",
+      "type": "string",
+      "enum": ["tracks", "hunter", "npcCooldown", "objectives", "flipper", "caughtCheck"]
+    },
+    "NodeStateValue": {
+      "type": "string",
+      "enum": ["hidden", "dim", "visible", "untouched", "compromised", "secured", "calm", "alerted", "detected", "scanned"]
+    },
+    "Tone": { "type": "string", "enum": ["friendly", "business", "urgent", "flattery", "pushy"] },
+    "EventType": {
+      "type": "string",
+      "enum": [
+        "CaseStarted",
+        "NodeScanned",
+        "NodesRevealed",
+        "CluesFound",
+        "TrackChanged",
+        "PuzzleOpened",
+        "ScopeWarning",
+        "PuzzleCancelled",
+        "PuzzleSolved",
+        "PuzzleFailed",
+        "ExploitSucceeded",
+        "ExploitMismatched",
+        "KeyAssembled",
+        "CombineFailed",
+        "SocketFilled",
+        "LockOpened",
+        "NpcReplied",
+        "NpcFactRevealed",
+        "NpcSuspicionChanged",
+        "NpcLocked",
+        "ScopeViolated",
+        "ConsequenceShown",
+        "TimePassed",
+        "RemediationChosen",
+        "NodeSecured",
+        "CaseCompleted",
+        "CheckpointRestored",
+        "CommandRejected",
+        "Ticked",
+        "ObjectiveCompleted",
+        "HunterMoved",
+        "FlipperMoodChanged",
+        "FlipperSaid",
+        "Caught"
+      ]
+    },
+    "Position": {
+      "type": "object",
+      "properties": { "x": { "type": "number" }, "y": { "type": "number" } },
+      "required": ["x", "y"],
+      "additionalProperties": false
+    },
+    "Threshold": {
+      "type": "object",
+      "properties": {
+        "track": { "$ref": "#/definitions/TrackId" },
+        "value": { "type": "integer", "minimum": 0, "maximum": 100 }
+      },
+      "required": ["track", "value"],
+      "additionalProperties": false
+    },
+    "Condition": {
+      "title": "Condition",
+      "description": "Condition tree: all / any / not over a closed set of atoms. Each object holds exactly one key.",
+      "oneOf": [
+        { "$ref": "#/definitions/ConditionAll" },
+        { "$ref": "#/definitions/ConditionAny" },
+        { "$ref": "#/definitions/ConditionNot" },
+        { "$ref": "#/definitions/ConditionNodeState" },
+        { "$ref": "#/definitions/ConditionHasClue" },
+        { "$ref": "#/definitions/ConditionHasKey" },
+        { "$ref": "#/definitions/ConditionSegmentOpen" },
+        { "$ref": "#/definitions/ConditionFlag" },
+        { "$ref": "#/definitions/ConditionNpcFactRevealed" },
+        { "$ref": "#/definitions/ConditionTrackBelow" },
+        { "$ref": "#/definitions/ConditionTrackAbove" },
+        { "$ref": "#/definitions/ConditionLockFilled" },
+        { "$ref": "#/definitions/ConditionTickAtLeast" }
+      ]
+    },
+    "ConditionAll": {
+      "type": "object",
+      "properties": { "all": { "type": "array", "items": { "$ref": "#/definitions/Condition" }, "minItems": 1 } },
+      "required": ["all"],
+      "additionalProperties": false
+    },
+    "ConditionAny": {
+      "type": "object",
+      "properties": { "any": { "type": "array", "items": { "$ref": "#/definitions/Condition" }, "minItems": 1 } },
+      "required": ["any"],
+      "additionalProperties": false
+    },
+    "ConditionNot": {
+      "type": "object",
+      "properties": { "not": { "$ref": "#/definitions/Condition" } },
+      "required": ["not"],
+      "additionalProperties": false
+    },
+    "ConditionNodeState": {
+      "type": "object",
+      "properties": {
+        "nodeState": {
+          "type": "object",
+          "properties": { "node": { "$ref": "#/definitions/Id" }, "state": { "$ref": "#/definitions/NodeStateValue" } },
+          "required": ["node", "state"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["nodeState"],
+      "additionalProperties": false
+    },
+    "ConditionHasClue": {
+      "type": "object",
+      "properties": { "hasClue": { "$ref": "#/definitions/Id" } },
+      "required": ["hasClue"],
+      "additionalProperties": false
+    },
+    "ConditionHasKey": {
+      "type": "object",
+      "properties": { "hasKey": { "$ref": "#/definitions/Id" } },
+      "required": ["hasKey"],
+      "additionalProperties": false
+    },
+    "ConditionSegmentOpen": {
+      "type": "object",
+      "properties": { "segmentOpen": { "$ref": "#/definitions/Id" } },
+      "required": ["segmentOpen"],
+      "additionalProperties": false
+    },
+    "ConditionFlag": {
+      "type": "object",
+      "properties": { "flag": { "$ref": "#/definitions/Id" } },
+      "required": ["flag"],
+      "additionalProperties": false
+    },
+    "ConditionNpcFactRevealed": {
+      "type": "object",
+      "properties": {
+        "npcFactRevealed": {
+          "type": "object",
+          "properties": { "npc": { "$ref": "#/definitions/Id" }, "fact": { "$ref": "#/definitions/Id" } },
+          "required": ["npc", "fact"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["npcFactRevealed"],
+      "additionalProperties": false
+    },
+    "ConditionTrackBelow": {
+      "type": "object",
+      "properties": { "trackBelow": { "$ref": "#/definitions/Threshold" } },
+      "required": ["trackBelow"],
+      "additionalProperties": false
+    },
+    "ConditionTrackAbove": {
+      "type": "object",
+      "properties": { "trackAbove": { "$ref": "#/definitions/Threshold" } },
+      "required": ["trackAbove"],
+      "additionalProperties": false
+    },
+    "ConditionLockFilled": {
+      "type": "object",
+      "properties": { "lockFilled": { "$ref": "#/definitions/Id" } },
+      "required": ["lockFilled"],
+      "additionalProperties": false
+    },
+    "ConditionTickAtLeast": {
+      "type": "object",
+      "properties": { "tickAtLeast": { "type": "integer", "minimum": 0 } },
+      "required": ["tickAtLeast"],
+      "additionalProperties": false
+    },
+    "Effect": {
+      "title": "Effect",
+      "description": "One simple operation. Each object holds exactly one key.",
+      "oneOf": [
+        { "$ref": "#/definitions/EffectRevealNodes" },
+        { "$ref": "#/definitions/EffectGrantClues" },
+        { "$ref": "#/definitions/EffectOpenSegment" },
+        { "$ref": "#/definitions/EffectSetFlag" },
+        { "$ref": "#/definitions/EffectAddTrack" },
+        { "$ref": "#/definitions/EffectUnlockCodex" },
+        { "$ref": "#/definitions/EffectFlipperSay" },
+        { "$ref": "#/definitions/EffectCompleteObjective" }
+      ]
+    },
+    "Effects": { "type": "array", "items": { "$ref": "#/definitions/Effect" } },
+    "EffectRevealNodes": {
+      "type": "object",
+      "properties": { "revealNodes": { "$ref": "#/definitions/IdList" } },
+      "required": ["revealNodes"],
+      "additionalProperties": false
+    },
+    "EffectGrantClues": {
+      "type": "object",
+      "properties": { "grantClues": { "$ref": "#/definitions/IdList" } },
+      "required": ["grantClues"],
+      "additionalProperties": false
+    },
+    "EffectOpenSegment": {
+      "type": "object",
+      "properties": { "openSegment": { "$ref": "#/definitions/Id" } },
+      "required": ["openSegment"],
+      "additionalProperties": false
+    },
+    "EffectSetFlag": {
+      "type": "object",
+      "properties": { "setFlag": { "$ref": "#/definitions/Id" } },
+      "required": ["setFlag"],
+      "additionalProperties": false
+    },
+    "EffectAddTrack": {
+      "type": "object",
+      "properties": {
+        "addTrack": {
+          "type": "object",
+          "properties": {
+            "track": { "$ref": "#/definitions/TrackId" },
+            "delta": { "type": "integer", "minimum": -100, "maximum": 100 }
+          },
+          "required": ["track", "delta"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["addTrack"],
+      "additionalProperties": false
+    },
+    "EffectUnlockCodex": {
+      "type": "object",
+      "properties": { "unlockCodex": { "$ref": "#/definitions/VulnId" } },
+      "required": ["unlockCodex"],
+      "additionalProperties": false
+    },
+    "EffectFlipperSay": {
+      "type": "object",
+      "properties": { "flipperSay": { "$ref": "#/definitions/Id" } },
+      "required": ["flipperSay"],
+      "additionalProperties": false
+    },
+    "EffectCompleteObjective": {
+      "type": "object",
+      "properties": { "completeObjective": { "$ref": "#/definitions/Id" } },
+      "required": ["completeObjective"],
+      "additionalProperties": false
+    },
+    "Difficulty": {
+      "type": "object",
+      "properties": {
+        "noiseMultiplier": { "type": "number", "minimum": 0 },
+        "alarmDecayPerTick": { "type": "number", "minimum": 0 },
+        "wrongGuessNoise": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "hints": {
+          "type": "object",
+          "properties": {
+            "frequency": { "type": "string", "enum": ["low", "medium", "high"] },
+            "depth": { "type": "string", "enum": ["nudge", "direction", "answer"] }
+          },
+          "required": ["frequency", "depth"],
+          "additionalProperties": false
+        },
+        "flipperPreWarn": { "type": "boolean" },
+        "puzzleKnobs": { "$ref": "#/definitions/PuzzleKnobs" }
+      },
+      "required": ["noiseMultiplier", "alarmDecayPerTick", "wrongGuessNoise", "hints", "flipperPreWarn", "puzzleKnobs"],
+      "additionalProperties": false
+    },
+    "DifficultyOverride": {
+      "description": "Partial Difficulty merged over the level difficulty.",
+      "type": "object",
+      "properties": {
+        "noiseMultiplier": { "type": "number", "minimum": 0 },
+        "alarmDecayPerTick": { "type": "number", "minimum": 0 },
+        "wrongGuessNoise": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "flipperPreWarn": { "type": "boolean" },
+        "puzzleKnobs": { "$ref": "#/definitions/PuzzleKnobs" }
+      },
+      "additionalProperties": false
+    },
+    "PuzzleKnobs": {
+      "description": "Per-archetype knobs: attempts, decoys, OTP window. Keys are archetype ids.",
+      "type": "object",
+      "propertyNames": { "$ref": "#/definitions/Archetype" },
+      "additionalProperties": { "$ref": "#/definitions/Knobs" }
+    },
+    "Knobs": {
+      "type": "object",
+      "properties": {
+        "attempts": { "type": "integer", "minimum": 1 },
+        "decoys": { "type": "integer", "minimum": 0 },
+        "otpWindow": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Vulnerabilities",
+  "description": "content/catalog/vulnerabilities.json: the SL catalog.",
+  "type": "object",
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/definitions/SchemaVersion" },
+    "items": { "type": "array", "items": { "$ref": "#/definitions/Vulnerability" }, "minItems": 1 }
+  },
+  "required": ["schemaVersion", "items"],
+  "additionalProperties": false,
+  "definitions": {
+    "Vulnerability": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "common.schema.json#/definitions/VulnId" },
+        "title": { "$ref": "common.schema.json#/definitions/Text" },
+        "archetype": { "$ref": "common.schema.json#/definitions/Archetype" },
+        "noiseProfile": { "type": "string", "enum": ["quiet", "moderate", "loud"] },
+        "killChainStage": {
+          "type": "string",
+          "enum": ["recon", "initial_access", "credential_access", "lateral_movement", "privilege_escalation", "defense_evasion", "collection"]
+        },
+        "codexCardId": { "$ref": "common.schema.json#/definitions/VulnId" },
+        "introducedInLevel": { "type": "integer", "minimum": 1, "maximum": 3 }
+      },
+      "required": ["id", "title", "archetype", "noiseProfile", "killChainStage", "codexCardId", "introducedInLevel"],
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Campaign",
+  "description": "content/campaign.json: levels, case order, interludes, difficulty.",
+  "type": "object",
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/definitions/SchemaVersion" },
+    "contentVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "levels": { "type": "array", "items": { "$ref": "#/definitions/Level" }, "minItems": 1 },
+    "interludes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "afterCase": { "$ref": "common.schema.json#/definitions/CaseId" },
+          "interlude": { "$ref": "common.schema.json#/definitions/Id" }
+        },
+        "required": ["afterCase", "interlude"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["schemaVersion", "contentVersion", "levels", "interludes"],
+  "additionalProperties": false,
+  "definitions": {
+    "Level": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "common.schema.json#/definitions/LevelId" },
+        "title": { "$ref": "common.schema.json#/definitions/Text" },
+        "accent": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "difficulty": { "$ref": "common.schema.json#/definitions/Difficulty" },
+        "cases": { "type": "array", "items": { "$ref": "common.schema.json#/definitions/CaseId" }, "minItems": 1, "uniqueItems": true }
+      },
+      "required": ["id", "title", "accent", "difficulty", "cases"],
+      "additionalProperties": false
+    }
+  }
+}

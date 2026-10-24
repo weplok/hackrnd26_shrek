@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Puzzles",
+  "description": "content/catalog/puzzles.json: puzzle archetype registry.",
+  "type": "object",
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/definitions/SchemaVersion" },
+    "items": { "type": "array", "items": { "$ref": "#/definitions/Puzzle" }, "minItems": 1 }
+  },
+  "required": ["schemaVersion", "items"],
+  "additionalProperties": false,
+  "definitions": {
+    "Puzzle": {
+      "type": "object",
+      "properties": {
+        "archetype": { "$ref": "common.schema.json#/definitions/Archetype" },
+        "vuln": { "$ref": "common.schema.json#/definitions/VulnId" },
+        "title": { "$ref": "common.schema.json#/definitions/Text" }
+      },
+      "required": ["archetype", "vuln", "title"],
+      "additionalProperties": false
+    }
+  }
+}
