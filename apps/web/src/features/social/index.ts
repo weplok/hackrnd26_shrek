@@ -19,6 +19,8 @@ export type SocialChat = {
 
 type Chats = Record<string, SocialChat>;
 
+const REPLY_TIMEOUT_MS = 90_000;
+
 type SocialStore = {
   chats: Chats;
   openKey: string | null;
@@ -130,14 +132,16 @@ export const useSocial = create<SocialStore>((set, get) => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ npc_id: chat.npcId, uuid: chat.sessionId, message }),
+          signal: AbortSignal.timeout(REPLY_TIMEOUT_MS),
         });
         if (!response.ok) throw new Error(String(response.status));
         const payload = (await response.json()) as { answer: string; verdict: SocialVerdict; trust_points: number };
         reply = { from: 'npc', text: payload.answer };
         verdict = payload.verdict;
         trust = payload.trust_points;
-      } catch {
-        reply = { from: 'sys', text: t.error };
+      } catch (error) {
+        const timedOut = error instanceof DOMException && error.name === 'TimeoutError';
+        reply = { from: 'sys', text: timedOut ? t.unavailable : t.error };
       }
 
       // A level reset during the request drops the chat; its late answer must not resurrect it.
