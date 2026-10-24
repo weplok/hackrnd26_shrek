@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from '@zero-day/ui';
 import type { PuzzleInstance, PuzzleOption } from '@zero-day/engine';
 import { ru } from '../../shared/ui/strings';
+import { ScanTuner } from './ScanTuner';
 import { BruteLock } from './BruteLock';
 import { VirusMaze } from './VirusMaze';
 import { DdosStorm } from './DdosStorm';
@@ -108,6 +109,17 @@ export function PuzzlePanel({ puzzle, onCancel, onSubmit }: PuzzlePanelProps): R
 
   const selected = answer.map((id) => optionLabel(puzzle.options, id)).filter(Boolean);
 
+  if (puzzle.action === 'scan') {
+    return (
+      <div className="puzzle-host">
+        <p className="puzzle-host__tool">{text.tool(puzzle.archetype)}</p>
+        <p className="puzzle-host__prompt">{puzzle.prompt}</p>
+        <ScanTuner key={`${puzzle.nodeId}:${puzzle.vuln}`} puzzle={puzzle} onCancel={onCancel} onSubmit={onSubmit} />
+      </div>
+    );
+  }
+
+  // A scan-archetype weakness reached through a hypothesis is the DDoS attack.
   const Game = GAMES[puzzle.archetype];
   if (Game) {
     return (
