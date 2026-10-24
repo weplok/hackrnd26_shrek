@@ -26,11 +26,10 @@
 
 ### EPIC A — Каркас и платформа (M0)
 
-- [ ] **T-A1** · Монорепо: pnpm workspaces + uv, структура папок, Makefile · INF · M · P0 · *после:* — · в работе: misterEugene
-  - Прогресс: сделано монорепо pnpm + uv (uv.lock), структура по ТЗ 5.3, Makefile, make install проходит; осталось проверка вторым человеком.
+- [x] **T-A1** · Монорепо: pnpm workspaces + uv, структура папок, Makefile · INF · M · P0 · *после:* —
 - [ ] **T-A2** · Линтеры/форматтеры/strict-типы, pre-commit · INF · S · P0 · *после:* T-A1
 - [ ] **T-A3** · JSON Schema контента (v1) + кодоген TS и Pydantic · CNT · L · P0 · *после:* T-A1 · в работе: misterEugene
-  - Прогресс: сделано схемы v1 в content/schemas для всех сущностей ТЗ 6.1 и языка условий/эффектов 6.2, кодоген TS (packages/engine/src/content/types.gen.ts) и Pydantic (services/api/src/zeroday/content/models), make codegen, решения схемы согласованы с разработчиком, схема NPC убрана (NPC — YAML-профили chars/, формат сценарного режима — в T-B8); осталось схема карт дуэли (P3, после Q-5a), проверка вторым человеком.
+  - Прогресс: сделано схемы v1 в content/schemas для всех сущностей ТЗ 6.1 и языка условий/эффектов 6.2, кодоген TS (packages/engine/src/content/types.gen.ts) и Pydantic (services/api/src/zeroday/content/models), make codegen, решения схемы согласованы с разработчиком, схема NPC убрана (NPC — YAML-профили chars/, формат сценарного режима — в T-B8); схемы v1 проверены вторым человеком (make codegen воспроизводим без диффа, модели валидируют пример узла из ТЗ 6.2); осталось схема карт дуэли (P3, после Q-5a).
 - [ ] **T-A4** · content-tools: валидатор схем + линтер ссылок + стоп-словарь · CNT · M · P0 · *после:* T-A3
 - [ ] **T-A5** · Каркас FastAPI: config, логи, ошибки, /healthz, POST /sessions, rate limit · API · L · P0 · *после:* T-A1
 - [ ] **T-A6** · Каркас SPA: роутинг, тема/токены, ErrorBoundary, экран никнейма, загрузчик контента · WEB · L · P0 · *после:* T-A1
