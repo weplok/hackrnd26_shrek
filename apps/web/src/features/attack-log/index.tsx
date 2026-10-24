@@ -20,10 +20,10 @@ type Outcome = 'ok' | 'fail';
 type Results = Record<string, Partial<Record<ColumnId, Outcome>>>;
 type Notice = { id: number; ok: boolean; node: string; attack: ColumnId };
 
-const COLUMNS: { id: ColumnId; label: string }[] = [
-  { id: 'scan', label: ru.nodeMenu.scan },
-  ...ATTACKS.map((attack) => ({ id: attack.id, label: ru.nodeMenu.attacks[attack.id] })),
-];
+const COLUMNS: { id: ColumnId; label: string }[] = ATTACKS.map((attack) => ({
+  id: attack.id,
+  label: ru.nodeMenu.attacks[attack.id],
+}));
 
 const t = ru.attackLog;
 // Lives outside GameState so checkpoint rollbacks and case switches keep it.

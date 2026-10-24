@@ -257,8 +257,7 @@
   }
 }
 
-.network-map__node--untouched:not(.network-map__node--locked),
-.network-map__node--scanned:not(.network-map__node--locked) {
+.network-map__node--untouched:not(.network-map__node--locked) {
   animation: node-pulse 1.6s ease-out infinite;
 }
 
