@@ -1,18 +1,18 @@
 {
   "schemaVersion": 1,
   "items": [
-    { "id": "SL-01", "title": "Заводской пароль", "archetype": "sticker", "noiseProfile": "quiet", "killChainStage": "initial_access", "codexCardId": "SL-01", "introducedInLevel": 1 },
-    { "id": "SL-02", "title": "Слабый или переиспользованный пароль", "archetype": "password-wheel", "noiseProfile": "moderate", "killChainStage": "credential_access", "codexCardId": "SL-02", "introducedInLevel": 1 },
-    { "id": "SL-03", "title": "Открытая папка", "archetype": "open-door", "noiseProfile": "quiet", "killChainStage": "initial_access", "codexCardId": "SL-03", "introducedInLevel": 1 },
-    { "id": "SL-04", "title": "Просроченная заплатка", "archetype": "expired-patch", "noiseProfile": "moderate", "killChainStage": "initial_access", "codexCardId": "SL-04", "introducedInLevel": 2 },
-    { "id": "SL-05", "title": "Раскрытие информации", "archetype": "legend-mosaic", "noiseProfile": "moderate", "killChainStage": "recon", "codexCardId": "SL-05", "introducedInLevel": 1 },
-    { "id": "SL-06", "title": "Горизонтальное перемещение через доверие", "archetype": "trust-path", "noiseProfile": "moderate", "killChainStage": "lateral_movement", "codexCardId": "SL-06", "introducedInLevel": 1 },
-    { "id": "SL-07", "title": "Забытый тестовый аккаунт", "archetype": "forgotten-key", "noiseProfile": "moderate", "killChainStage": "credential_access", "codexCardId": "SL-07", "introducedInLevel": 2 },
-    { "id": "SL-08", "title": "Дырявый шлюз", "archetype": "wall", "noiseProfile": "moderate", "killChainStage": "lateral_movement", "codexCardId": "SL-08", "introducedInLevel": 2 },
-    { "id": "SL-09", "title": "Обученный, но уставший", "archetype": "tired-guard", "noiseProfile": "quiet", "killChainStage": "initial_access", "codexCardId": "SL-09", "introducedInLevel": 2 },
-    { "id": "SL-10", "title": "Открытый порт у входа", "archetype": "open-port", "noiseProfile": "moderate", "killChainStage": "initial_access", "codexCardId": "SL-10", "introducedInLevel": 3 },
-    { "id": "SL-11", "title": "Болтливые логи", "archetype": "chatty-logs", "noiseProfile": "quiet", "killChainStage": "defense_evasion", "codexCardId": "SL-11", "introducedInLevel": 3 },
-    { "id": "SL-12", "title": "Перехват одноразового кода", "archetype": "code-intercept", "noiseProfile": "loud", "killChainStage": "credential_access", "codexCardId": "SL-12", "introducedInLevel": 2 },
-    { "id": "SL-13", "title": "Слепое пятно антифрода", "archetype": "blind-spot", "noiseProfile": "moderate", "killChainStage": "defense_evasion", "codexCardId": "SL-13", "introducedInLevel": 2 }
+    { "id": "SL-01", "title": "Заводской пароль", "archetype": "exploit", "noiseProfile": "quiet", "killChainStage": "initial_access", "codexCardId": "SL-01", "introducedInLevel": 1 },
+    { "id": "SL-02", "title": "Слабый или переиспользованный пароль", "archetype": "brute", "noiseProfile": "moderate", "killChainStage": "credential_access", "codexCardId": "SL-02", "introducedInLevel": 1 },
+    { "id": "SL-03", "title": "Открытая папка", "archetype": "scan", "noiseProfile": "quiet", "killChainStage": "initial_access", "codexCardId": "SL-03", "introducedInLevel": 1 },
+    { "id": "SL-04", "title": "Просроченная заплатка", "archetype": "exploit", "noiseProfile": "moderate", "killChainStage": "initial_access", "codexCardId": "SL-04", "introducedInLevel": 2 },
+    { "id": "SL-05", "title": "Раскрытие информации", "archetype": "phish", "noiseProfile": "moderate", "killChainStage": "recon", "codexCardId": "SL-05", "introducedInLevel": 1 },
+    { "id": "SL-06", "title": "Горизонтальное перемещение через доверие", "archetype": "evasion", "noiseProfile": "moderate", "killChainStage": "lateral_movement", "codexCardId": "SL-06", "introducedInLevel": 1 },
+    { "id": "SL-07", "title": "Забытый тестовый аккаунт", "archetype": "rootkit", "noiseProfile": "moderate", "killChainStage": "credential_access", "codexCardId": "SL-07", "introducedInLevel": 2 },
+    { "id": "SL-08", "title": "Дырявый шлюз", "archetype": "wipe", "noiseProfile": "moderate", "killChainStage": "lateral_movement", "codexCardId": "SL-08", "introducedInLevel": 2 },
+    { "id": "SL-09", "title": "Обученный, но уставший", "archetype": "phish", "noiseProfile": "quiet", "killChainStage": "initial_access", "codexCardId": "SL-09", "introducedInLevel": 2 },
+    { "id": "SL-10", "title": "Открытый порт у входа", "archetype": "scan", "noiseProfile": "moderate", "killChainStage": "initial_access", "codexCardId": "SL-10", "introducedInLevel": 3 },
+    { "id": "SL-11", "title": "Болтливые логи", "archetype": "wipe", "noiseProfile": "quiet", "killChainStage": "defense_evasion", "codexCardId": "SL-11", "introducedInLevel": 3 },
+    { "id": "SL-12", "title": "Перехват одноразового кода", "archetype": "crypto", "noiseProfile": "loud", "killChainStage": "credential_access", "codexCardId": "SL-12", "introducedInLevel": 2 },
+    { "id": "SL-13", "title": "Слепое пятно антифрода", "archetype": "rootkit", "noiseProfile": "moderate", "killChainStage": "defense_evasion", "codexCardId": "SL-13", "introducedInLevel": 2 }
   ]
 }

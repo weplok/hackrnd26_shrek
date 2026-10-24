@@ -49,6 +49,11 @@ export const strs = (p: Record<string, unknown>, key: string, fallback: string[]
 
 export const decoyCount = (knobs: Knobs, fallback = 3): number => Math.max(1, knobs.decoys ?? fallback);
 
+export function knob(knobs: Knobs, key: string, fallback: number): number {
+  const value = (knobs as Record<string, unknown>)[key];
+  return typeof value === 'number' ? value : fallback;
+}
+
 /** Shuffle correct + decoy labels into options; correct ids keep the order of `good`. */
 export function options(rng: number, good: string[], decoys: string[]): [number, PuzzleOption[], string[]] {
   const labels = [...new Set([...good, ...decoys])];

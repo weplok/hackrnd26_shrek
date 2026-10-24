@@ -14,6 +14,7 @@ import { GameHud } from '../features/hud';
 import { useCaseStore } from '../features/game-session';
 import { Terminal } from '../features/terminal';
 import { SaveRepository, startAutosave } from '../features/persistence';
+import { PuzzleHost, ToolLab } from '../features/puzzle-host';
 
 type CampaignStart = {
   caseData: Case;
@@ -124,6 +125,14 @@ function ApplicationRoutes({ bootstrap }: { bootstrap: BootstrapState }): ReactN
         element={
           <Screen>
             <GamePage />
+          </Screen>
+        }
+      />
+      <Route
+        path="/tools"
+        element={
+          <Screen>
+            <ToolLab />
           </Screen>
         }
       />
@@ -241,6 +250,14 @@ function StartPage({ bootstrap }: { bootstrap: BootstrapState }): ReactNode {
           </Button>
           <Button type="button" disabled>
             {ru.duel}
+          </Button>
+          <Button
+            type="button"
+            onClick={() => {
+              navigate('/tools');
+            }}
+          >
+            {ru.toolLab}
           </Button>
           <Button
             type="button"
@@ -440,6 +457,7 @@ function GamePage(): ReactNode {
       )}
       <p className="copy">{caseData.brief.text}</p>
       <Terminal vulns={Object.values(gameContent.vulnerabilities)} />
+      <PuzzleHost />
       <Link className="zd-button button-link" to="/">
         {ru.backToMenu}
       </Link>

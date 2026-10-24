@@ -1,0 +1,69 @@
+.puzzle-host {
+  display: grid;
+  gap: var(--space-3);
+}
+.puzzle-host__tool,
+.puzzle-host__attempts,
+.puzzle-host__selected,
+.puzzle-host__result {
+  margin: 0;
+  color: var(--color-muted);
+  font: 0.75rem/1.45 var(--font-mono);
+}
+.puzzle-host__tool {
+  color: var(--color-green-bright);
+  letter-spacing: 0.12em;
+}
+.puzzle-host__prompt {
+  margin: 0;
+  line-height: 1.55;
+}
+.puzzle-scene {
+  display: grid;
+  min-height: 5.5rem;
+  place-items: center;
+  padding: var(--space-2);
+  border: 1px dashed var(--color-line);
+  color: var(--color-green-bright);
+  background: #000;
+  font: 0.75rem/1.4 var(--font-mono);
+  text-align: center;
+}
+.puzzle-scene--radar { border-radius: 50%; min-height: 10rem; background: radial-gradient(circle, #123322 1%, #000 66%); }
+.puzzle-scene--breach { clip-path: polygon(0 0, 85% 0, 100% 35%, 82% 55%, 100% 100%, 0 100%); }
+.puzzle-scene--tower { align-items: end; background: repeating-linear-gradient(0deg, #07140e 0 1.25rem, #000 1.25rem 2.5rem); }
+.puzzle-scene--beams { background: repeating-linear-gradient(135deg, #000 0 0.9rem, #351114 0.9rem 1rem, #000 1rem 1.9rem); }
+.puzzle-scene--rotors { border-radius: 50%; min-height: 9rem; background: radial-gradient(circle, transparent 0 20%, #1b3b2c 21% 23%, transparent 24% 40%, #1b3b2c 41% 43%, transparent 44%); }
+.puzzle-scene--edr { background: linear-gradient(90deg, #163d2b 0 75%, #351114 75%); }
+.puzzle-scene--logs { align-items: start; text-align: left; background: repeating-linear-gradient(0deg, #000 0 1.35rem, #15251d 1.35rem 1.42rem); }
+.puzzle-options,
+.puzzle-actions,
+.tool-lab__tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.puzzle-option {
+  flex: 1 1 12rem;
+  min-height: 2.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-line);
+  color: var(--color-text);
+  background: #000;
+  text-align: left;
+}
+.puzzle-option:hover,
+.puzzle-option--selected {
+  border-color: var(--color-green-bright);
+  background: var(--color-panel-raised);
+}
+.puzzle-actions { justify-content: flex-end; }
+.puzzle-sliders { display: grid; gap: var(--space-2); }
+.puzzle-slider { display: grid; gap: 0.25rem; color: var(--color-muted); font-size: 0.75rem; }
+.puzzle-slider input { width: 100%; accent-color: var(--color-green-bright); }
+.tool-lab { margin-top: 2rem; }
+.tool-lab > .zd-panel { max-width: 42rem; margin: 0 auto; }
+@media (max-width: 375px) {
+  .puzzle-actions .zd-button,
+  .tool-lab__tools .zd-button { width: auto; }
+}

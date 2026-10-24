@@ -77,8 +77,11 @@
         {
           "vuln": "SL-01",
           "puzzleParams": {
-            "credentials": "admin/admin",
-            "source": "sticker"
+            "shape": "Заводской паз RT-300",
+            "shapes": [
+              "Кольцевой паз",
+              "Двойной паз"
+            ]
           },
           "requires": {
             "hasClue": "router_sticker"

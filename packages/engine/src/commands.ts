@@ -22,6 +22,7 @@ export type RejectReason =
 
 export type GameEvent =
   | { type: 'CommandRejected'; reason: RejectReason }
+  | { type: 'ScanOpened'; node: string }
   | { type: 'NodeScanned'; node: string; repeat: boolean }
   | { type: 'NodesRevealed'; nodes: string[] }
   | { type: 'CluesFound'; clues: string[] }
@@ -57,8 +58,8 @@ export function validate(content: Content, s: GameState, cmd: Command): RejectRe
       const n = content.cases[s.caseId]?.nodes.find((x) => x.id === cmd.node);
       if (!n) return 'unknown-node';
       if (!s.nodes[cmd.node]?.revealed) return 'node-hidden';
-      if (cmd.type === 'ScanNode') return null;
       if (s.activePuzzle) return 'puzzle-active';
+      if (cmd.type === 'ScanNode') return null;
       if (!n.inScope) return null;
       if (n.kind === 'person' || n.lock) return 'not-exploitable';
       if (!s.nodes[cmd.node]?.scanned) return 'not-scanned';
@@ -96,6 +97,7 @@ function primaryEvents(content: Content, prev: GameState, next: GameState, cmd: 
   if (next.pendingScope && !prev.pendingScope) return [{ type: 'ScopeWarning', node: next.pendingScope }];
   switch (cmd.type) {
     case 'ScanNode':
+      if (next.activePuzzle?.action === 'scan') return [{ type: 'ScanOpened', node: cmd.node }];
       return [{ type: 'NodeScanned', node: cmd.node, repeat: !!prev.nodes[cmd.node]?.scanned }];
     case 'ProposeHypothesis':
       return [{ type: 'PuzzleOpened', node: cmd.node, vuln: cmd.vuln }];
@@ -109,6 +111,7 @@ function primaryEvents(content: Content, prev: GameState, next: GameState, cmd: 
       const node = inst.nodeId;
       if (!verifyPuzzle(inst, cmd.answer))
         return [{ type: 'PuzzleFailed', node, attemptsLeft: next.activePuzzle?.attemptsLeft ?? 0 }];
+      if (inst.action === 'scan') return [{ type: 'PuzzleSolved', node }, { type: 'NodeScanned', node, repeat: false }];
       if (next.nodes[node]?.compromised && !prev.nodes[node]?.compromised)
         return [
           { type: 'PuzzleSolved', node },

@@ -194,7 +194,7 @@ export function startCase(content: Content, state: GameState): GameState {
 
 export function scan(content: Content, state: GameState, nodeId: string): GameState {
   const s = clone(state);
-  if (s.phase !== 'playing') return s;
+  if (s.phase !== 'playing' || s.activePuzzle) return s;
   const c = getCase(content, s);
   const n = node(c, nodeId);
   if (!n || !nodeRt(s, nodeId).revealed) return s;
@@ -209,6 +209,28 @@ export function scan(content: Content, state: GameState, nodeId: string): GameSt
     recompute(content, s);
     return s;
   }
+  const knobs = s.difficulty.puzzleKnobs.scan ?? {};
+  let inst: PuzzleInstance;
+  [s.rng, inst] = generatePuzzle(
+    s.rng,
+    'scan',
+    'Радар-эхо',
+    { target: n.label, ports: n.exploits.length > 0 ? ['эхо: 443/tcp', 'эхо: 53/udp'] : ['эхо: 53/udp'] },
+    knobs,
+    nodeId,
+    'scan',
+    { genuine: true, label: (id) => node(c, id)?.label ?? id },
+    'scan',
+  );
+  s.activePuzzle = inst;
+  s.log.push({ t: `[scan] ${n.label}: импульс отправлен.`, kind: 'cmd' });
+  return s;
+}
+
+function completeScan(content: Content, s: GameState, nodeId: string): void {
+  const c = getCase(content, s);
+  const n = node(c, nodeId);
+  if (!n || nodeRt(s, nodeId).scanned) return;
   nodeRt(s, nodeId).scanned = true;
   s.scans += 1;
   s.techActions += 1;
@@ -224,7 +246,6 @@ export function scan(content: Content, state: GameState, nodeId: string): GameSt
   if (sl) s.log.push({ t: `[scan] ${n.label}: слабость ${sl}.`, kind: 'sys' });
   stepAlarm(s, n.scanNoise, nodeId);
   recompute(content, s);
-  return s;
 }
 
 // clue ids that any node grants via onCompromise (so they are not surfaced by scan)
@@ -293,6 +314,10 @@ export function submitPuzzle(content: Content, state: GameState, selected: strin
     return s;
   }
   s.activePuzzle = null;
+  if (inst.action === 'scan') {
+    completeScan(content, s, inst.nodeId);
+    return s;
+  }
   const ex = n.exploits.find((e) => e.vuln === inst.vuln);
   const reqOk = ex ? evalCondition(ex.requires, s) : false;
   if (ex && reqOk) {

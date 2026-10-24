@@ -21,13 +21,16 @@ function solve(s: GameState): GameState {
   if (!s.activePuzzle) throw new Error('no active puzzle');
   return E.submitPuzzle(content, s, s.activePuzzle.correct);
 }
+function scan(s: GameState, node: string): GameState {
+  return solve(E.scan(content, s, node));
+}
 
 console.log('L1C1:');
 {
   let s = E.createGame(content, 'L1C1', difficulty(0), 777);
   s = E.startCase(content, s);
-  s = E.scan(content, s, 'wifi');
-  s = E.scan(content, s, 'speaker');
+  s = scan(s, 'wifi');
+  s = scan(s, 'speaker');
   s = E.hypothesize(content, s, 'wifi', 'SL-02');
   s = solve(s);
   assert(s.phase === 'report', 'report phase reached');
@@ -41,9 +44,9 @@ console.log('L1C1 alt (SL-01 via router):');
 {
   let s = E.createGame(content, 'L1C1', difficulty(0), 777);
   s = E.startCase(content, s);
-  s = E.scan(content, s, 'wifi');
-  s = E.scan(content, s, 'speaker');
-  s = E.scan(content, s, 'router');
+  s = scan(s, 'wifi');
+  s = scan(s, 'speaker');
+  s = scan(s, 'router');
   s = E.hypothesize(content, s, 'router', 'SL-01');
   s = solve(s);
   assert(s.nodes.wifi?.compromised === true, 'wifi taken through router');
@@ -58,22 +61,22 @@ console.log('L2C1:');
 {
   let s = E.createGame(content, 'L2C1', difficulty(1), 4242);
   s = E.startCase(content, s);
-  s = E.scan(content, s, 'guest_wifi');
+  s = scan(s, 'guest_wifi');
   s = E.hypothesize(content, s, 'guest_wifi', 'SL-02');
   s = solve(s);
-  s = E.scan(content, s, 'mail');
+  s = scan(s, 'mail');
   s = E.hypothesize(content, s, 'mail', 'SL-05');
   s = solve(s);
   s = E.combine(content, s, ['mail_format', 'dept_list']);
   s = E.present(content, s, 'kostya', 'friendly', []);
-  s = E.scan(content, s, 'teacher_pc');
+  s = scan(s, 'teacher_pc');
   s = E.hypothesize(content, s, 'teacher_pc', 'SL-07');
   s = solve(s);
-  s = E.scan(content, s, 'gateway');
+  s = scan(s, 'gateway');
   s = E.hypothesize(content, s, 'gateway', 'SL-08');
   s = solve(s);
   s = E.present(content, s, 'anton', 'flattery', []);
-  s = E.scan(content, s, 'controller');
+  s = scan(s, 'controller');
   s = E.hypothesize(content, s, 'controller', 'SL-06');
   s = solve(s);
   s = E.combine(content, s, ['controller_token', 'anton_vouch']);

@@ -34,7 +34,8 @@ void test('case start is the first checkpoint', () => {
 });
 
 void test('alarm 100 catches the player; only RestoreCheckpoint is accepted', () => {
-  const s = E.apply(content, start(), { type: 'ScanNode', node: 'wifi' }).state;
+  const opened = E.apply(content, start(), { type: 'ScanNode', node: 'wifi' });
+  const s = E.apply(content, opened.state, { type: 'SubmitPuzzle', answer: opened.state.activePuzzle?.correct ?? [] }).state;
   s.difficulty = { ...s.difficulty, alarmDecayPerTick: 0 };
   s.tracks.alarm = 99;
   s.codex['SL-01'] = true;
@@ -63,7 +64,8 @@ void test('RestoreCheckpoint outside caught is rejected', () => {
 });
 
 void test('reaching a later step moves the checkpoint and resets the noise tally', () => {
-  const s = E.apply(content, start(), { type: 'ScanNode', node: 'wifi' }).state;
+  const opened = E.apply(content, start(), { type: 'ScanNode', node: 'wifi' });
+  const s = E.apply(content, opened.state, { type: 'SubmitPuzzle', answer: opened.state.activePuzzle?.correct ?? [] }).state;
   assert.ok(E.noiseSources(s).length > 0);
   const n = s.nodes.wifi;
   if (!n) throw new Error('no wifi');

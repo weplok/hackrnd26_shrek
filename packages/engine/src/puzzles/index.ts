@@ -1,20 +1,21 @@
 // Puzzle registry (TZ 7.4): built from explicit imports, one entry per archetype directory.
 import type { PuzzleInstance } from '../types.ts';
 import { type GenerateCtx, type Knobs, type PuzzleLogic, type VerifyResult } from './types.ts';
-import { sticker } from './sticker/index.ts';
-import { passwordWheel } from './password-wheel/index.ts';
-import { expiredPatch } from './expired-patch/index.ts';
-import { legendMosaic } from './legend-mosaic/index.ts';
-import { trustPath } from './trust-path/index.ts';
-import { forgottenKey } from './forgotten-key/index.ts';
-import { wall } from './wall/index.ts';
+import { scan } from './scan/index.ts';
+import { exploit } from './exploit/index.ts';
+import { brute } from './brute/index.ts';
+import { phish } from './phish/index.ts';
+import { evasion } from './evasion/index.ts';
+import { crypto } from './crypto/index.ts';
+import { rootkit } from './rootkit/index.ts';
+import { wipe } from './wipe/index.ts';
 import { fallback } from './fallback/index.ts';
 
 export type { PuzzleLogic, PuzzleBody, PuzzleOption, VerifyResult, GenerateCtx } from './types.ts';
 export { DEFAULT_FAIL_HINT } from './fallback/index.ts';
 
 export const PUZZLES: Record<string, PuzzleLogic> = Object.fromEntries(
-  [sticker, passwordWheel, expiredPatch, legendMosaic, trustPath, forgottenKey, wall].map((p) => [p.archetype, p]),
+  [scan, exploit, brute, phish, evasion, crypto, rootkit, wipe].map((p) => [p.archetype, p]),
 );
 
 export function puzzleLogic(archetype: string): PuzzleLogic {
@@ -30,10 +31,11 @@ export function generatePuzzle(
   nodeId: string,
   vuln: string,
   ctx: GenerateCtx = { genuine: true, label: (id) => id },
+  action: PuzzleInstance['action'] = 'exploit',
 ): [number, PuzzleInstance] {
   const [next, body] = puzzleLogic(archetype).generate(params, knobs, rng, ctx);
   const attemptsLeft = Math.max(1, knobs.attempts ?? 3);
-  return [next, { ...body, nodeId, vuln, archetype, title, genuine: ctx.genuine, knobs, attemptsLeft }];
+  return [next, { ...body, nodeId, vuln, archetype, title, genuine: ctx.genuine, knobs, attemptsLeft, action }];
 }
 
 export function checkPuzzle(inst: PuzzleInstance, answer: string[]): VerifyResult {

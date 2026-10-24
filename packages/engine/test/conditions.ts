@@ -111,6 +111,7 @@ void test('npcFactRevealed checks the specific fact the NPC gave away', () => {
   const fact = (f: string) => E.evalCondition({ npcFactRevealed: { npc: 'kostya', fact: f } }, s);
   assert.equal(fact('admin_is_anton'), false);
   s = E.scan(content, s, 'guest_wifi');
+  s = E.submitPuzzle(content, s, s.activePuzzle?.correct ?? []);
   s = E.present(content, s, 'kostya', 'friendly', []);
   assert.equal(s.npc.kostya?.yielded, true);
   assert.equal(fact('admin_is_anton'), true);

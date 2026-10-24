@@ -1,4 +1,3 @@
-// Puzzle registry and the L1/L2 archetypes: 01, 02, 04, 05, 06, 07, 08 (T-B5).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import * as E from '../src/index.ts';
@@ -6,103 +5,76 @@ import type { PuzzleInstance } from '../src/index.ts';
 import { loadContent } from './content.ts';
 
 const content = loadContent();
-const ARCHETYPES = [
-  'sticker',
-  'password-wheel',
-  'expired-patch',
-  'legend-mosaic',
-  'trust-path',
-  'forgotten-key',
-  'wall',
-];
+const ARCHETYPES = ['scan', 'exploit', 'brute', 'phish', 'evasion', 'crypto', 'rootkit', 'wipe'];
+const SAMPLES: Record<string, Record<string, unknown>> = {
+  scan: { ports: ['эхо: 443/tcp', 'эхо: 53/udp'] },
+  exploit: { shape: 'Г-образный паз' },
+  brute: { answer: 'barsik123' },
+  phish: { blocks: ['Легенда', 'Зацепка', 'Тон'] },
+  evasion: { path: ['Фрагмент A', 'Фрагмент B'] },
+  crypto: { rotors: ['Ротор A: 7', 'Ротор B: 3', 'Ротор C: 9'] },
+  rootkit: { profile: ['Процессор: 20%', 'Сеть: 10%', 'Файлы: 5%'] },
+  wipe: { ownLines: ['auth: тестовая сессия', 'proxy: учебный маршрут'] },
+};
 
-// Every exploit of the shipped cases, with the knobs the engine would merge for it.
-const exploits = Object.values(content.cases).flatMap((c) =>
-  c.nodes.flatMap((n) =>
-    n.exploits.map((ex) => ({
-      caseId: c.id,
-      node: n.id,
-      vuln: ex.vuln,
-      params: ex.puzzleParams,
-      knobs: ex.knobs ?? {},
-    })),
-  ),
-);
-const archOf = (vuln: string) => content.puzzles[vuln]?.archetype ?? 'default';
-const gen = (vuln: string, params: object, knobs: object, seed: number): PuzzleInstance =>
-  E.generatePuzzle(seed, archOf(vuln), vuln, params as Record<string, unknown>, knobs, 'n', vuln)[1];
+function gen(archetype: string, params: Record<string, unknown>, knobs: Record<string, number> = {}, seed = 42): PuzzleInstance {
+  return E.generatePuzzle(seed, archetype, archetype, params, knobs, 'node', 'SL-01')[1];
+}
 
-void test('registry has a plugin for every archetype of Neighbour and College', () => {
-  for (const a of ARCHETYPES) assert.equal(E.PUZZLES[a]?.archetype, a);
-  for (const ex of exploits) assert.ok(E.PUZZLES[archOf(ex.vuln)], `${ex.caseId}/${ex.node} ${ex.vuln}`);
+void test('registry has all eight tool plugins', () => {
+  for (const archetype of ARCHETYPES) assert.equal(E.PUZZLES[archetype]?.archetype, archetype);
+  for (const puzzle of Object.values(content.puzzles)) assert.ok(E.PUZZLES[puzzle.archetype]);
 });
 
-void test('generation is deterministic per seed and always solvable', () => {
-  for (const ex of exploits)
-    for (const seed of [1, 42, 777, 123456]) {
-      const a = gen(ex.vuln, ex.params, ex.knobs, seed);
-      assert.deepEqual(a, gen(ex.vuln, ex.params, ex.knobs, seed));
-      assert.ok(a.correct.length > 0 && a.correct.every((id) => a.options.some((o) => o.id === id)));
-      assert.equal(new Set(a.options.map((o) => o.label)).size, a.options.length);
-      assert.deepEqual(E.checkPuzzle(a, a.correct), { solved: true, mistakes: 0 });
-      assert.equal(E.checkPuzzle(a, []).solved, false);
-    }
+void test('every tool is deterministic and solvable', () => {
+  for (const archetype of ARCHETYPES) {
+    const first = gen(archetype, SAMPLES[archetype] ?? {}, { decoys: 2 });
+    const second = gen(archetype, SAMPLES[archetype] ?? {}, { decoys: 2 });
+    assert.deepEqual(first, second, archetype);
+    assert.ok(first.correct.length > 0, archetype);
+    assert.ok(first.correct.every((id) => first.options.some((option) => option.id === id)), archetype);
+    assert.deepEqual(E.checkPuzzle(first, first.correct), { solved: true, mistakes: 0 }, archetype);
+  }
 });
 
-void test('decoy count follows knobs', () => {
-  const few = gen('SL-01', { credentials: 'admin/admin' }, { decoys: 1 }, 7);
-  const many = gen('SL-01', { credentials: 'admin/admin' }, { decoys: 4 }, 7);
-  assert.deepEqual([few.options.length, many.options.length], [2, 5]);
+void test('tool controls change generated views and decoy count', () => {
+  const scan = gen('scan', SAMPLES.scan ?? {}, { falseEchoes: 4, fadeSteps: 2 });
+  assert.equal(scan.options.length, 6);
+  assert.equal(scan.view.fadeSteps, 2);
+  const exploit = gen('exploit', SAMPLES.exploit ?? {}, { contourComplexity: 5 });
+  assert.equal(exploit.view.contourComplexity, 5);
+  const crypto = gen('crypto', SAMPLES.crypto ?? {}, { rotorCount: 2, hintCount: 3 });
+  assert.equal(crypto.correct.length, 2);
+  assert.equal(crypto.view.hintCount, 3);
+  const rootkit = gen('rootkit', SAMPLES.rootkit ?? {}, { parameterCount: 2, edrThreshold: 90 });
+  assert.equal(rootkit.correct.length, 2);
+  assert.equal(rootkit.view.edrThreshold, 90);
 });
 
-void test('password wheel and trust path check the order of slots', () => {
-  const wheel = gen('SL-02', { answer: 'barsik123', decoys: ['qwerty123'] }, {}, 3);
-  assert.deepEqual(
-    wheel.correct.map((id) => wheel.options.find((o) => o.id === id)?.label),
-    ['barsik', '123'],
-  );
-  assert.deepEqual(E.checkPuzzle(wheel, [...wheel.correct].reverse()), { solved: false, mistakes: 2 });
-  const path = gen('SL-06', { trustPath: ['a', 'b', 'c'] }, { decoys: 2 }, 3);
-  assert.equal(path.ordered, true);
-  const extra = path.options.find((o) => !path.correct.includes(o.id))?.id ?? '';
-  assert.deepEqual(E.checkPuzzle(path, [...path.correct, extra]), { solved: false, mistakes: 1 });
+void test('ordered tools reject swapped sequence and cleanup tools reject wrong selection', () => {
+  for (const archetype of ['brute', 'phish', 'evasion', 'crypto', 'rootkit']) {
+    const puzzle = gen(archetype, SAMPLES[archetype] ?? {});
+    assert.equal(puzzle.ordered, true, archetype);
+    assert.equal(E.checkPuzzle(puzzle, [...puzzle.correct].reverse()).solved, false, archetype);
+  }
+  for (const archetype of ['scan', 'wipe']) {
+    const puzzle = gen(archetype, SAMPLES[archetype] ?? {});
+    const wrong = puzzle.options.find((option) => !puzzle.correct.includes(option.id))?.id ?? '';
+    assert.equal(E.checkPuzzle(puzzle, [...puzzle.correct, wrong]).solved, false, archetype);
+  }
 });
 
-void test('multi-select mosaic counts wrong and missed tiles as mistakes', () => {
-  const m = gen('SL-05', { sources: ['about_page', 'mail_headers', 'dept_pages'] }, { decoys: 3 }, 9);
-  const decoy = m.options.find((o) => !m.correct.includes(o.id))?.id ?? '';
-  assert.deepEqual(E.checkPuzzle(m, [...m.correct.slice(1), decoy]), { solved: false, mistakes: 2 });
-});
-
-void test('archetype views carry the data the mechanic needs', () => {
-  const patch = gen('SL-04', { component: 'portal-cms' }, { decoys: 2 }, 5);
-  const rows = patch.view.rows as { component: string; version: string; fixedIn: string }[];
-  const behind = rows.filter((r) => Number(r.version) < Number(r.fixedIn));
-  assert.deepEqual(
-    behind.map((r) => r.component),
-    ['portal-cms'],
-  );
-  const key = gen('SL-07', { accounts: ['ivanova', 'test_svc', 'temp_backup'], forgotten: 'test_svc' }, {}, 5);
-  const owners = key.view.rows as { name: string; owner: string }[];
-  assert.deepEqual(
-    owners.filter((r) => r.owner === '—').map((r) => r.name),
-    ['test_svc'],
-  );
-  const sticker = gen('SL-01', { credentials: 'admin/admin', model: 'RT-300' }, { decoys: 2 }, 5);
-  const book = sticker.view.handbook as { model: string; pair: string }[];
-  assert.equal(book.find((r) => r.model === sticker.view.device)?.pair, 'admin/admin');
-});
-
-void test('engine merges level knobs with node knobs and labels trust path nodes', () => {
-  const d = content.campaign.levels[1]?.difficulty;
-  if (!d) throw new Error('no level 1');
-  let s = E.startCase(content, E.createGame(content, 'L2C1', d, 5));
-  s = E.scan(content, s, 'guest_wifi');
-  s = E.hypothesize(content, s, 'guest_wifi', 'SL-02');
-  assert.equal(s.activePuzzle?.attemptsLeft, 4);
-  assert.equal(s.activePuzzle.genuine, true);
-  s = E.cancelPuzzle(content, s);
-  s = E.hypothesize(content, s, 'guest_wifi', 'SL-07');
-  assert.equal(s.activePuzzle?.genuine, false);
-  assert.ok(!s.activePuzzle.options.some((o) => o.label === 'test_svc'), 'non-genuine instance uses neutral data');
+void test('scan opens Radar Echo and only resolves node after a correct answer', () => {
+  const difficulty = content.campaign.levels[0]?.difficulty;
+  if (!difficulty) throw new Error('no level 1');
+  let state = E.startCase(content, E.createGame(content, 'L1C1', difficulty, 5));
+  state = E.scan(content, state, 'wifi');
+  assert.equal(state.activePuzzle?.action, 'scan');
+  assert.equal(state.nodes.wifi?.scanned, false);
+  state = E.submitPuzzle(content, state, state.activePuzzle?.correct ?? []);
+  assert.equal(state.activePuzzle, null);
+  assert.equal(state.nodes.wifi?.scanned, true);
+  state = E.hypothesize(content, state, 'wifi', 'SL-02');
+  assert.equal(state.activePuzzle?.archetype, 'brute');
+  assert.equal(state.activePuzzle?.attemptsLeft, 6);
 });

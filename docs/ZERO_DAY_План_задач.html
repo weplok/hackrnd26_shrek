@@ -111,10 +111,10 @@ const N = {
   A7:'Docker Compose + профиль offline', A8:'CI: lint → types → контент → тесты → сборка → смоук', A9:'Дизайн-система shared/ui + Storybook',
   A10:'VPS: Caddy, домен, HTTPS, /ws и /mcp', A11:'LICENSE, .env.example, gitleaks, README',
   B1:'Типы состояния, RNG, apply-каркас', B2:'Тревога, шкалы, откат к чекпоинту', B3:'Команды scan/hypothesis/submit/cancel + события',
-  B4:'Язык условий и эффектов + тесты', B5:'Реестр головоломок + архетипы', B6:'Двойной замок, сегменты, ключи, pivoting',
+  B4:'Язык условий и эффектов + тесты', B5:'Реестр 8 инструментов', B6:'Двойной замок, сегменты, ключи, pivoting',
   B7:'Scope и развилка последствий', B8:'Диалоговый движок NPC (scripted)', B9:'Отчёт, ранги, профиль, Кодекс', B10:'Солвер контента (BFS)',
   C1:'game-session: стор, dispatch, шина эффектов', C2:'Карта сети на React Flow', C3:'Жетоны улик, сборка ключей, замки', C4:'Терминал: парсер, автодополнение',
-  C5:'puzzle-host + view головоломок', C6:'HUD: шкалы, цели, Флиппер', C7:'Чат: мессенджер, DialogueProvider', C8:'Scope-диалог и карта последствий',
+  C5:'puzzle-host + view 8 инструментов', C6:'HUD: шкалы, цели, Флиппер', C7:'Чат: мессенджер, DialogueProvider', C8:'Scope-диалог и карта последствий',
   C9:'Отчёт + Кодекс + экспорт PNG', C10:'Сохранения: чекпоинты, миграции', C11:'Мобильная раскладка «Игра»', C12:'Аудио: музыка, звуки, громкость',
   D1:'Каталог СЛ (13) + карточки Кодекса', D2:'Кейс L2C1 «Колледж»', D3:'Реплики Флиппера + карты последствий', D4:'Кейс L1C1 «Сосед»',
   D4b:'Кейс L1C2 «Друг» + интерлюдия', D5:'Кейс L2C2 «Банк»', D6:'Кейсы L3C1, L3C2 + головоломки 10, 11', D7:'СЛ-10 и СЛ-11 без таймера',
@@ -126,9 +126,9 @@ const N = {
 };
 const CRIT = new Set(['A1','A3','B1','B3','B5','C5','D4','B10','D2','G3','G7']);
 // Task status: keep in sync with docs/ZERO_DAY_Задачи.md.
-const DONE = new Set(['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'A11', 'B1', 'B2', 'B3', 'B4', 'B5', 'C1', 'C4', 'C10', 'C6', 'D1', 'D3', 'D4', 'D7', 'D8', 'E1', 'G1', 'G8']);
-const DONE_BY = { A4: 'misterEugene', A5: 'weplok', A6: 'Android', A7: 'weplok', A8: 'weplok', A9: 'Android', A11: 'weplok', B1: 'misterEugene', B2: 'Lolik', B3: 'misterEugene', B4: 'Lolik', B5: 'Lolik', C1: 'Android', C6: 'Android', D1: 'misterEugene', D3: 'Lolik', D4: 'misterEugene', E1: 'weplok', G1: 'weplok', G8: 'misterEugene', D7: 'Lolik', C4: 'Lolik', C10: 'Lolik' };
-const WIP = { A10: 'misterEugene', C2: 'weplok', C5: 'Android', G4: 'Lolik' };
+const DONE = new Set(['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'A11', 'B1', 'B2', 'B3', 'B4', 'B5', 'C1', 'C4', 'C5', 'C10', 'C6', 'D1', 'D3', 'D4', 'D7', 'D8', 'E1', 'G1', 'G8']);
+const DONE_BY = { A4: 'misterEugene', A5: 'weplok', A6: 'Android', A7: 'weplok', A8: 'weplok', A9: 'Android', A11: 'weplok', B1: 'misterEugene', B2: 'Lolik', B3: 'misterEugene', B4: 'Lolik', B5: 'Lolik', C1: 'Android', C5: 'Android', C6: 'Android', D1: 'misterEugene', D3: 'Lolik', D4: 'misterEugene', E1: 'weplok', G1: 'weplok', G8: 'misterEugene', D7: 'Lolik', C4: 'Lolik', C10: 'Lolik' };
+const WIP = { A10: 'misterEugene', C2: 'weplok', G4: 'Lolik' };
 // t(id, after, extra-name, continued)
 const t = (id, after, x, cont) => ({ id, after, x, cont });
 const c = (id, x) => t(id, '', x, true);

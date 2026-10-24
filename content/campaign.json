@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contentVersion": "0.1.0",
+  "contentVersion": "0.2.0",
   "levels": [
     {
       "id": "L1",
@@ -16,25 +16,51 @@
         },
         "flipperPreWarn": true,
         "puzzleKnobs": {
-          "password-wheel": {
+          "scan": {
+            "attempts": 3,
+            "falseEchoes": 1,
+            "fadeSteps": 1
+          },
+          "brute": {
             "attempts": 6,
-            "decoys": 2
+            "decoys": 2,
+            "towerHeight": 2,
+            "junkShare": 35
           },
-          "sticker": {
+          "exploit": {
             "attempts": 4,
-            "decoys": 1
+            "decoys": 1,
+            "contourComplexity": 2
           },
-          "open-door": {
+          "phish": {
             "attempts": 4,
-            "decoys": 2
+            "decoys": 2,
+            "blockCount": 3,
+            "trustSensitivity": 2
           },
-          "legend-mosaic": {
+          "evasion": {
             "attempts": 5,
-            "decoys": 2
+            "decoys": 2,
+            "beamCount": 3,
+            "gapWidth": 2
           },
-          "trust-path": {
+          "crypto": {
             "attempts": 5,
-            "decoys": 1
+            "decoys": 2,
+            "rotorCount": 3,
+            "hintCount": 2
+          },
+          "rootkit": {
+            "attempts": 4,
+            "decoys": 1,
+            "parameterCount": 3,
+            "edrThreshold": 75
+          },
+          "wipe": {
+            "attempts": 5,
+            "decoys": 1,
+            "ownLines": 2,
+            "errorPenalty": 2
           }
         }
       },
@@ -56,29 +82,51 @@
         },
         "flipperPreWarn": true,
         "puzzleKnobs": {
-          "password-wheel": {
-            "attempts": 4,
-            "decoys": 3
-          },
-          "expired-patch": {
-            "attempts": 4,
-            "decoys": 2
-          },
-          "legend-mosaic": {
-            "attempts": 4,
-            "decoys": 3
-          },
-          "forgotten-key": {
-            "attempts": 4,
-            "decoys": 3
-          },
-          "wall": {
+          "scan": {
             "attempts": 3,
-            "decoys": 3
+            "falseEchoes": 3,
+            "fadeSteps": 2
           },
-          "trust-path": {
+          "brute": {
             "attempts": 4,
-            "decoys": 2
+            "decoys": 3,
+            "towerHeight": 3,
+            "junkShare": 55
+          },
+          "exploit": {
+            "attempts": 4,
+            "decoys": 2,
+            "contourComplexity": 4
+          },
+          "phish": {
+            "attempts": 4,
+            "decoys": 3,
+            "blockCount": 3,
+            "trustSensitivity": 4
+          },
+          "evasion": {
+            "attempts": 4,
+            "decoys": 2,
+            "beamCount": 5,
+            "gapWidth": 1
+          },
+          "crypto": {
+            "attempts": 3,
+            "decoys": 3,
+            "rotorCount": 4,
+            "hintCount": 2
+          },
+          "rootkit": {
+            "attempts": 4,
+            "decoys": 3,
+            "parameterCount": 3,
+            "edrThreshold": 82
+          },
+          "wipe": {
+            "attempts": 3,
+            "decoys": 3,
+            "ownLines": 3,
+            "errorPenalty": 4
           }
         }
       },

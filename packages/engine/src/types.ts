@@ -99,6 +99,7 @@ export interface PuzzleInstance extends PuzzleBody {
   genuine: boolean; // vuln is on the node; UI must not show it before the verdict
   knobs: Knobs;
   attemptsLeft: number;
+  action: 'scan' | 'exploit';
 }
 
 export interface LogEntry {

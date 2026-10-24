@@ -83,8 +83,11 @@
         {
           "vuln": "SL-04",
           "puzzleParams": {
-            "component": "portal-cms",
-            "versionBehindBulletin": true
+            "shape": "Контур portal-cms",
+            "shapes": [
+              "Контур auth-lib",
+              "Контур render"
+            ]
           },
           "knobs": {
             "attempts": 4,
@@ -127,10 +130,10 @@
         {
           "vuln": "SL-05",
           "puzzleParams": {
-            "sources": [
-              "about_page",
-              "mail_headers",
-              "dept_pages"
+            "blocks": [
+              "Легенда: подрядчик IT-отдела",
+              "Зацепка: заявка деканата №17",
+              "Тон: спокойно и по делу"
             ]
           },
           "knobs": {
@@ -204,17 +207,26 @@
         {
           "vuln": "SL-07",
           "puzzleParams": {
-            "accounts": [
-              "ivanova",
-              "test_svc",
-              "temp_backup"
-            ],
-            "forgotten": "test_svc"
+            "profile": [
+              "Процессор: 18%",
+              "Сеть: 12%",
+              "Файлы: 4%"
+            ]
           },
           "knobs": {
             "attempts": 4,
-            "decoys": 3
-          }
+            "decoys": 3,
+            "parameterCount": 3,
+            "edrThreshold": 82
+          },
+          "effects": [
+            {
+              "addTrack": {
+                "track": "alarm",
+                "delta": -20
+              }
+            }
+          ]
         }
       ],
       "failHints": {
@@ -295,16 +307,34 @@
         {
           "vuln": "SL-08",
           "puzzleParams": {
-            "ruleset": "firewall-grid",
-            "gap": "rule-14-misorder"
+            "ownLines": [
+              "gateway: учебный маршрут",
+              "proxy: разрешённый тест",
+              "audit: контрольный след"
+            ],
+            "systemLines": [
+              "kernel: плановая задача",
+              "dns: кэш обновлён",
+              "backup: контрольная точка"
+            ]
           },
           "requires": {
             "hasClue": "gateway_gap"
           },
           "knobs": {
             "attempts": 3,
-            "decoys": 3
-          }
+            "decoys": 3,
+            "ownLines": 3,
+            "errorPenalty": 4
+          },
+          "effects": [
+            {
+              "addTrack": {
+                "track": "alarm",
+                "delta": -25
+              }
+            }
+          ]
         }
       ],
       "failHints": {

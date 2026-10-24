@@ -83,7 +83,7 @@ export interface Difficulty {
   puzzleKnobs: PuzzleKnobs;
 }
 /**
- * Per-archetype knobs: attempts, decoys, OTP window. Keys are archetype ids.
+ * Per-tool puzzle controls. Keys are tool ids.
  */
 export interface PuzzleKnobs {
   [k: string]: Knobs;
@@ -92,6 +92,21 @@ export interface Knobs {
   attempts?: number;
   decoys?: number;
   otpWindow?: number;
+  falseEchoes?: number;
+  fadeSteps?: number;
+  contourComplexity?: number;
+  towerHeight?: number;
+  junkShare?: number;
+  blockCount?: number;
+  trustSensitivity?: number;
+  beamCount?: number;
+  gapWidth?: number;
+  rotorCount?: number;
+  hintCount?: number;
+  parameterCount?: number;
+  edrThreshold?: number;
+  ownLines?: number;
+  errorPenalty?: number;
 }
 /**
  * One case of the campaign: content/cases/<id>.json.
@@ -432,6 +447,7 @@ export interface FlipperLine {
   trigger: {
     event:
       | "CaseStarted"
+      | "ScanOpened"
       | "NodeScanned"
       | "NodesRevealed"
       | "CluesFound"
@@ -505,20 +521,7 @@ export interface Puzzles {
   items: Puzzle[];
 }
 export interface Puzzle {
-  archetype:
-    | "sticker"
-    | "password-wheel"
-    | "open-door"
-    | "expired-patch"
-    | "legend-mosaic"
-    | "trust-path"
-    | "forgotten-key"
-    | "wall"
-    | "tired-guard"
-    | "open-port"
-    | "chatty-logs"
-    | "code-intercept"
-    | "blind-spot";
+  archetype: "scan" | "exploit" | "brute" | "phish" | "evasion" | "crypto" | "rootkit" | "wipe";
   vuln: string;
   title: string;
 }
@@ -535,20 +538,7 @@ export interface Vulnerabilities {
 export interface Vulnerability {
   id: string;
   title: string;
-  archetype:
-    | "sticker"
-    | "password-wheel"
-    | "open-door"
-    | "expired-patch"
-    | "legend-mosaic"
-    | "trust-path"
-    | "forgotten-key"
-    | "wall"
-    | "tired-guard"
-    | "open-port"
-    | "chatty-logs"
-    | "code-intercept"
-    | "blind-spot";
+  archetype: "scan" | "exploit" | "brute" | "phish" | "evasion" | "crypto" | "rootkit" | "wipe";
   noiseProfile: "quiet" | "moderate" | "loud";
   killChainStage:
     | "recon"

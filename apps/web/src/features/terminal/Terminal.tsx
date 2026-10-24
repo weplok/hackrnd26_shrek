@@ -36,6 +36,8 @@ export function eventText(event: GameEvent): string | null {
       return t.rejected[event.reason];
     case 'NodeScanned':
       return event.repeat ? t.rescanned(event.node) : t.scanned(event.node);
+    case 'ScanOpened':
+      return t.scanOpened(event.node);
     case 'NodesRevealed':
       return t.revealed(event.nodes.join(', '));
     case 'CluesFound':

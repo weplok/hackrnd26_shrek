@@ -41,11 +41,15 @@ describe('game session store', () => {
     });
 
     store.getState().start({ content, caseId: 'L1C1', difficulty, seed: 777 });
-    const result = store.getState().dispatch({ type: 'ScanNode', node: 'wifi' });
+    const opened = store.getState().dispatch({ type: 'ScanNode', node: 'wifi' });
+    const result = store
+      .getState()
+      .dispatch({ type: 'SubmitPuzzle', answer: store.getState().caseRun?.activePuzzle?.correct ?? [] });
 
     unsubscribe();
 
-    expect(result?.events[0]).toEqual({ type: 'NodeScanned', node: 'wifi', repeat: false });
+    expect(opened?.events).toEqual([{ type: 'ScanOpened', node: 'wifi' }]);
+    expect(result?.events).toContainEqual({ type: 'NodeScanned', node: 'wifi', repeat: false });
     expect(store.getState().caseRun?.nodes.wifi?.scanned).toBe(true);
     expect(events).toContain('NodeScanned');
     expect(events).toContain('Ticked');

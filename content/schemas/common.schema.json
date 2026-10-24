@@ -18,19 +18,14 @@
     "Archetype": {
       "type": "string",
       "enum": [
-        "sticker",
-        "password-wheel",
-        "open-door",
-        "expired-patch",
-        "legend-mosaic",
-        "trust-path",
-        "forgotten-key",
-        "wall",
-        "tired-guard",
-        "open-port",
-        "chatty-logs",
-        "code-intercept",
-        "blind-spot"
+        "scan",
+        "exploit",
+        "brute",
+        "phish",
+        "evasion",
+        "crypto",
+        "rootkit",
+        "wipe"
       ]
     },
     "TrackId": { "type": "string", "enum": ["alarm", "logs", "antifraud", "attention"] },
@@ -47,6 +42,7 @@
       "type": "string",
       "enum": [
         "CaseStarted",
+        "ScanOpened",
         "NodeScanned",
         "NodesRevealed",
         "CluesFound",
@@ -323,7 +319,7 @@
       "additionalProperties": false
     },
     "PuzzleKnobs": {
-      "description": "Per-archetype knobs: attempts, decoys, OTP window. Keys are archetype ids.",
+      "description": "Per-tool puzzle controls. Keys are tool ids.",
       "type": "object",
       "propertyNames": { "$ref": "#/definitions/Archetype" },
       "additionalProperties": { "$ref": "#/definitions/Knobs" }
@@ -333,7 +329,22 @@
       "properties": {
         "attempts": { "type": "integer", "minimum": 1 },
         "decoys": { "type": "integer", "minimum": 0 },
-        "otpWindow": { "type": "integer", "minimum": 1 }
+        "otpWindow": { "type": "integer", "minimum": 1 },
+        "falseEchoes": { "type": "integer", "minimum": 0 },
+        "fadeSteps": { "type": "integer", "minimum": 1 },
+        "contourComplexity": { "type": "integer", "minimum": 1 },
+        "towerHeight": { "type": "integer", "minimum": 1 },
+        "junkShare": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "blockCount": { "type": "integer", "minimum": 1 },
+        "trustSensitivity": { "type": "integer", "minimum": 1 },
+        "beamCount": { "type": "integer", "minimum": 1 },
+        "gapWidth": { "type": "integer", "minimum": 1 },
+        "rotorCount": { "type": "integer", "minimum": 1 },
+        "hintCount": { "type": "integer", "minimum": 1 },
+        "parameterCount": { "type": "integer", "minimum": 1 },
+        "edrThreshold": { "type": "integer", "minimum": 1, "maximum": 100 },
+        "ownLines": { "type": "integer", "minimum": 1 },
+        "errorPenalty": { "type": "integer", "minimum": 1 }
       },
       "additionalProperties": false
     }

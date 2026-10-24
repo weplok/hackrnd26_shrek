@@ -14,6 +14,12 @@ function start(): GameState {
 }
 const types = (ev: GameEvent[]) => ev.map((e) => e.type);
 
+function scanNode(state: GameState, node: string): GameState {
+  const opened = E.apply(content, state, { type: 'ScanNode', node });
+  assert.deepEqual(opened.events, [{ type: 'ScanOpened', node }]);
+  return E.apply(content, opened.state, { type: 'SubmitPuzzle', answer: opened.state.activePuzzle?.correct ?? [] }).state;
+}
+
 void test('commands before contract signing are rejected', () => {
   const d = content.campaign.levels[0]?.difficulty;
   if (!d) throw new Error('no level 0');
@@ -26,8 +32,11 @@ void test('commands before contract signing are rejected', () => {
 void test('scan reveals neighbours and clues; repeat scan only adds noise', () => {
   const s = start();
   assert.equal(E.apply(content, s, { type: 'ScanNode', node: 'router' }).events[0]?.type, 'CommandRejected');
-  const r = E.apply(content, s, { type: 'ScanNode', node: 'wifi' });
-  assert.deepEqual(r.events[0], { type: 'NodeScanned', node: 'wifi', repeat: false });
+  const opened = E.apply(content, s, { type: 'ScanNode', node: 'wifi' });
+  assert.deepEqual(opened.events, [{ type: 'ScanOpened', node: 'wifi' }]);
+  const r = E.apply(content, opened.state, { type: 'SubmitPuzzle', answer: opened.state.activePuzzle?.correct ?? [] });
+  const scanned = r.events.find((event) => event.type === 'NodeScanned');
+  assert.deepEqual(scanned, { type: 'NodeScanned', node: 'wifi', repeat: false });
   const revealed = r.events.find((e) => e.type === 'NodesRevealed');
   assert.deepEqual(revealed, { type: 'NodesRevealed', nodes: ['router', 'speaker'] });
   assert.ok(types(r.events).includes('CluesFound'));
@@ -43,7 +52,7 @@ void test('hypothesis needs a scanned node and a single active puzzle', () => {
   let s = start();
   const unscanned = E.apply(content, s, { type: 'ProposeHypothesis', node: 'wifi', vuln: 'SL-02' });
   assert.deepEqual(unscanned.events, [{ type: 'CommandRejected', reason: 'not-scanned' }]);
-  s = E.apply(content, s, { type: 'ScanNode', node: 'wifi' }).state;
+  s = scanNode(s, 'wifi');
   const r = E.apply(content, s, { type: 'ProposeHypothesis', node: 'wifi', vuln: 'SL-02' });
   assert.deepEqual(r.events, [{ type: 'PuzzleOpened', node: 'wifi', vuln: 'SL-02' }]);
   assert.equal(
@@ -54,7 +63,7 @@ void test('hypothesis needs a scanned node and a single active puzzle', () => {
 
 void test('cancel before submit is silent: no tick, no noise', () => {
   let s = start();
-  s = E.apply(content, s, { type: 'ScanNode', node: 'wifi' }).state;
+  s = scanNode(s, 'wifi');
   s = E.apply(content, s, { type: 'ProposeHypothesis', node: 'wifi', vuln: 'SL-02' }).state;
   const r = E.apply(content, s, { type: 'CancelPuzzle' });
   assert.deepEqual(r.events, [{ type: 'PuzzleCancelled', node: 'wifi' }]);
@@ -67,8 +76,8 @@ void test('cancel before submit is silent: no tick, no noise', () => {
 
 void test('solved genuine exploit takes the node and reaches the target', () => {
   let s = start();
-  s = E.apply(content, s, { type: 'ScanNode', node: 'wifi' }).state;
-  s = E.apply(content, s, { type: 'ScanNode', node: 'speaker' }).state;
+  s = scanNode(s, 'wifi');
+  s = scanNode(s, 'speaker');
   s = E.apply(content, s, { type: 'ProposeHypothesis', node: 'wifi', vuln: 'SL-02' }).state;
   const r = E.apply(content, s, { type: 'SubmitPuzzle', answer: s.activePuzzle?.correct ?? [] });
   const t = types(r.events);
@@ -80,7 +89,7 @@ void test('solved genuine exploit takes the node and reaches the target', () => 
 
 void test('solved puzzle for the wrong vuln reports mismatch with failHint', () => {
   let s = start();
-  s = E.apply(content, s, { type: 'ScanNode', node: 'wifi' }).state;
+  s = scanNode(s, 'wifi');
   s = E.apply(content, s, { type: 'ProposeHypothesis', node: 'wifi', vuln: 'SL-01' }).state;
   const r = E.apply(content, s, { type: 'SubmitPuzzle', answer: s.activePuzzle?.correct ?? [] });
   const hint = content.cases.L1C1?.nodes.find((n) => n.id === 'wifi')?.failHints['SL-01'];
@@ -90,7 +99,7 @@ void test('solved puzzle for the wrong vuln reports mismatch with failHint', () 
 
 void test('wrong answer costs an attempt and makes noise; last attempt closes the puzzle', () => {
   let s = start();
-  s = E.apply(content, s, { type: 'ScanNode', node: 'wifi' }).state;
+  s = scanNode(s, 'wifi');
   s = E.apply(content, s, { type: 'ProposeHypothesis', node: 'wifi', vuln: 'SL-02' }).state;
   const attempts = s.activePuzzle?.attemptsLeft ?? 0;
   assert.equal(attempts, 6);
