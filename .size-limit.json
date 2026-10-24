@@ -1,0 +1,8 @@
+[
+  {
+    "name": "initial JS (NFR-01)",
+    "path": "apps/web/dist/assets/*.js",
+    "limit": "300 kB",
+    "gzip": true
+  }
+]

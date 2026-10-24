@@ -107,7 +107,7 @@
 - [ ] **T-G2** · Метрики Prometheus + /metrics + алерты · API · S · P2 · *после:* T-A5
 - [ ] **T-G4** · a11y (axe), Lighthouse, size-limit в CI · QA · S · P1 · *после:* T-A8
   - в работе: Lolik
-  - Прогресс: назначено Lolik; осталось size-limit, Lighthouse CI, axe в Playwright.
+  - Прогресс: сделано size-limit, axe в Playwright (desktop + phone), Lighthouse CI, шаги в ci.yml; осталось подтвердить Lighthouse (Performance >= 0.85) в GitHub Actions.
 - [ ] **T-G3** · E2E Playwright (смоук «Сосед» → «Колледж» + альт-путь + сохранение + офлайн + scope + откат) · QA · L · P0 · *после:* M2
 - [ ] **T-G6** · Плейтесты + итоговый отчёт для презентации · QA · M · P1 · *после:* M2, M3
 - [ ] **T-G5** · Нагрузочный тест k6 · QA · S · P3 · *после:* T-F2, T-E2

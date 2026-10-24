@@ -21,8 +21,11 @@
     "format:check": "pnpm run format:check:ts && pnpm run format:check:python",
     "format:check:ts": "prettier --check .",
     "format:check:python": "uv run --project backend_api ruff format --check --config backend_api/pyproject.toml backend_api",
+    "size": "size-limit",
+    "lighthouse": "lhci autorun",
+    "a11y": "playwright test --config e2e/playwright.config.ts",
     "typecheck": "pnpm run typecheck:ts && pnpm run typecheck:python",
-    "typecheck:ts": "pnpm -r --if-present run typecheck",
+    "typecheck:ts": "pnpm -r --if-present run typecheck && tsc --project e2e/tsconfig.json",
     "typecheck:python": "uv run --project backend_api mypy --config-file backend_api/pyproject.toml backend_api",
     "hooks:install": "uv run --project backend_api pre-commit install",
     "hooks:run": "uv run --project backend_api pre-commit run --all-files",
@@ -36,7 +39,11 @@
     "*.{json,yml,yaml,md,css,html}": "prettier --write"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@eslint/js": "9.39.5",
+    "@lhci/cli": "0.15.1",
+    "@playwright/test": "1.64.1",
+    "@size-limit/file": "14.3.0",
     "@types/node": "26.6.5",
     "concurrently": "10.0.6",
     "eslint": "9.39.5",
@@ -46,6 +53,7 @@
     "globals": "17.13.0",
     "lint-staged": "17.6.0",
     "prettier": "3.9.10",
+    "size-limit": "14.3.0",
     "typescript": "5.9.3",
     "typescript-eslint": "8.72.0"
   }

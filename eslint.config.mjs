@@ -19,6 +19,9 @@ export default tseslint.config(
       '.pnpm-store/**',
       'packages/ui/storybook-static/**',
       'apps/web/storybook-static/**',
+      '.lighthouseci/**',
+      'e2e/test-results/**',
+      'e2e/playwright-report/**',
       // Legacy prototype, not wired into main.tsx.
       'apps/web/src/App.tsx',
       'apps/web/src/content.ts',
