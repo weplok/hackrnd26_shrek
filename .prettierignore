@@ -16,3 +16,9 @@ docs/
 node_modules/
 opencode.jsonc
 pnpm-lock.yaml
+apps/web/src/App.tsx
+apps/web/src/content.ts
+apps/web/src/profile.ts
+apps/web/src/ui.css
+apps/web/storybook-static/
+packages/ui/storybook-static/

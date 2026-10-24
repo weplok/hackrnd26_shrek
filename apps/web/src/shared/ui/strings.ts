@@ -22,7 +22,7 @@ export const ru = {
   contentReady: 'контент готов к подключению',
   contentOffline: 'локальный режим: контент недоступен',
   contentReadyDetail: (vulnerabilities: number, puzzles: number) =>
-    `Найдено: слабостей ${vulnerabilities}, головоломок ${puzzles}.`,
+    `Найдено: слабостей ${String(vulnerabilities)}, головоломок ${String(puzzles)}.`,
   contentOfflineDetail: 'Срез работает без контента. Кампания останется доступна в офлайн-режиме.',
   localProfile: (nickname: string) => `профиль: ${nickname}`,
   localMode: 'локальный режим',

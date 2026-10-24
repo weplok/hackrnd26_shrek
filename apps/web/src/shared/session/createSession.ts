@@ -8,7 +8,11 @@ export async function createAnonymousSession(): Promise<SessionState> {
     const response = await fetch('/api/v1/sessions', { method: 'POST' });
     const payload: unknown = response.ok ? await response.json() : null;
 
-    if (typeof payload === 'object' && payload !== null && typeof (payload as { session_id?: unknown }).session_id === 'string') {
+    if (
+      typeof payload === 'object' &&
+      payload !== null &&
+      typeof (payload as { session_id?: unknown }).session_id === 'string'
+    ) {
       return { id: (payload as { session_id: string }).session_id, status: 'ready' };
     }
   } catch {

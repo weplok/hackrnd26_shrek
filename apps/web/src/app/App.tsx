@@ -31,7 +31,8 @@ export function App(): ReactNode {
 
     void Promise.allSettled([loadContentSummary(), createAnonymousSession()]).then(([content, session]) => {
       if (disposed) return;
-      const sessionState = session.status === 'fulfilled' ? session.value : { id: crypto.randomUUID(), status: 'offline' as const };
+      const sessionState =
+        session.status === 'fulfilled' ? session.value : { id: crypto.randomUUID(), status: 'offline' as const };
       const client = new TelemetryClient({
         clientVersion: 'dev',
         sessionId: sessionState.id,

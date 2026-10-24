@@ -20,6 +20,7 @@ const content = {
       tracks: [{ id: 'alarm', start: 0 }],
       npcs: [],
       clues: [],
+      checkpoints: [],
       keyRecipes: [],
       objectives: [],
       ranks: [],

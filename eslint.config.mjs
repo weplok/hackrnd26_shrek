@@ -19,6 +19,10 @@ export default tseslint.config(
       '.pnpm-store/**',
       'packages/ui/storybook-static/**',
       'apps/web/storybook-static/**',
+      // Legacy prototype, not wired into main.tsx.
+      'apps/web/src/App.tsx',
+      'apps/web/src/content.ts',
+      'apps/web/src/profile.ts',
       'beta/**',
       'docs/**',
       'backend_api/content/models/**',
