@@ -26,6 +26,4 @@ class CodexCard(BaseModel):
     defense: common_schema.Text
     realCase: common_schema.Text
     law: common_schema.Text
-    learnMore: list[LearnMoreItem] = Field(
-        ..., description='Legal training resources only.'
-    )
+    learnMore: list[LearnMoreItem] = Field(..., description='Legal training resources only.')

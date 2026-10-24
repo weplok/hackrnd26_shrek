@@ -9,11 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, RootModel
 
 
 class Common(RootModel[Any]):
-    root: Any = Field(
-        ...,
-        description='Shared definitions for ZERO DAY content, schemaVersion 1.',
-        title='Common',
-    )
+    root: Any = Field(..., description='Shared definitions for ZERO DAY content, schemaVersion 1.', title='Common')
 
 
 class SchemaVersion(RootModel[Literal[1]]):
@@ -359,8 +355,7 @@ class Effects(RootModel[list[Effect]]):
 
 class PuzzleKnobs(RootModel[dict[Archetype, Knobs]]):
     root: dict[Archetype, Knobs] = Field(
-        ...,
-        description='Per-archetype knobs: attempts, decoys, OTP window. Keys are archetype ids.',
+        ..., description='Per-archetype knobs: attempts, decoys, OTP window. Keys are archetype ids.'
     )
 
 

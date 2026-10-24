@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, StrictStr, field_validator
@@ -23,6 +24,15 @@ class DialogueRequest(BaseModel):
 class DialogueResponse(BaseModel):
     answer: str
     verdict: Literal["continue", "ended", "noticed"]
+
+
+class HealthResponse(BaseModel):
+    status: Literal["ok"] = "ok"
+
+
+class SessionResponse(BaseModel):
+    session_id: str
+    expires_at: datetime
 
 
 JudgeVerdict = Literal["continue", "ended", "noticed"]

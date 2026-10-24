@@ -45,8 +45,7 @@ class Scope(BaseModel):
     text: common_schema.Text
     rules: list[common_schema.Text] | None = None
     consequence: common_schema.Id | None = Field(
-        None,
-        description='Consequence shown when the player confirms an out-of-scope action.',
+        None, description='Consequence shown when the player confirms an out-of-scope action.'
     )
 
 
@@ -182,8 +181,7 @@ class Exploit(BaseModel):
     vuln: common_schema.VulnId
     requires: common_schema.Condition | None = None
     puzzleParams: dict[str, Any] = Field(
-        ...,
-        description='Archetype-specific generator data; the puzzle plugin validates it.',
+        ..., description='Archetype-specific generator data; the puzzle plugin validates it.'
     )
     knobs: common_schema.Knobs | None = None
     effects: common_schema.Effects | None = None

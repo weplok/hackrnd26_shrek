@@ -18,14 +18,18 @@ class CharacterProfileError(RuntimeError):
 @dataclass(frozen=True)
 class CharacterProfile:
     npc_id: str
-    data: dict
+    data: dict[str, object]
     source_text: str
 
     def value(self, section: str, field: str) -> object:
-        try:
-            return self.data[section][field]["значение"]
-        except (KeyError, TypeError) as error:
-            raise CharacterProfileError(f"Missing profile value: {section}/{field}") from error
+        section_data = self.data.get(section)
+        if not isinstance(section_data, dict):
+            raise CharacterProfileError(f"Missing profile value: {section}/{field}")
+        field_data = section_data.get(field)
+        if not isinstance(field_data, dict) or "значение" not in field_data:
+            raise CharacterProfileError(f"Missing profile value: {section}/{field}")
+        value: object = field_data["значение"]
+        return value
 
 
 class CharacterRepository:
