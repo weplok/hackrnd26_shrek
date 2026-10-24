@@ -20,6 +20,11 @@ services:
       dockerfile: backend_api/Dockerfile
     environment:
       REDIS_URL: redis://redis:6379/0
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:?set OPENAI_BASE_URL}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?set OPENAI_API_KEY}
+      NPC_MODEL: ${NPC_MODEL:?set NPC_MODEL}
+      INJECTION_JUDGE_MODEL: ${INJECTION_JUDGE_MODEL:?set INJECTION_JUDGE_MODEL}
+      ALARM_JUDGE_MODEL: ${ALARM_JUDGE_MODEL:?set ALARM_JUDGE_MODEL}
     volumes:
       - npc_data:/app/backend_api/data
     depends_on:
