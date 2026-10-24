@@ -15,11 +15,11 @@ const SERVERS = [
 ] as const;
 const CORE_R = 8;
 const MIN_R = 4;
-// Full power makes a ball touch the core.
-const MAX_R = CENTER - 12 - CORE_R;
 const GAIN = 0.07;
 const DECAY = 0.08; // per second
-const REACH = 1;
+// Power at which a ball touches the core; above it the ball presses in.
+const REACH = 0.85;
+const TOUCH_R = CENTER - 12 - CORE_R;
 // Indexes follow SERVERS: top, right, bottom, left.
 const KEYS: Record<string, number> = {
   ArrowUp: 0,
@@ -118,6 +118,9 @@ export function DdosStorm({ puzzle, onCancel, onSubmit }: GameProps): ReactNode 
             cy={CENTER}
             r={CORE_R}
           />
+          <text className="ddos-storm__count" x={CENTER} y={CENTER}>
+            {`${String(reached)}/4`}
+          </text>
           {SERVERS.map(([x, y], i) => {
             const p = view.power[i] ?? 0;
             return (
@@ -128,7 +131,7 @@ export function DdosStorm({ puzzle, onCancel, onSubmit }: GameProps): ReactNode 
                   cx={x}
                   cy={y}
                   onPointerDown={() => pump(i)}
-                  r={MIN_R + p * (MAX_R - MIN_R)}
+                  r={MIN_R + (p / REACH) * (TOUCH_R - MIN_R)}
                   role="button"
                 />
                 <text className="ddos-storm__key" x={x} y={y}>
