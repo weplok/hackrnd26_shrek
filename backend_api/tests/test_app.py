@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import sqlite3
 import tempfile
 import unittest
-from datetime import datetime
+from contextlib import closing
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 from uuid import UUID
@@ -11,6 +13,7 @@ from fastapi.testclient import TestClient
 
 from backend_api.app import create_app
 from backend_api.config import Settings
+from backend_api.telemetry import TelemetryStore
 
 
 class FakeChatClient:
@@ -125,6 +128,55 @@ class AppContractTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertNotEqual(response.headers["X-Request-Id"], "contains spaces")
         self.assertEqual(len(response.headers["X-Request-Id"]), 32)
+
+    def test_telemetry_contract_hashes_session_and_ignores_duplicate_events(self) -> None:
+        event = {
+            "event_id": "b4be1c51-b6f8-4d04-bc6c-7f97b0cb5b7b",
+            "event_type": "puzzle_finished",
+            "occurred_at": "2026-10-24T10:00:00Z",
+            "session_id": "anonymous-session",
+            "client_version": "test",
+            "case_id": "L1C1",
+            "payload": {"puzzle_id": "SL-01", "outcome": "solved", "attempt": 2},
+        }
+        with TestClient(create_app(self.settings())) as client:
+            first = client.post("/telemetry", json={"events": [event]})
+            duplicate = client.post("/telemetry", json={"events": [event]})
+            invalid = client.post("/telemetry", json={"events": [{**event, "payload": {"nickname": "secret"}}]})
+
+        self.assertEqual(first.status_code, 202)
+        self.assertEqual(first.json(), {"accepted": 1})
+        self.assertEqual(duplicate.json(), {"accepted": 0})
+        self.assertEqual(invalid.status_code, 400)
+        with closing(sqlite3.connect(self.directory / "telemetry.sqlite3")) as database, database:
+            stored_session = database.execute("SELECT session_hash FROM telemetry_sessions").fetchone()[0]
+        self.assertNotEqual(stored_session, event["session_id"])
+
+    def test_telemetry_retention_deletes_events_after_thirty_days(self) -> None:
+        TelemetryStore(self.directory / "telemetry.sqlite3", retention_days=30)
+        old_time = (datetime.now(UTC) - timedelta(days=31)).isoformat()
+        with closing(sqlite3.connect(self.directory / "telemetry.sqlite3")) as database, database:
+            database.execute(
+                "INSERT INTO telemetry_sessions VALUES (?, ?, ?)",
+                ("old", old_time, old_time),
+            )
+            database.execute(
+                "INSERT INTO telemetry_events VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                ("old-event", "old", "case_started", old_time, old_time, "test", None, "{}"),
+            )
+        event = {
+            "event_id": "f3cfcdfd-f515-4cf9-b4de-8711d6d089d1",
+            "event_type": "case_started",
+            "occurred_at": "2026-10-24T10:00:00Z",
+            "session_id": "new-session",
+            "client_version": "test",
+            "payload": {},
+        }
+        with TestClient(create_app(self.settings())) as client:
+            self.assertEqual(client.post("/telemetry", json={"events": [event]}).status_code, 202)
+        with closing(sqlite3.connect(self.directory / "telemetry.sqlite3")) as database, database:
+            event_ids = {row[0] for row in database.execute("SELECT event_id FROM telemetry_events")}
+        self.assertEqual(event_ids, {event["event_id"]})
 
 
 if __name__ == "__main__":

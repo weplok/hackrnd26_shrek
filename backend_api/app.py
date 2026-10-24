@@ -17,12 +17,20 @@ from fastapi.responses import JSONResponse, Response
 
 from .characters import CharacterNotFoundError, CharacterProfileError, CharacterRepository
 from .config import ConfigurationError, Settings
-from .llm import ChatClient, ModelError, OpenAIChatClient
+from .llm import CircuitBreakingLlm, LlmClient, ModelError, OpenAICompatibleLlm
 from .rate_limit import FixedWindowRateLimiter, RateLimitExceeded
-from .schemas import DialogueRequest, DialogueResponse, HealthResponse, SessionResponse
+from .schemas import (
+    DialogueRequest,
+    DialogueResponse,
+    HealthResponse,
+    SessionResponse,
+    TelemetryRequest,
+    TelemetryResponse,
+)
 from .service import DialogueService
 from .sessions import AnonymousSessionStore
 from .storage import SessionStore
+from .telemetry import TelemetryStore
 
 REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
 request_logger = logging.getLogger("backend_api.requests")
@@ -34,13 +42,14 @@ request_logger.setLevel(logging.INFO)
 request_logger.propagate = False
 
 
-def create_app(settings: Settings | None = None, client: ChatClient | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, client: LlmClient | None = None) -> FastAPI:
     app = FastAPI(title="ZERO DAY backend API", version="0.2.0")
     app.state.settings = settings
     app.state.client = client
     app.state.service = None
     app.state.anonymous_sessions = None
     app.state.rate_limiter = None
+    app.state.telemetry = None
 
     def get_settings() -> Settings:
         if app.state.settings is None:
@@ -56,7 +65,7 @@ def create_app(settings: Settings | None = None, client: ChatClient | None = Non
                 settings=runtime_settings,
                 characters=CharacterRepository(runtime_settings.npc_ids_path),
                 sessions=SessionStore(runtime_settings.session_db_path),
-                client=app.state.client or OpenAIChatClient(runtime_settings),
+                client=app.state.client or CircuitBreakingLlm(OpenAICompatibleLlm(runtime_settings)),
             )
         return cast(DialogueService, app.state.service)
 
@@ -69,6 +78,15 @@ def create_app(settings: Settings | None = None, client: ChatClient | None = Non
         if app.state.rate_limiter is None:
             app.state.rate_limiter = FixedWindowRateLimiter(get_settings().rate_limit_window_seconds)
         return cast(FixedWindowRateLimiter, app.state.rate_limiter)
+
+    def get_telemetry() -> TelemetryStore:
+        if app.state.telemetry is None:
+            runtime_settings = get_settings()
+            app.state.telemetry = TelemetryStore(
+                runtime_settings.session_db_path.with_name("telemetry.sqlite3"),
+                runtime_settings.telemetry_retention_days,
+            )
+        return cast(TelemetryStore, app.state.telemetry)
 
     def client_ip(request: Request) -> str:
         return request.client.host if request.client is not None else "unknown"
@@ -175,6 +193,10 @@ def create_app(settings: Settings | None = None, client: ChatClient | None = Non
         limiter.check(f"dialogue:ip:{client_ip(request)}", runtime_settings.dialogue_rate_limit)
         limiter.check(f"dialogue:session:{payload.uuid}", runtime_settings.dialogue_rate_limit)
         return await get_service().reply(payload.npc_id, payload.uuid, payload.message)
+
+    @app.post("/telemetry", response_model=TelemetryResponse, status_code=status.HTTP_202_ACCEPTED)
+    async def telemetry(payload: TelemetryRequest) -> TelemetryResponse:
+        return TelemetryResponse(accepted=get_telemetry().record(payload.events))
 
     return app
 

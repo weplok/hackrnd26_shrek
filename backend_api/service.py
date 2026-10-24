@@ -5,7 +5,7 @@ import json
 
 from .characters import CharacterProfile, CharacterRepository
 from .config import Settings
-from .llm import ChatClient, ModelError
+from .llm import LlmClient, ModelError
 from .schemas import DialogueResponse, TrustVerdict
 from .storage import Session, SessionStore
 
@@ -20,7 +20,7 @@ class DialogueService:
         settings: Settings,
         characters: CharacterRepository,
         sessions: SessionStore,
-        client: ChatClient,
+        client: LlmClient,
     ) -> None:
         self.settings = settings
         self.characters = characters
