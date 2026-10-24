@@ -6,6 +6,7 @@ import type { SaveData, SaveRepository } from './SaveRepository';
 const SIGNIFICANT = new Set<GameEvent['type']>([
   'NodeCompromised',
   'ObjectiveCompleted',
+  'CaseWon',
   'TargetReached',
   'Caught',
   'CheckpointRestored',
@@ -19,6 +20,12 @@ export function withCaseRun(save: SaveData, state: GameState): SaveData {
     caseRun: state,
     codex: [...new Set([...save.codex, ...opened])],
     completedCases: won ? [...save.completedCases, state.caseId] : save.completedCases,
+    profile: won
+      ? {
+          technicalSuccesses: save.profile.technicalSuccesses + state.technicalSuccesses,
+          socialSuccesses: save.profile.socialSuccesses + state.socialSuccesses,
+        }
+      : save.profile,
   };
 }
 

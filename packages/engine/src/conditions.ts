@@ -17,6 +17,8 @@ export function evalCondition(cond: Condition | undefined, s: GameState): boolea
   if ('npcFactRevealed' in c) return !!s.npc[c.npcFactRevealed.npc]?.revealedFacts[c.npcFactRevealed.fact];
   if ('trackBelow' in c) return (s.tracks[c.trackBelow.track] ?? 0) < c.trackBelow.value;
   if ('trackAbove' in c) return (s.tracks[c.trackAbove.track] ?? 0) > c.trackAbove.value;
+  if ('maxAlarmBelow' in c) return s.maxAlarm < c.maxAlarmBelow;
+  if ('scansBelow' in c) return s.scans < c.scansBelow;
   if ('lockFilled' in c) {
     const socks = s.sockets[c.lockFilled];
     return !!socks && Object.values(socks).every(Boolean);

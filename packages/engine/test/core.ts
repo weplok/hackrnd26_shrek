@@ -14,7 +14,12 @@ function state(): GameState {
     scans: 0,
     socialActions: 0,
     techActions: 0,
-    nodes: { wifi: { segment: 'home', revealed: false, scanned: true, compromised: false, secured: false } },
+    technicalSuccesses: 0,
+    socialSuccesses: 0,
+    successfulVulnerabilities: [],
+    nodes: {
+      wifi: { segment: 'home', revealed: false, scanned: true, compromised: false, secured: false, alertLevel: 'calm' },
+    },
     segmentsOpen: { lan: false },
     clues: { ssid: true },
     keys: {},
@@ -77,6 +82,8 @@ void test('evalCondition covers leaves and combinators', () => {
   assert.equal(evalCondition({ npcFactRevealed: { npc: 'kostya', fact: 'pc_name' } }, s), true);
   assert.equal(evalCondition({ trackBelow: { track: 'alarm', value: 50 } }, s), true);
   assert.equal(evalCondition({ trackAbove: { track: 'alarm', value: 50 } }, s), false);
+  assert.equal(evalCondition({ maxAlarmBelow: 50 }, s), true);
+  assert.equal(evalCondition({ scansBelow: 1 }, s), true);
   assert.equal(evalCondition({ lockFilled: 'dean' }, s), false);
   assert.equal(evalCondition({ tickAtLeast: 3 }, s), true);
   assert.equal(evalCondition({ all: [{ hasClue: 'ssid' }, { tickAtLeast: 4 }] }, s), false);

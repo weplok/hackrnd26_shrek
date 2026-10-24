@@ -4,7 +4,13 @@ import { gameSessionEffects } from '../game-session';
 import { startAutosave, withCaseRun } from './autosave';
 import { SAVE_KEY, SAVE_VERSION, SaveRepository, emptySave, memoryStore } from './SaveRepository';
 
-const caseRun = { caseId: 'L1C1', phase: 'playing', codex: { 'SL-01': true } } as unknown as GameState;
+const caseRun = {
+  caseId: 'L1C1',
+  phase: 'playing',
+  codex: { 'SL-01': true },
+  technicalSuccesses: 3,
+  socialSuccesses: 2,
+} as unknown as GameState;
 
 function seeded(value: unknown) {
   const store = memoryStore();
@@ -72,7 +78,9 @@ describe('autosave', () => {
 
     expect(save.codex).toEqual(['SL-02', 'SL-01']);
     expect(save.completedCases).toEqual(['L1C1']);
+    expect(save.profile).toEqual({ technicalSuccesses: 3, socialSuccesses: 2 });
     expect(withCaseRun(save, won).completedCases).toEqual(['L1C1']);
+    expect(withCaseRun(save, won).profile).toEqual({ technicalSuccesses: 3, socialSuccesses: 2 });
   });
 
   it('saves only on significant events', () => {

@@ -17,6 +17,8 @@ export {
   confirmScope,
   wait,
   answerReport,
+  reportFindings,
+  buildCaseReport,
   restoreCheckpoint,
   alarmLevel,
   noiseSources,

@@ -11,6 +11,7 @@ import {
   fillSocket,
   confirmScope,
   needsScopeConfirm,
+  answerReport,
 } from './engine.ts';
 import { verifyPuzzle } from './puzzles/index.ts';
 
@@ -23,6 +24,7 @@ export type Command =
   | { type: 'FillSocket'; node: string; socket: string; key: string }
   | { type: 'ConfirmOutOfScope'; node: string }
   | { type: 'DeclineOutOfScope' }
+  | { type: 'AnswerReport'; finding: string; option: string }
   | { type: 'RestoreCheckpoint' };
 
 export type RejectReason =
@@ -38,6 +40,7 @@ export type RejectReason =
   | 'no-puzzle'
   | 'not-scanned'
   | 'not-exploitable'
+  | 'not-report'
   | 'not-caught';
 
 export type GameEvent =
@@ -66,6 +69,9 @@ export type GameEvent =
   | { type: 'SegmentOpened'; segment: string }
   | { type: 'CodexUnlocked'; card: string }
   | { type: 'ObjectiveCompleted'; objective: string }
+  | { type: 'NodeSecured'; node: string }
+  | { type: 'ReportAnswered'; finding: string; correct: boolean }
+  | { type: 'CaseWon' }
   | { type: 'Ticked'; tick: number }
   | { type: 'Caught' }
   | { type: 'CheckpointRestored'; checkpoint: string }
@@ -79,6 +85,7 @@ export interface StepResult {
 export function validate(content: Content, s: GameState, cmd: Command): RejectReason | null {
   // TZ 7.1: in caught only RestoreCheckpoint is accepted.
   if (cmd.type === 'RestoreCheckpoint') return s.phase === 'caught' && s.checkpoint ? null : 'not-caught';
+  if (cmd.type === 'AnswerReport') return s.phase === 'report' ? null : 'not-report';
   if (s.phase !== 'playing') return 'not-playing';
   if (cmd.type === 'ConfirmOutOfScope') return s.pendingScope === cmd.node ? null : 'no-scope-pending';
   if (cmd.type === 'DeclineOutOfScope') return s.pendingScope ? null : 'no-scope-pending';
@@ -150,6 +157,8 @@ function run(content: Content, s: GameState, cmd: Command): GameState {
       return confirmScope(content, s, true);
     case 'DeclineOutOfScope':
       return confirmScope(content, s, false);
+    case 'AnswerReport':
+      return answerReport(content, s, cmd.finding, cmd.option);
   }
 }
 
@@ -187,6 +196,13 @@ function primaryEvents(content: Content, prev: GameState, next: GameState, cmd: 
         ev.push({ type: 'LockOpened', node: cmd.node });
       return ev;
     }
+    case 'AnswerReport': {
+      const finding = content.cases[prev.caseId]?.report.findings.find((item) => item.id === cmd.finding);
+      const correct =
+        !!prev.nodes[finding?.node ?? '']?.compromised &&
+        (finding?.options.find((option) => option.id === cmd.option)?.correct ?? false);
+      return [{ type: 'ReportAnswered', finding: cmd.finding, correct }];
+    }
     case 'SubmitPuzzle': {
       const inst = prev.activePuzzle;
       if (!inst) return [];
@@ -223,6 +239,8 @@ function diffEvents(prev: GameState, next: GameState): GameEvent[] {
   if (clues.length) ev.push({ type: 'CluesFound', clues });
   for (const id of Object.keys(next.nodes))
     if (next.nodes[id]?.compromised && !prev.nodes[id]?.compromised) ev.push({ type: 'NodeCompromised', node: id });
+  for (const id of Object.keys(next.nodes))
+    if (next.nodes[id]?.secured && !prev.nodes[id]?.secured) ev.push({ type: 'NodeSecured', node: id });
   for (const segment of added(prev.segmentsOpen, next.segmentsOpen)) ev.push({ type: 'SegmentOpened', segment });
   for (const card of added(prev.codex, next.codex)) ev.push({ type: 'CodexUnlocked', card });
   for (const [track, to] of Object.entries(next.tracks)) {
@@ -232,6 +250,7 @@ function diffEvents(prev: GameState, next: GameState): GameEvent[] {
   for (const objective of added(prev.objectives, next.objectives)) ev.push({ type: 'ObjectiveCompleted', objective });
   if (next.tick !== prev.tick) ev.push({ type: 'Ticked', tick: next.tick });
   if (next.phase === 'report' && prev.phase !== 'report') ev.push({ type: 'TargetReached' });
+  if (next.phase === 'won' && prev.phase !== 'won') ev.push({ type: 'CaseWon' });
   if (next.phase === 'caught' && prev.phase !== 'caught') ev.push({ type: 'Caught' });
   return ev;
 }

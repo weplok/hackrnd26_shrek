@@ -15,6 +15,8 @@ export type Condition =
   | ConditionNpcFactRevealed
   | ConditionTrackBelow
   | ConditionTrackAbove
+  | ConditionMaxAlarmBelow
+  | ConditionScansBelow
   | ConditionLockFilled
   | ConditionTickAtLeast;
 /**
@@ -262,6 +264,12 @@ export interface Threshold {
 }
 export interface ConditionTrackAbove {
   trackAbove: Threshold;
+}
+export interface ConditionMaxAlarmBelow {
+  maxAlarmBelow: number;
+}
+export interface ConditionScansBelow {
+  scansBelow: number;
 }
 export interface ConditionLockFilled {
   lockFilled: string;

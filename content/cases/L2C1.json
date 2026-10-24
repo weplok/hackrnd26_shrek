@@ -831,10 +831,7 @@
       "id": "rank_ghost",
       "title": "Призрак",
       "when": {
-        "trackBelow": {
-          "track": "alarm",
-          "value": 30
-        }
+        "maxAlarmBelow": 30
       }
     },
     {
@@ -844,6 +841,13 @@
         "not": {
           "tickAtLeast": 22
         }
+      }
+    },
+    {
+      "id": "rank_cleaner",
+      "title": "Чистильщик",
+      "when": {
+        "scansBelow": 7
       }
     },
     {

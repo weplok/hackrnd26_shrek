@@ -108,6 +108,8 @@
         { "$ref": "#/definitions/ConditionNpcFactRevealed" },
         { "$ref": "#/definitions/ConditionTrackBelow" },
         { "$ref": "#/definitions/ConditionTrackAbove" },
+        { "$ref": "#/definitions/ConditionMaxAlarmBelow" },
+        { "$ref": "#/definitions/ConditionScansBelow" },
         { "$ref": "#/definitions/ConditionLockFilled" },
         { "$ref": "#/definitions/ConditionTickAtLeast" }
       ]
@@ -190,6 +192,18 @@
       "type": "object",
       "properties": { "trackAbove": { "$ref": "#/definitions/Threshold" } },
       "required": ["trackAbove"],
+      "additionalProperties": false
+    },
+    "ConditionMaxAlarmBelow": {
+      "type": "object",
+      "properties": { "maxAlarmBelow": { "type": "integer", "minimum": 0, "maximum": 100 } },
+      "required": ["maxAlarmBelow"],
+      "additionalProperties": false
+    },
+    "ConditionScansBelow": {
+      "type": "object",
+      "properties": { "scansBelow": { "type": "integer", "minimum": 0 } },
+      "required": ["scansBelow"],
       "additionalProperties": false
     },
     "ConditionLockFilled": {

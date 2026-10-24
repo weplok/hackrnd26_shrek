@@ -32,6 +32,8 @@ const SAMPLE_CONDITIONS: Record<string, Condition> = {
   npcFactRevealed: { npcFactRevealed: { npc: 'x', fact: 'y' } },
   trackBelow: { trackBelow: { track: 'alarm', value: 1 } },
   trackAbove: { trackAbove: { track: 'alarm', value: 1 } },
+  maxAlarmBelow: { maxAlarmBelow: 1 },
+  scansBelow: { scansBelow: 1 },
   lockFilled: { lockFilled: 'x' },
   tickAtLeast: { tickAtLeast: 1 },
 };

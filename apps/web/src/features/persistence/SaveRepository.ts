@@ -1,6 +1,6 @@
-import type { GameState } from '@zero-day/engine';
+import type { CareerProfile, GameState } from '@zero-day/engine';
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 export const SAVE_KEY = 'zero-day.save';
 
 export interface SaveData {
@@ -12,6 +12,8 @@ export interface SaveData {
   caseRun: GameState | null;
   /** Codex cards opened across the campaign. */
   codex: string[];
+  /** Successes across completed cases; used for the career profile. */
+  profile: CareerProfile;
 }
 
 export type LoadStatus = 'empty' | 'ok' | 'case-reset' | 'corrupt';
@@ -28,10 +30,19 @@ type RawSave = Record<string, unknown>;
 /** Migration from version N (key) to N + 1. */
 export type Migration = (raw: RawSave) => RawSave;
 
-export const migrations: Record<number, Migration> = {};
+export const migrations: Record<number, Migration> = {
+  1: (raw) => ({ ...raw, profile: { technicalSuccesses: 0, socialSuccesses: 0 } }),
+};
 
 export function emptySave(contentVersion: string): SaveData {
-  return { saveVersion: SAVE_VERSION, contentVersion, completedCases: [], caseRun: null, codex: [] };
+  return {
+    saveVersion: SAVE_VERSION,
+    contentVersion,
+    completedCases: [],
+    caseRun: null,
+    codex: [],
+    profile: { technicalSuccesses: 0, socialSuccesses: 0 },
+  };
 }
 
 export function memoryStore(): KeyValueStore {
@@ -66,6 +77,14 @@ function isRecord(value: unknown): value is RawSave {
 
 function stringList(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function careerProfile(value: unknown): CareerProfile {
+  if (!isRecord(value)) return { technicalSuccesses: 0, socialSuccesses: 0 };
+  return {
+    technicalSuccesses: typeof value.technicalSuccesses === 'number' ? value.technicalSuccesses : 0,
+    socialSuccesses: typeof value.socialSuccesses === 'number' ? value.socialSuccesses : 0,
+  };
 }
 
 export class SaveRepository {
@@ -112,6 +131,7 @@ export class SaveRepository {
       ...empty,
       completedCases: stringList(data.completedCases),
       codex: stringList(data.codex),
+      profile: careerProfile(data.profile),
     };
     const caseRun = data.caseRun;
     if (caseRun === null || caseRun === undefined) return { status: 'ok', save };

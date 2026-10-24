@@ -12,6 +12,7 @@ import type {
   Campaign,
   Interludes,
   Flipper,
+  Finding,
 } from './content/types.gen.ts';
 import type { Knobs, PuzzleBody } from './puzzles/types.ts';
 
@@ -28,6 +29,7 @@ export type {
   Campaign,
   Interludes,
   Flipper,
+  Finding,
 };
 
 /** Scripted NPC config (content/npc/<id>.json). No JSON-schema; shape per ИИ-диалоги diz-doc. */
@@ -110,6 +112,18 @@ export interface LogEntry {
   kind: string;
 }
 
+export interface CareerProfile {
+  technicalSuccesses: number;
+  socialSuccesses: number;
+}
+
+export interface CaseReport {
+  caseId: string;
+  path: { nodeId: string; vulnerabilityId: string; stage: string }[];
+  findings: Finding[];
+  scopeViolated: boolean;
+}
+
 /** State saved at the start of a case step (Q-7); restored after caught. */
 export interface CheckpointSnapshot {
   id: string;
@@ -123,6 +137,9 @@ export interface GameState {
   scans: number;
   socialActions: number;
   techActions: number;
+  technicalSuccesses: number;
+  socialSuccesses: number;
+  successfulVulnerabilities: string[];
   nodes: Record<string, NodeRuntime>;
   segmentsOpen: Record<string, boolean>;
   clues: Record<string, boolean>;

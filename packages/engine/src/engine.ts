@@ -1,5 +1,5 @@
 // ZERO DAY engine core: command handlers over GameState. Content-driven.
-import type { Content, GameState, Case, ContentNode, PuzzleInstance, Difficulty, NodeRuntime } from './types.ts';
+import type { Content, GameState, Case, CaseReport, ContentNode, PuzzleInstance, Difficulty, NodeRuntime } from './types.ts';
 import { evalCondition } from './conditions.ts';
 import { applyEffects, clamp } from './effects.ts';
 import { generatePuzzle, checkPuzzle, puzzleLogic, DEFAULT_FAIL_HINT } from './puzzles/index.ts';
@@ -72,6 +72,9 @@ export function createGame(content: Content, caseId: string, difficulty: Difficu
     scans: 0,
     socialActions: 0,
     techActions: 0,
+    technicalSuccesses: 0,
+    socialSuccesses: 0,
+    successfulVulnerabilities: [],
     nodes,
     segmentsOpen,
     clues: {},
@@ -343,6 +346,10 @@ export function submitPuzzle(content: Content, state: GameState, selected: strin
   if (ex && reqOk) {
     const vulnInfo = content.vulnerabilities[inst.vuln];
     const noise = NOISE[vulnInfo?.noiseProfile ?? 'moderate'] ?? 9;
+    if (!s.successfulVulnerabilities.includes(inst.vuln)) s.successfulVulnerabilities.push(inst.vuln);
+    s.technicalSuccesses += 1;
+    const card = vulnInfo?.codexCardId;
+    if (card) s.codex[card] = true;
     applyEffects(ex.effects, s, compromiser(content, s));
     compromise(content, s, n);
     stepAlarm(s, noise, n.id);
@@ -445,6 +452,7 @@ export function present(
   s.log.push({ t: `[чат ${cfg.role}] ${cfg.replies[out.replyKey] ?? '…'}`, kind: out.grant.length ? 'ok' : 'sys' });
   if (out.grant.length) {
     rt.yielded = true;
+    s.socialSuccesses += 1;
     for (const fact of out.grant) rt.revealedFacts[fact] = true;
     compromise(content, s, pnode); // node.onCompromise grants the held clue
   }
@@ -506,14 +514,35 @@ export function restoreCheckpoint(content: Content, state: GameState): GameState
 export function answerReport(content: Content, state: GameState, findingId: string, optionId: string): GameState {
   const s = clone(state);
   if (s.phase !== 'report') return s;
-  const c = getCase(content, s);
-  const finding = c.report.findings.find((f) => f.id === findingId);
+  const finding = reportFindings(content, s).find((f) => f.id === findingId);
   if (!finding) return s;
   const opt = finding.options.find((o) => o.id === optionId);
   s.report[findingId] = !!opt?.correct;
-  const allCorrect = c.report.findings.every((f) => s.report[f.id] === true);
+  if (opt?.correct) nodeRt(s, finding.node).secured = true;
+  const allCorrect = reportFindings(content, s).every((f) => s.report[f.id] === true);
   if (allCorrect) finalizeWin(content, s);
   return s;
+}
+
+export function reportFindings(content: Content, state: GameState): Case['report']['findings'] {
+  return getCase(content, state).report.findings.filter((finding) => state.nodes[finding.node]?.compromised);
+}
+
+export function buildCaseReport(content: Content, state: GameState): CaseReport {
+  return {
+    caseId: state.caseId,
+    path: state.successfulVulnerabilities.flatMap((vulnerabilityId) => {
+      const vulnerability = content.vulnerabilities[vulnerabilityId];
+      const nodeId = getCase(content, state).nodes.find((node) =>
+        node.exploits.some((exploit) => exploit.vuln === vulnerabilityId),
+      )?.id;
+      return vulnerability && nodeId
+        ? [{ nodeId, vulnerabilityId, stage: vulnerability.killChainStage }]
+        : [];
+    }),
+    findings: reportFindings(content, state),
+    scopeViolated: !!state.flags.scope_violated,
+  };
 }
 
 function finalizeWin(content: Content, s: GameState): void {
@@ -528,6 +557,7 @@ function finalizeWin(content: Content, s: GameState): void {
 
 export function computeRank(content: Content, s: GameState): string {
   const c = getCase(content, s);
+  if (s.flags.scope_violated) return c.ranks[c.ranks.length - 1]?.title ?? '—';
   for (const r of c.ranks) {
     if (!r.when || evalCondition(r.when, s)) return r.title;
   }
@@ -535,10 +565,11 @@ export function computeRank(content: Content, s: GameState): string {
 }
 
 export function profileStyle(s: GameState): 'технарь' | 'переговорщик' | 'универсал' {
-  const t = s.techActions,
-    soc = s.socialActions,
+  const t = s.technicalSuccesses,
+    soc = s.socialSuccesses,
     total = t + soc;
   if (total === 0) return 'универсал';
-  if (Math.abs(t - soc) <= Math.max(2, total * 0.25)) return 'универсал';
-  return t > soc ? 'технарь' : 'переговорщик';
+  if (t / total >= 0.6) return 'технарь';
+  if (soc / total >= 0.6) return 'переговорщик';
+  return 'универсал';
 }
