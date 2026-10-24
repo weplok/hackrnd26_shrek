@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "items": [
+    { "archetype": "sticker", "vuln": "SL-01", "title": "Наклейка" },
+    { "archetype": "password-wheel", "vuln": "SL-02", "title": "Колесо догадок" },
+    { "archetype": "open-door", "vuln": "SL-03", "title": "Незапертая дверь" },
+    { "archetype": "expired-patch", "vuln": "SL-04", "title": "Просроченная заплатка" },
+    { "archetype": "legend-mosaic", "vuln": "SL-05", "title": "Мозаика легенды" },
+    { "archetype": "trust-path", "vuln": "SL-06", "title": "Тропа доверия" },
+    { "archetype": "forgotten-key", "vuln": "SL-07", "title": "Забытый ключ" },
+    { "archetype": "wall", "vuln": "SL-08", "title": "Стена" },
+    { "archetype": "tired-guard", "vuln": "SL-09", "title": "Уставший вахтёр" },
+    { "archetype": "open-port", "vuln": "SL-10", "title": "Открытый порт" },
+    { "archetype": "chatty-logs", "vuln": "SL-11", "title": "Болтливые логи" },
+    { "archetype": "code-intercept", "vuln": "SL-12", "title": "Перехват кода" },
+    { "archetype": "blind-spot", "vuln": "SL-13", "title": "Слепое пятно" }
+  ]
+}
