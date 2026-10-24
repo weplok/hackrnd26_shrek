@@ -31,7 +31,7 @@
 - [x] **T-A3** · JSON Schema контента (v1) + кодоген TS и Pydantic · CNT · L · P0 · *после:* T-A1
 - [ ] **T-A4** · content-tools: валидатор схем + линтер ссылок + стоп-словарь · CNT · M · P0 · *после:* T-A3 · в работе: Lolik
 - [x] **T-A5** · Расширить `backend_api`: config, JSON-логи/request_id, ошибки, `GET /healthz`, `POST /api/v1/sessions`, локальный rate limit с `429`/`Retry-After`, тесты контрактов · API · L · P0 · *после:* T-A1
-- [ ] **T-A6** · Каркас SPA: роутинг, тема/токены, ErrorBoundary, экран никнейма, загрузчик контента · WEB · L · P0 · *после:* T-A1 · в работе: Android
+- [x] **T-A6** · Каркас SPA: роутинг, тема/токены, ErrorBoundary, экран никнейма, загрузчик контента · WEB · L · P0 · *после:* T-A1
 - [ ] **T-A7** · Docker Compose (web на Caddy + api + redis + postgres + migrate) + профиль offline · INF · L · P0 · *после:* T-A5, T-A6 · в работе: weplok
 - [ ] **T-A8** · CI-пайплайн (lint → types → контент → тесты → сборка → смоук) · INF · M · P0 · *после:* T-A7 · в работе: weplok
 - [ ] **T-A9** · Дизайн-система shared/ui + Storybook · WEB · M · P0 · *после:* T-A6
