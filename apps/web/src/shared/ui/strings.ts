@@ -140,7 +140,15 @@ export const ru = {
     node: 'Узел',
     ok: 'УСПЕШНО',
     fail: 'НЕУСПЕШНО',
-    notice: (attack: string, node: string) => `${attack} → ${node}`,
+    notice: (attack: string, node: string, ok: boolean) =>
+      `Вид атаки ${attack} ${ok ? 'подошёл' : 'не подошёл'} (${node}).`,
+    attackOf: {
+      brute: 'брутфорса',
+      virus: 'заражения вирусом',
+      ddos: 'DDoS',
+      social: 'социальной инженерии',
+      injection: 'инъекций',
+    },
   },
   nodeMenu: {
     title: 'УЗЕЛ',
