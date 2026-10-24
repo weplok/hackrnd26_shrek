@@ -29,6 +29,22 @@ curl http://localhost:8000/healthz
 
 Ожидаемый ответ: `{"status":"ok"}`. Переменные LLM не нужны для `/healthz` и создания анонимной сессии.
 
+## Docker Compose
+
+Полный стек запускается одной командой. Сначала создайте `.env` из примера и замените `POSTGRES_PASSWORD` перед развёртыванием.
+
+```bash
+docker compose up --build
+```
+
+Сайт будет доступен по `http://localhost:8080`. Контейнер `web` раздаёт SPA через Caddy и проксирует API. Redis хранит сессии и rate limit. PostgreSQL запускается с пустой baseline-миграцией; прикладные таблицы появятся в задачах T-G1 и T-F2.
+
+Offline-профиль запускает только статику. Он не обращается к API; клиент переключается в существующий offline-режим.
+
+```bash
+docker compose --env-file .env.offline -f compose.yaml -f compose.offline.yaml up --build
+```
+
 ## Переменные окружения
 
 Корневой `.env` — основной файл конфигурации. `backend_api/.env` временно поддерживается как fallback. Переменные процесса имеют высший приоритет.

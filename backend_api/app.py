@@ -14,11 +14,12 @@ from fastapi import FastAPI, Request, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
+from redis.asyncio import Redis
 
 from .characters import CharacterNotFoundError, CharacterProfileError, CharacterRepository
 from .config import ConfigurationError, Settings
 from .llm import CircuitBreakingLlm, LlmClient, ModelError, OpenAICompatibleLlm
-from .rate_limit import FixedWindowRateLimiter, RateLimitExceeded
+from .rate_limit import FixedWindowRateLimiter, RateLimitExceeded, RedisFixedWindowRateLimiter
 from .schemas import (
     DialogueRequest,
     DialogueResponse,
@@ -28,7 +29,7 @@ from .schemas import (
     TelemetryResponse,
 )
 from .service import DialogueService
-from .sessions import AnonymousSessionStore
+from .sessions import AnonymousSessionStore, RedisAnonymousSessionStore
 from .storage import SessionStore
 from .telemetry import TelemetryStore
 
@@ -49,6 +50,7 @@ def create_app(settings: Settings | None = None, client: LlmClient | None = None
     app.state.service = None
     app.state.anonymous_sessions = None
     app.state.rate_limiter = None
+    app.state.redis = None
     app.state.telemetry = None
 
     def get_settings() -> Settings:
@@ -69,15 +71,33 @@ def create_app(settings: Settings | None = None, client: LlmClient | None = None
             )
         return cast(DialogueService, app.state.service)
 
-    def get_anonymous_sessions() -> AnonymousSessionStore:
-        if app.state.anonymous_sessions is None:
-            app.state.anonymous_sessions = AnonymousSessionStore(get_settings().anonymous_session_ttl_seconds)
-        return cast(AnonymousSessionStore, app.state.anonymous_sessions)
+    def get_redis() -> Redis | None:
+        runtime_settings = get_settings()
+        if not runtime_settings.redis_url:
+            return None
+        if app.state.redis is None:
+            app.state.redis = Redis.from_url(runtime_settings.redis_url, decode_responses=True)
+        return cast(Redis, app.state.redis)
 
-    def get_rate_limiter() -> FixedWindowRateLimiter:
+    def get_anonymous_sessions() -> AnonymousSessionStore | RedisAnonymousSessionStore:
+        if app.state.anonymous_sessions is None:
+            redis = get_redis()
+            app.state.anonymous_sessions = (
+                RedisAnonymousSessionStore(redis, get_settings().anonymous_session_ttl_seconds)
+                if redis is not None
+                else AnonymousSessionStore(get_settings().anonymous_session_ttl_seconds)
+            )
+        return cast(AnonymousSessionStore | RedisAnonymousSessionStore, app.state.anonymous_sessions)
+
+    def get_rate_limiter() -> FixedWindowRateLimiter | RedisFixedWindowRateLimiter:
         if app.state.rate_limiter is None:
-            app.state.rate_limiter = FixedWindowRateLimiter(get_settings().rate_limit_window_seconds)
-        return cast(FixedWindowRateLimiter, app.state.rate_limiter)
+            redis = get_redis()
+            app.state.rate_limiter = (
+                RedisFixedWindowRateLimiter(redis, get_settings().rate_limit_window_seconds)
+                if redis is not None
+                else FixedWindowRateLimiter(get_settings().rate_limit_window_seconds)
+            )
+        return cast(FixedWindowRateLimiter | RedisFixedWindowRateLimiter, app.state.rate_limiter)
 
     def get_telemetry() -> TelemetryStore:
         if app.state.telemetry is None:
@@ -179,19 +199,19 @@ def create_app(settings: Settings | None = None, client: LlmClient | None = None
     @app.post("/api/v1/sessions", response_model=SessionResponse, status_code=status.HTTP_201_CREATED)
     async def create_session(request: Request) -> SessionResponse:
         runtime_settings = get_settings()
-        get_rate_limiter().check(
+        await get_rate_limiter().check(
             f"sessions:ip:{client_ip(request)}",
             runtime_settings.session_rate_limit,
         )
-        session = get_anonymous_sessions().create()
+        session = await get_anonymous_sessions().create()
         return SessionResponse(session_id=session.session_id, expires_at=session.expires_at)
 
     @app.post("/dialogue", response_model=DialogueResponse)
     async def dialogue(payload: DialogueRequest, request: Request) -> DialogueResponse:
         runtime_settings = get_settings()
         limiter = get_rate_limiter()
-        limiter.check(f"dialogue:ip:{client_ip(request)}", runtime_settings.dialogue_rate_limit)
-        limiter.check(f"dialogue:session:{payload.uuid}", runtime_settings.dialogue_rate_limit)
+        await limiter.check(f"dialogue:ip:{client_ip(request)}", runtime_settings.dialogue_rate_limit)
+        await limiter.check(f"dialogue:session:{payload.uuid}", runtime_settings.dialogue_rate_limit)
         return await get_service().reply(payload.npc_id, payload.uuid, payload.message)
 
     @app.post("/telemetry", response_model=TelemetryResponse, status_code=status.HTTP_202_ACCEPTED)

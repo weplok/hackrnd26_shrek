@@ -1,5 +1,6 @@
 node_modules/
 .pnpm-store/
+packages/ui/storybook-static/
 dist/
 .venv/
 .ruff_cache/

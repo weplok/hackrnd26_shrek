@@ -126,9 +126,15 @@ const N = {
 };
 const CRIT = new Set(['A1','A3','B1','B3','B5','C5','D4','B10','D2','G3','G7']);
 // Task status: keep in sync with docs/ZERO_DAY_Задачи.md.
+<<<<<<< HEAD
 const DONE = new Set(['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A11', 'B1', 'D1', 'D3', 'D4', 'D7', 'D8', 'G8']);
 const DONE_BY = { A4: 'misterEugene', B1: 'misterEugene', D1: 'misterEugene', D4: 'misterEugene', G8: 'misterEugene', A5: 'weplok', A6: 'Android', A11: 'weplok', D3: 'Lolik', D7: 'Lolik' };
 const WIP = { D2: 'misterEugene', A7: 'weplok', A8: 'weplok', A10: 'weplok', E1: 'weplok', G1: 'weplok' };
+=======
+const DONE = new Set(['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A11', 'B1', 'D1', 'D3', 'D4', 'D8', 'G8']);
+const DONE_BY = { A4: 'misterEugene', B1: 'misterEugene', D1: 'misterEugene', D4: 'misterEugene', G8: 'misterEugene', A5: 'weplok', A6: 'Android', A11: 'weplok', D3: 'Lolik' };
+const WIP = { D2: 'misterEugene', B3: 'misterEugene', B4: 'misterEugene', B5: 'misterEugene', B6: 'misterEugene', B10: 'misterEugene', A7: 'weplok', A8: 'weplok', A9: 'Android', A10: 'weplok', E1: 'weplok', G1: 'weplok', D7: 'Lolik' };
+>>>>>>> 660529a3cf0f504125cd4a0312842aaa182c9e09
 // t(id, after, extra-name, continued)
 const t = (id, after, x, cont) => ({ id, after, x, cont });
 const c = (id, x) => t(id, '', x, true);

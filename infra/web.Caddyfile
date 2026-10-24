@@ -1,0 +1,21 @@
+:80 {
+    root * /usr/share/caddy
+    encode zstd gzip
+
+    header {
+        Content-Security-Policy "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+    }
+
+    @api path /api/* /dialogue /telemetry /ws* /mcp*
+    handle @api {
+        reverse_proxy api:8000
+    }
+
+    handle {
+        try_files {path} /index.html
+        file_server
+    }
+}
