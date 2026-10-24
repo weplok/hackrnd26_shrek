@@ -1,0 +1,5 @@
+# Host Caddy on the VPS. Copy to /etc/caddy/Caddyfile and replace the domain.
+# Caddy obtains and renews the Let's Encrypt certificate automatically.
+example.com {
+    reverse_proxy 127.0.0.1:8080
+}

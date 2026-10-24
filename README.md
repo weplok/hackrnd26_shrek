@@ -45,6 +45,24 @@ Offline-профиль запускает только статику. Он не
 docker compose --env-file .env.offline -f compose.yaml -f compose.offline.yaml up --build
 ```
 
+## Развёртывание на VPS
+
+Compose публикует `web` только на `127.0.0.1:8080`. Снаружи стоит Caddy на хосте: он получает сертификат Let's Encrypt и проксирует домен на localhost.
+
+1. Направьте A-запись домена на IP VPS. Откройте порты 80 и 443.
+2. Установите Caddy 2 по [официальной инструкции](https://caddyserver.com/docs/install).
+3. Скопируйте `infra/Caddyfile.host` в `/etc/caddy/Caddyfile` и замените `example.com` на свой домен.
+4. Запустите стек: `docker compose up -d --build`.
+5. Примените конфиг: `sudo systemctl reload caddy`.
+
+Проверка:
+
+```bash
+curl https://<домен>/healthz
+curl -i -H "Connection: Upgrade" -H "Upgrade: websocket" -H "Sec-WebSocket-Version: 13" -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" https://<домен>/ws
+curl -i https://<домен>/mcp
+```
+
 ## Переменные окружения
 
 Корневой `.env` — основной файл конфигурации. `backend_api/.env` временно поддерживается как fallback. Переменные процесса имеют высший приоритет.

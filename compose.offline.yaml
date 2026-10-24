@@ -2,4 +2,4 @@ services:
   web:
     profiles: [online, offline]
     ports:
-      - "${WEB_PORT:-8080}:80"
+      - "127.0.0.1:${WEB_PORT:-8080}:80"
