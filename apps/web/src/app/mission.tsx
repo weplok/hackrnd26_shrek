@@ -77,8 +77,6 @@ export function MissionPage({
   };
   const order = caseOrder(content);
   const nextCase = order[order.indexOf(caseId) + 1];
-  const target = caseData.nodes.find((node) => node.kind === 'target');
-  const targetOpen = target ? Boolean(caseRun.nodes[target.id]?.compromised) : false;
   const goalsDone = caseData.objectives.filter((objective) => caseRun.objectives[objective.id]).length;
   const levelNumber = levelIndex + 1;
   const playing = caseRun.phase === 'playing';
@@ -107,12 +105,6 @@ export function MissionPage({
         <Metric label={t.ticks} value={String(caseRun.tick)} />
         <Metric label={t.scans} value={String(caseRun.scans)} />
         <Metric label={t.goals} value={`${String(goalsDone)}/${String(caseData.objectives.length)}`} />
-        <Metric
-          label={t.target}
-          value={targetOpen ? t.targetOpen : t.targetClosed}
-          tone={targetOpen ? 'ok' : 'muted'}
-        />
-        <Metric label={t.style} value={profileStyle(caseRun)} tone="muted" />
         <div className="mission__buttons">
           <Button
             type="button"

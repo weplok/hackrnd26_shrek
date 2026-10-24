@@ -8,21 +8,75 @@ type Status = 'ready' | 'run' | 'won' | 'lost';
 type World = { snake: Cell[]; dir: Cell; next: Cell; pac: Cell; pacPrev: Cell; apples: Cell[]; grow: number; tick: number };
 
 const text = ru.puzzle;
-const MAZE = [
-  '#################',
-  '#S....#...#.....#',
-  '#.##..#.#.#.###.#',
-  '#.#.....#.....#A#',
-  '#.#.###.###.#.#.#',
-  '#...#A..P...#...#',
-  '###.#.##.##.###.#',
-  '#.....#...#.....#',
-  '#.###.#.#.#.###.#',
-  '#A......#......F#',
-  '#################',
+const MAZES = [
+  [
+    '#################',
+    '#S....#...#.....#',
+    '#.##..#.#.#.###.#',
+    '#.#.....#.....#A#',
+    '#.#.###.###.#.#.#',
+    '#...#A..P...#...#',
+    '###.#.##.##.###.#',
+    '#.....#...#.....#',
+    '#.###.#.#.#.###.#',
+    '#A......#......F#',
+    '#################',
+  ],
+  [
+    '#################',
+    '#S..#.....#....A#',
+    '#.#.#.###.#.##..#',
+    '#.#...#.....#..##',
+    '#.###.#.###.#.#.#',
+    '#...#...P.#...#.#',
+    '#.#.###.#.###.#.#',
+    '#A#.....#.....#.#',
+    '#.#####.#.###.#.#',
+    '#.......#..A#..F#',
+    '#################',
+  ],
+  [
+    '#################',
+    '#S.......#......#',
+    '#.#####.##.####.#',
+    '#.#A..#....#..#.#',
+    '#.#.#.####.#.##.#',
+    '#...#...P....#..#',
+    '###.###.##.#.#.##',
+    '#.....#..#.#....#',
+    '#.###.##.#.####.#',
+    '#...A#..A.....#F#',
+    '#################',
+  ],
+  [
+    '#################',
+    '#S#.....#.....#A#',
+    '#.#.###.#.###.#.#',
+    '#...#.....#.....#',
+    '###.#.##P##.#.###',
+    '#A..#.......#...#',
+    '#.###.#####.###.#',
+    '#.....#...#.....#',
+    '#.###.#.#.#.###.#',
+    '#...#...#A..#..F#',
+    '#################',
+  ],
+  [
+    '#################',
+    '#S....#.A.#.....#',
+    '####.##.#.#.###.#',
+    '#....#..#...#...#',
+    '#.##.#.###.##.#.#',
+    '#.#....#P#....#.#',
+    '#.#.##.#.#.##.#.#',
+    '#.#A.#.....#..#A#',
+    '#.####.###.#.##.#',
+    '#............#.F#',
+    '#################',
+  ],
 ];
-const W = MAZE[0]?.length ?? 0;
-const H = MAZE.length;
+const W = MAZES[0]?.[0]?.length ?? 0;
+const H = MAZES[0]?.length ?? 0;
 const STEP_MS = 300;
 const PAC_EVERY = 2;
 const START_LENGTH = 3;
@@ -43,29 +97,37 @@ const KEYS: Record<string, Cell> = {
   KeyD: [1, 0],
 };
 
-const isWall = ([x, y]: Cell): boolean => (MAZE[y]?.[x] ?? '#') === '#';
 const same = (a: Cell, b: Cell): boolean => a[0] === b[0] && a[1] === b[1];
 
-function find(ch: string): Cell[] {
-  const cells: Cell[] = [];
-  MAZE.forEach((row, y) => Array.from(row).forEach((c, x) => c === ch && cells.push([x, y])));
-  return cells;
+type Level = { maze: string[]; start: Cell; pacStart: Cell; finish: Cell; apples: Cell[]; walls: Cell[] };
+
+function buildLevel(maze: string[]): Level {
+  const find = (ch: string): Cell[] => {
+    const cells: Cell[] = [];
+    maze.forEach((row, y) => Array.from(row).forEach((c, x) => c === ch && cells.push([x, y])));
+    return cells;
+  };
+  return {
+    maze,
+    start: find('S')[0] ?? [1, 1],
+    pacStart: find('P')[0] ?? [8, 5],
+    finish: find('F')[0] ?? [15, 9],
+    apples: find('A'),
+    walls: find('#'),
+  };
 }
 
-const START = find('S')[0] ?? [1, 1];
-const PAC_START = find('P')[0] ?? [8, 5];
-const FINISH = find('F')[0] ?? [15, 9];
-const APPLES = find('A');
-const WALLS = MAZE.flatMap((row, y) => Array.from(row).flatMap((c, x): Cell[] => (c === '#' ? [[x, y]] : [])));
+const LEVELS = MAZES.map(buildLevel);
+const isWall = (level: Level, [x, y]: Cell): boolean => (level.maze[y]?.[x] ?? '#') === '#';
 
-function freshWorld(): World {
+function freshWorld(level: Level): World {
   return {
-    snake: Array.from({ length: START_LENGTH }, (): Cell => [...START]),
+    snake: Array.from({ length: START_LENGTH }, (): Cell => [...level.start]),
     dir: [1, 0],
     next: [1, 0],
-    pac: [...PAC_START],
-    pacPrev: [...PAC_START],
-    apples: APPLES.map((a): Cell => [...a]),
+    pac: [...level.pacStart],
+    pacPrev: [...level.pacStart],
+    apples: level.apples.map((a): Cell => [...a]),
     grow: 0,
     tick: 0,
   };
@@ -74,8 +136,8 @@ function freshWorld(): World {
 const snapshot = (world: World): World => ({ ...world, snake: [...world.snake], apples: [...world.apples] });
 
 /** Random step that never goes straight back, unless the antivirus is in a dead end. */
-function wander(world: World): void {
-  const open = DIRS.map(([dx, dy]): Cell => [world.pac[0] + dx, world.pac[1] + dy]).filter((cell) => !isWall(cell));
+function wander(level: Level, world: World): void {
+  const open = DIRS.map(([dx, dy]): Cell => [world.pac[0] + dx, world.pac[1] + dy]).filter((cell) => !isWall(level, cell));
   const forward = open.filter((cell) => !same(cell, world.pacPrev));
   const choices = forward.length > 0 ? forward : open;
   const next = choices[Math.floor(Math.random() * choices.length)];
@@ -84,12 +146,12 @@ function wander(world: World): void {
   world.pac = next;
 }
 
-function advance(world: World): Status {
+function advance(level: Level, world: World): Status {
   const [nx, ny] = world.next;
   if (nx !== -world.dir[0] || ny !== -world.dir[1]) world.dir = world.next;
-  const head = world.snake[0] ?? START;
+  const head = world.snake[0] ?? level.start;
   const target: Cell = [head[0] + world.dir[0], head[1] + world.dir[1]];
-  if (!isWall(target)) {
+  if (!isWall(level, target)) {
     world.snake.unshift(target);
     const apple = world.apples.findIndex((a) => same(a, target));
     if (apple >= 0) {
@@ -100,17 +162,18 @@ function advance(world: World): Status {
     else world.snake.pop();
   }
   world.tick += 1;
-  if (world.tick % PAC_EVERY === 0) wander(world);
+  if (world.tick % PAC_EVERY === 0) wander(level, world);
   if (world.snake.some((seg) => same(seg, world.pac))) return 'lost';
-  if (world.apples.length === 0 && same(world.snake[0] ?? START, FINISH)) return 'won';
+  if (world.apples.length === 0 && same(world.snake[0] ?? level.start, level.finish)) return 'won';
   return 'run';
 }
 
 export function VirusMaze({ puzzle, onCancel, onSubmit }: GameProps): ReactNode {
-  const world = useRef<World>(freshWorld());
+  const [level] = useState(() => LEVELS[Math.floor(Math.random() * LEVELS.length)] ?? buildLevel(MAZES[0] ?? []));
+  const world = useRef<World>(freshWorld(level));
   const submit = useRef(onSubmit);
   const [status, setStatus] = useState<Status>('ready');
-  const [view, setView] = useState<World>(freshWorld);
+  const [view, setView] = useState<World>(() => freshWorld(level));
 
   useEffect(() => {
     submit.current = onSubmit;
@@ -119,7 +182,7 @@ export function VirusMaze({ puzzle, onCancel, onSubmit }: GameProps): ReactNode 
   useEffect(() => {
     if (status !== 'run') return;
     const timer = setInterval(() => {
-      const next = advance(world.current);
+      const next = advance(level, world.current);
       setView(snapshot(world.current));
       if (next === 'run') return;
       setStatus(next);
@@ -127,7 +190,7 @@ export function VirusMaze({ puzzle, onCancel, onSubmit }: GameProps): ReactNode 
       else setTimeout(() => submit.current(puzzle.correct), 700);
     }, STEP_MS);
     return () => clearInterval(timer);
-  }, [status, puzzle.correct]);
+  }, [status, puzzle.correct, level]);
 
   useEffect(() => {
     if (status !== 'run') return;
@@ -153,7 +216,7 @@ export function VirusMaze({ puzzle, onCancel, onSubmit }: GameProps): ReactNode 
   }, [status]);
 
   function start(): void {
-    world.current = freshWorld();
+    world.current = freshWorld(level);
     setView(snapshot(world.current));
     setStatus('run');
   }
@@ -165,10 +228,10 @@ export function VirusMaze({ puzzle, onCancel, onSubmit }: GameProps): ReactNode 
     <div className="virus-maze">
       <p className="puzzle-host__prompt">{text.virusRules}</p>
       <svg className="virus-maze__field" viewBox={`0 0 ${String(W)} ${String(H)}`} role="img" aria-label={text.virusField}>
-        {WALLS.map(([x, y]) => (
+        {level.walls.map(([x, y]) => (
           <rect className="virus-maze__wall" height="1" key={`${String(x)}:${String(y)}`} width="1" x={x} y={y} />
         ))}
-        <rect className={`virus-maze__finish${armed ? ' virus-maze__finish--armed' : ''}`} height="0.8" width="0.8" x={FINISH[0] + 0.1} y={FINISH[1] + 0.1} />
+        <rect className={`virus-maze__finish${armed ? ' virus-maze__finish--armed' : ''}`} height="0.8" width="0.8" x={level.finish[0] + 0.1} y={level.finish[1] + 0.1} />
         {apples.map(([x, y]) => (
           <circle className="virus-maze__apple" cx={x + 0.5} cy={y + 0.5} key={`${String(x)}:${String(y)}`} r="0.3" />
         ))}
@@ -202,7 +265,7 @@ export function VirusMaze({ puzzle, onCancel, onSubmit }: GameProps): ReactNode 
         ))}
       </div>
       <p className="puzzle-host__attempts">
-        {status === 'won' ? text.virusWon : status === 'lost' ? text.virusLost : text.virusApples(APPLES.length - apples.length, APPLES.length)}
+        {status === 'won' ? text.virusWon : status === 'lost' ? text.virusLost : text.virusApples(level.apples.length - apples.length, level.apples.length)}
       </p>
       <p className="puzzle-host__attempts">{text.attempts(puzzle.attemptsLeft)}</p>
       <div className="puzzle-actions">

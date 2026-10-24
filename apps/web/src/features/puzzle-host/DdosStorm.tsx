@@ -6,17 +6,32 @@ import type { GameProps } from './game';
 type Status = 'ready' | 'run' | 'won' | 'lost';
 
 const text = ru.puzzle;
-const SERVERS = [
-  [10, 10],
-  [90, 10],
-  [10, 90],
-  [90, 90],
-] as const;
 const CENTER = 50;
-const REACH_DIST = Math.hypot(CENTER - 10, CENTER - 10);
-const GAIN = 0.1;
-const DECAY = 0.09; // per second
-const REACH = 0.9;
+const SERVERS = [
+  [CENTER, 12],
+  [88, CENTER],
+  [CENTER, 88],
+  [12, CENTER],
+] as const;
+const CORE_R = 8;
+const MIN_R = 4;
+// Full power makes a ball touch the core.
+const MAX_R = CENTER - 12 - CORE_R;
+const GAIN = 0.07;
+const DECAY = 0.08; // per second
+const REACH = 1;
+// Indexes follow SERVERS: top, right, bottom, left.
+const KEYS: Record<string, number> = {
+  ArrowUp: 0,
+  KeyW: 0,
+  ArrowRight: 1,
+  KeyD: 1,
+  ArrowDown: 2,
+  KeyS: 2,
+  ArrowLeft: 3,
+  KeyA: 3,
+};
+const KEY_LABELS = ['W ↑', 'D →', 'S ↓', 'A ←'];
 const LIMIT_S = 60;
 
 const zero = (): number[] => SERVERS.map(() => 0);
@@ -58,6 +73,27 @@ export function DdosStorm({ puzzle, onCancel, onSubmit }: GameProps): ReactNode 
     return () => cancelAnimationFrame(raf);
   }, [status, puzzle.correct]);
 
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      const index = KEYS[event.code];
+      if (index !== undefined) {
+        event.preventDefault();
+        if (!event.repeat) pump(index);
+        return;
+      }
+      if (
+        status !== 'run' &&
+        status !== 'won' &&
+        (event.code === 'Space' || event.code === 'Enter' || event.code === 'NumpadEnter')
+      ) {
+        event.preventDefault();
+        start();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
   function start(): void {
     power.current = zero();
     setView({ power: zero(), left: LIMIT_S });
@@ -75,35 +111,46 @@ export function DdosStorm({ puzzle, onCancel, onSubmit }: GameProps): ReactNode 
     <div className="ddos-storm">
       <p className="puzzle-host__prompt">{text.ddosRules}</p>
       <div className={`ddos-storm__stage ddos-storm__stage--${status}`}>
-        <svg className="ddos-storm__field" viewBox="0 0 100 100" aria-hidden="true">
+        <svg className="ddos-storm__field" viewBox="0 0 100 100">
+          <circle
+            className={`ddos-storm__core ddos-storm__core--${String(reached)}`}
+            cx={CENTER}
+            cy={CENTER}
+            r={CORE_R}
+          />
           {SERVERS.map(([x, y], i) => {
             const p = view.power[i] ?? 0;
             return (
               <g key={i}>
-                <line className="ddos-storm__link" x1={x} x2={CENTER} y1={y} y2={CENTER} />
-                <circle className={`ddos-storm__wave${p >= REACH ? ' ddos-storm__wave--hit' : ''}`} cx={x} cy={y} r={p * REACH_DIST} />
-                <circle className="ddos-storm__wave ddos-storm__wave--echo" cx={x} cy={y} r={p * REACH_DIST * 0.6} />
+                <circle
+                  aria-label={text.ddosServer(i + 1)}
+                  className={`ddos-storm__ball${p >= REACH ? ' ddos-storm__ball--hit' : ''}`}
+                  cx={x}
+                  cy={y}
+                  onPointerDown={() => pump(i)}
+                  r={MIN_R + p * (MAX_R - MIN_R)}
+                  role="button"
+                />
+                <text className="ddos-storm__key" x={x} y={y}>
+                  {KEY_LABELS[i]}
+                </text>
               </g>
             );
           })}
-          <circle className={`ddos-storm__core ddos-storm__core--${String(reached)}`} cx={CENTER} cy={CENTER} r="7" />
         </svg>
-        {SERVERS.map(([x, y], i) => (
-          <button
-            aria-label={text.ddosServer(i + 1)}
-            className="ddos-storm__server"
-            disabled={status !== 'run'}
-            key={i}
-            onClick={() => pump(i)}
-            style={{ left: `${String(x)}%`, top: `${String(y)}%` }}
-            type="button"
-          >
-            {i + 1}
-          </button>
-        ))}
+        {status === 'won' && (
+          <div className="ddos-storm__down">
+            <span className="ddos-storm__down-icon" aria-hidden="true" />
+            <span>{text.ddosWon}</span>
+          </div>
+        )}
       </div>
       <p className="puzzle-host__attempts">
-        {status === 'won' ? text.ddosWon : status === 'lost' ? text.ddosLost : text.ddosStatus(reached, Math.ceil(view.left))}
+        {status === 'won'
+          ? text.ddosWon
+          : status === 'lost'
+            ? text.ddosLost
+            : text.ddosStatus(reached, Math.ceil(view.left))}
       </p>
       <p className="puzzle-host__attempts">{text.attempts(puzzle.attemptsLeft)}</p>
       <div className="puzzle-actions">

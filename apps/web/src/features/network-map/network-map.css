@@ -158,8 +158,10 @@
   border-color: var(--color-green);
 }
 
-.network-map__node--compromised {
-  border-color: var(--color-green-bright);
+.network-map__node--compromised,
+.network-map__node--secured {
+  border: 2px solid var(--color-green-bright);
+  animation: none;
   background: #0c2a1d;
 }
 

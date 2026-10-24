@@ -82,7 +82,7 @@ export function AttackNotice(): ReactNode {
   return (
     <div className="attack-notice">
       <Toast key={notice.id} title={notice.ok ? t.ok : t.fail} variant={notice.ok ? 'success' : 'danger'}>
-        {t.notice(ru.nodeMenu.attacks[notice.attack], notice.node)}
+        {t.notice(t.attackOf[notice.attack], notice.node, notice.ok)}
       </Toast>
     </div>
   );
