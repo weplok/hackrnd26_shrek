@@ -41,6 +41,7 @@ class Settings:
     session_rate_limit: int = 10
     dialogue_rate_limit: int = 20
     telemetry_retention_days: int = 30
+    redis_url: str = ""
 
     def require_llm(self) -> None:
         values = {
@@ -80,6 +81,7 @@ class Settings:
             session_rate_limit=_positive_int("SESSION_RATE_LIMIT", 10),
             dialogue_rate_limit=_positive_int("DIALOGUE_RATE_LIMIT", 20),
             telemetry_retention_days=_positive_int("TELEMETRY_RETENTION_DAYS", 30),
+            redis_url=os.getenv("REDIS_URL", "").strip(),
         )
         if require_llm:
             settings.require_llm()

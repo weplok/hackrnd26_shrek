@@ -32,7 +32,7 @@
 - [ ] **T-A4** · content-tools: валидатор схем + линтер ссылок + стоп-словарь · CNT · M · P0 · *после:* T-A3 · в работе: Lolik
 - [x] **T-A5** · Расширить `backend_api`: config, JSON-логи/request_id, ошибки, `GET /healthz`, `POST /api/v1/sessions`, локальный rate limit с `429`/`Retry-After`, тесты контрактов · API · L · P0 · *после:* T-A1
 - [x] **T-A6** · Каркас SPA: роутинг, тема/токены, ErrorBoundary, экран никнейма, загрузчик контента · WEB · L · P0 · *после:* T-A1
-- [ ] **T-A7** · Docker Compose (web на Caddy + api + redis + postgres + migrate) + профиль offline · INF · L · P0 · *после:* T-A5, T-A6 · в работе: weplok
+- [x] **T-A7** · Docker Compose (web на Caddy + api + redis + postgres + migrate) + профиль offline · INF · L · P0 · *после:* T-A5, T-A6
 - [ ] **T-A8** · CI-пайплайн (lint → types → контент → тесты → сборка → смоук) · INF · M · P0 · *после:* T-A7 · в работе: weplok
 - [ ] **T-A9** · Дизайн-система shared/ui + Storybook · WEB · M · P0 · *после:* T-A6
 - [ ] **T-A10** · VPS: Caddy на хосте, домен, Let's Encrypt, reverse proxy на localhost (проверить /ws и /mcp) · INF · S · P0 · *после:* T-A7 · в работе: weplok
@@ -80,8 +80,7 @@
 
 ### EPIC E — Живые NPC (M4)
 
-- [ ] **T-E1** · Порт LlmClient + адаптер OpenAI-совместимый (основной) + FakeLlm + circuit breaker · API · M · P2 · *после:* T-A5 · в работе: weplok
-  - Прогресс: добавлены FakeLlm, circuit breaker и контрактные тесты существующего адаптера; осталось ревью вторым человеком и merge/staging по DoD.
+- [x] **T-E1** · Порт LlmClient + адаптер OpenAI-совместимый (основной) + FakeLlm + circuit breaker · API · M · P2 · *после:* T-A5
 - [ ] **T-E2** · Конвейер `POST /dialogue`: судья инъекций → NPC → судья доверия → SQLite-сессия · API · L · P2 · *после:* T-E1, T-B8
 - [ ] **T-E3** · Бюджеты/лимиты LLM + метрики + moderation_incidents · API · M · P2 · *после:* T-E2
 - [ ] **T-E4** · LlmProvider на клиенте + fallback на scripted · WEB · S · P2 · *после:* T-E2, T-C7
@@ -100,8 +99,7 @@
 ### EPIC G — Наблюдаемость, тесты, презентация (сквозное, M7)
 
 - [ ] **T-G8** · Ответ жюри про вымышленный техслой (слайд + тезисы) · QA · S · P0 · *после:* — · в работе: Lolik
-- [ ] **T-G1** · Телеметрия: клиентский сбор + POST /telemetry + таблицы · API+WEB · M · P1 · *после:* T-A5 · в работе: weplok
-  - Прогресс: добавлены POST /telemetry, SQLite-таблицы с хранением 30 дней и клиентский TelemetryClient; осталось подключить его к стартующему SPA и пройти DoD.
+- [x] **T-G1** · Телеметрия: клиентский сбор + POST /telemetry + таблицы · API+WEB · M · P1 · *после:* T-A5
 - [ ] **T-G2** · Метрики Prometheus + /metrics + алерты · API · S · P2 · *после:* T-A5
 - [ ] **T-G4** · a11y (axe), Lighthouse, size-limit в CI · QA · S · P1 · *после:* T-A8
 - [ ] **T-G3** · E2E Playwright (смоук «Сосед» → «Колледж» + альт-путь + сохранение + офлайн + scope + откат) · QA · L · P0 · *после:* M2

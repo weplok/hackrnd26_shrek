@@ -1,0 +1,5 @@
+services:
+  web:
+    profiles: [online, offline]
+    ports:
+      - "${WEB_PORT:-8080}:80"
