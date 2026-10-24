@@ -88,3 +88,4 @@ Pre-commit запускает `lint-staged`, Ruff и gitleaks. Полный CI �
 ## Лицензия
 
 [MIT](LICENSE), copyright 2026 Команда "Ш.Р.Э.К."
+
