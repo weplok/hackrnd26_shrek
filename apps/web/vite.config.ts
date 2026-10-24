@@ -1,29 +1,20 @@
-<<<<<<< HEAD
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import { fileURLToPath } from "node:url";
+import react from '@vitejs/plugin-react';
+import { fileURLToPath } from 'node:url';
+import { defineConfig } from 'vite';
 
 // Repo root is two levels up from apps/web.
-const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
-
-export default defineConfig({
-  plugins: [react()],
-  resolve: {
-    alias: {
-      "@zero-day/engine": fileURLToPath(new URL("../../packages/engine/src/index.ts", import.meta.url)),
-    },
-  },
-  server: {
-    fs: { allow: [repoRoot] },
-=======
-import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
 
 export default defineConfig({
   plugins: [react()],
   publicDir: '../../content',
+  resolve: {
+    alias: {
+      '@zero-day/engine': fileURLToPath(new URL('../../packages/engine/src/index.ts', import.meta.url)),
+    },
+  },
   server: {
     port: 5173,
->>>>>>> 6f0b5d1021ece56acf7816db674f9ce1fececf1a
+    fs: { allow: [repoRoot] },
   },
 });
