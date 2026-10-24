@@ -110,7 +110,7 @@ function NetworkNode({ data, id }: NodeProps<InteractiveNode>): ReactNode {
     <div
       className={`network-map__node network-map__node--${data.state} network-map__node--${data.alertLevel}${
         data.selected ? ' network-map__node--selected' : ''
-      }${data.disabled ? ' network-map__node--locked' : ''}${data.inScope ? '' : ' network-map__node--out-of-scope'}`}
+      }${data.disabled ? ' network-map__node--locked' : ''}${data.done ? '' : ' network-map__node--pending'}${data.inScope ? '' : ' network-map__node--out-of-scope'}`}
     >
       <Handle className="network-map__handle" isConnectable={false} position={Position.Left} type="target" />
       <button

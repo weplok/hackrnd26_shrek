@@ -14,6 +14,7 @@ export type NetworkNodeData = {
   alertLevel: NodeAlertLevel;
   ariaLabel: string;
   disabled: boolean;
+  done: boolean;
   inScope: boolean;
   isGateway: boolean;
   kind: ContentNode['kind'];
@@ -42,6 +43,13 @@ function visualState(runtime: NodeRuntime): NetworkVisualState {
   if (runtime.compromised) return 'compromised';
   if (runtime.scanned) return 'scanned';
   return 'untouched';
+}
+
+// Done once every action the node needs is applied: scan plus its exploits, or the take-over for people and locks.
+function isDone(node: ContentNode, runtime: NodeRuntime, gameState: GameState): boolean {
+  if (runtime.secured) return true;
+  if (node.kind === 'person' || node.lock) return runtime.compromised;
+  return runtime.scanned && node.exploits.every((exploit) => gameState.successfulVulnerabilities.includes(exploit.vuln));
 }
 
 function isGateway(node: ContentNode): boolean {
@@ -113,6 +121,7 @@ export function buildNetworkMap(caseData: Case, gameState: GameState, selectedNo
         alertLevel: runtime.alertLevel,
         ariaLabel: nodeAriaLabel(node, runtime, locked, gateway),
         disabled: locked,
+        done: !node.inScope || isDone(node, runtime, gameState),
         inScope: node.inScope,
         isGateway: gateway,
         kind: node.kind,

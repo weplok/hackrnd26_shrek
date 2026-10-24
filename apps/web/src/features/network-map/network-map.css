@@ -159,15 +159,15 @@
   border-color: var(--color-green);
 }
 
-.network-map__node--compromised,
+.network-map__node--compromised:not(.network-map__node--pending),
 .network-map__node--secured {
   border: 2px solid var(--color-green-bright);
   animation: none;
   background: #0c2a1d;
 }
 
-.network-map__node--compromised .network-map__node-kind,
-.network-map__node--compromised .network-map__node-status {
+.network-map__node--compromised:not(.network-map__node--pending) .network-map__node-kind,
+.network-map__node--compromised:not(.network-map__node--pending) .network-map__node-status {
   color: var(--color-green-bright);
 }
 
@@ -258,7 +258,7 @@
   }
 }
 
-.network-map__node--untouched:not(.network-map__node--locked) {
+.network-map__node--pending:not(.network-map__node--locked) {
   animation: node-pulse 1.6s ease-out infinite;
 }
 
