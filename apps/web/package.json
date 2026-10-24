@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+<<<<<<< HEAD
     "build": "vite build",
     "preview": "vite preview"
   },
@@ -12,12 +13,29 @@
     "@zero-day/engine": "workspace:*",
     "react": "18.3.1",
     "react-dom": "18.3.1"
+=======
+    "build": "tsc --noEmit && vite build",
+    "test": "vitest run",
+    "typecheck": "tsc --project tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-router-dom": "6.28.0"
+>>>>>>> 6f0b5d1021ece56acf7816db674f9ce1fececf1a
   },
   "devDependencies": {
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
+<<<<<<< HEAD
     "@vitejs/plugin-react": "4.3.3",
     "typescript": "5.6.3",
     "vite": "5.4.11"
+=======
+    "@vitejs/plugin-react": "4.3.4",
+    "typescript": "5.7.2",
+    "vite": "6.0.5",
+    "vitest": "2.1.8"
+>>>>>>> 6f0b5d1021ece56acf7816db674f9ce1fececf1a
   }
 }

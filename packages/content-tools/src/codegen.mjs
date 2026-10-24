@@ -7,15 +7,17 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const schemasDir = join(root, 'content/schemas');
 const outFile = join(root, 'packages/engine/src/content/types.gen.ts');
 
-const files = (await readdir(schemasDir)).filter((f) => f.endsWith('.schema.json') && f !== 'common.schema.json').sort();
+const files = (await readdir(schemasDir))
+  .filter((f) => f.endsWith('.schema.json') && f !== 'common.schema.json')
+  .sort();
 
 // One bundle schema so shared definitions are emitted once instead of per file.
-const bundle = {
+const bundle = /** @type {Parameters<typeof compile>[0]} */ ({
   title: 'Content',
   type: 'object',
   properties: Object.fromEntries(files.map((f) => [f.replace('.schema.json', ''), { $ref: f }])),
   additionalProperties: false,
-};
+});
 
 const ts = await compile(bundle, 'Content', {
   cwd: schemasDir,

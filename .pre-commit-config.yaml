@@ -1,0 +1,24 @@
+repos:
+  - repo: local
+    hooks:
+      - id: lint-staged
+        name: lint staged frontend files
+        entry: pnpm lint-staged
+        language: system
+        pass_filenames: false
+      - id: ruff-check
+        name: ruff check
+        entry: uv run --project backend_api ruff check --config backend_api/pyproject.toml --fix
+        language: system
+        files: ^backend_api/.*\.py$
+        exclude: ^backend_api/content/models/
+      - id: ruff-format
+        name: ruff format
+        entry: uv run --project backend_api ruff format --config backend_api/pyproject.toml
+        language: system
+        files: ^backend_api/.*\.py$
+        exclude: ^backend_api/content/models/
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks

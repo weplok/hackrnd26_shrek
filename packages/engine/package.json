@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+<<<<<<< HEAD
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
@@ -11,5 +12,9 @@
   },
   "scripts": {
     "test": "node --experimental-strip-types test/playthrough.ts"
+=======
+  "scripts": {
+    "typecheck": "tsc --project tsconfig.json --noEmit"
+>>>>>>> 6f0b5d1021ece56acf7816db674f9ce1fececf1a
   }
 }

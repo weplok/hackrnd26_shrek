@@ -126,9 +126,9 @@ const N = {
 };
 const CRIT = new Set(['A1','A3','B1','B3','B5','C5','D4','B10','D2','G3','G7']);
 // Task status: keep in sync with docs/ZERO_DAY_Задачи.md.
-const DONE = new Set(['A1', 'A3', 'D1', 'D3', 'G8']);
-const DONE_BY = { D1: 'Lolik', D3: 'Lolik', G8: 'Lolik' };
-const WIP = { D4: 'Lolik', D2: 'Lolik', A4: 'Lolik', B1: 'Lolik', A2: 'weplok', A5: 'weplok', A6: 'Android', A11: 'weplok' };
+const DONE = new Set(['A1', 'A2', 'A3', 'A5', 'A6', 'A11', 'D1', 'D3', 'G8']);
+const DONE_BY = { A5: 'weplok', A6: 'Android', A11: 'weplok', D1: 'Lolik', D3: 'Lolik', G8: 'Lolik' };
+const WIP = { D4: 'Lolik', D2: 'Lolik', A4: 'Lolik', B1: 'Lolik', A7: 'weplok', A8: 'weplok', A10: 'weplok' };
 // t(id, after, extra-name, continued)
 const t = (id, after, x, cont) => ({ id, after, x, cont });
 const c = (id, x) => t(id, '', x, true);
