@@ -34,7 +34,8 @@
 - [x] **T-A6** · Каркас SPA: роутинг, тема/токены, ErrorBoundary, экран никнейма, загрузчик контента · WEB · L · P0 · *после:* T-A1
 - [ ] **T-A7** · Docker Compose (web на Caddy + api + redis + postgres + migrate) + профиль offline · INF · L · P0 · *после:* T-A5, T-A6 · в работе: weplok
 - [ ] **T-A8** · CI-пайплайн (lint → types → контент → тесты → сборка → смоук) · INF · M · P0 · *после:* T-A7 · в работе: weplok
-- [ ] **T-A9** · Дизайн-система shared/ui + Storybook · WEB · M · P0 · *после:* T-A6
+- [ ] **T-A9** · Дизайн-система shared/ui + Storybook · WEB · M · P0 · *после:* T-A6 · в работе: Android
+  - Прогресс: задача взята; осталось определить состав shared/ui и настроить Storybook.
 - [ ] **T-A10** · VPS: Caddy на хосте, домен, Let's Encrypt, reverse proxy на localhost (проверить /ws и /mcp) · INF · S · P0 · *после:* T-A7 · в работе: weplok
 - [x] **T-A11** · LICENSE (MIT), .env.example, gitleaks, README «запуск за 5 минут» · INF · S · P0 · *после:* T-A1
 
