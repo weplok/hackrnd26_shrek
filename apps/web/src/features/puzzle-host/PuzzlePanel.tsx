@@ -3,6 +3,11 @@ import { Button } from '@zero-day/ui';
 import type { PuzzleInstance, PuzzleOption } from '@zero-day/engine';
 import { ru } from '../../shared/ui/strings';
 import { ScanTuner } from './ScanTuner';
+import { BruteLock } from './BruteLock';
+import { VirusMaze } from './VirusMaze';
+import { DdosStorm } from './DdosStorm';
+import { InjectionPaint } from './InjectionPaint';
+import type { GameProps } from './game';
 
 type PuzzlePanelProps = {
   puzzle: PuzzleInstance;
@@ -11,6 +16,16 @@ type PuzzlePanelProps = {
 };
 
 const text = ru.puzzle;
+
+// Archetypes grouped by attack method in NodeContextMenu share one mini-game.
+const GAMES: Record<string, (props: GameProps) => ReactNode> = {
+  brute: BruteLock,
+  crypto: BruteLock,
+  rootkit: VirusMaze,
+  evasion: VirusMaze,
+  wipe: DdosStorm,
+  exploit: InjectionPaint,
+};
 
 function viewNumber(view: Record<string, unknown>, key: string, fallback: number): number {
   return typeof view[key] === 'number' ? view[key] : fallback;
@@ -99,6 +114,16 @@ export function PuzzlePanel({ puzzle, onCancel, onSubmit }: PuzzlePanelProps): R
         <p className="puzzle-host__tool">{text.tool(puzzle.archetype)}</p>
         <p className="puzzle-host__prompt">{puzzle.prompt}</p>
         <ScanTuner key={`${puzzle.nodeId}:${puzzle.vuln}`} puzzle={puzzle} onCancel={onCancel} onSubmit={onSubmit} />
+      </div>
+    );
+  }
+
+  const Game = GAMES[puzzle.archetype];
+  if (Game) {
+    return (
+      <div className="puzzle-host">
+        <p className="puzzle-host__tool">{text.tool(puzzle.archetype)}</p>
+        <Game key={`${puzzle.nodeId}:${puzzle.vuln}`} puzzle={puzzle} onCancel={onCancel} onSubmit={onSubmit} />
       </div>
     );
   }
