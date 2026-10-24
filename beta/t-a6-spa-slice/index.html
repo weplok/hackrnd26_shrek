@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#050a07" />
+    <title>ZERO DAY — SPA slice</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg: #000;
+        --panel: #07140e;
+        --panel-strong: #0b1f17;
+        --line: #1b3b2c;
+        --text: #e8efe9;
+        --muted: #8aa399;
+        --green: #4a9a72;
+        --green-bright: #7cffb2;
+        --amber: #e8b047;
+        --danger: #e30b5c;
+        --font: "JetBrains Mono", ui-monospace, "Courier New", monospace;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        min-height: 100vh;
+        margin: 0;
+        color: var(--text);
+        background: var(--bg);
+        font-family: var(--font);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      button, input { font: inherit; }
+      button { cursor: pointer; }
+      button:focus-visible, input:focus-visible { outline: 2px solid var(--green-bright); outline-offset: 3px; }
+      .shell { width: min(760px, calc(100% - 32px)); margin: 0 auto; padding: 24px 0 60px; animation: flicker 7s infinite; }
+      .topbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-bottom: 16px; }
+      .brand { padding: 0; border: 0; color: var(--green); background: transparent; font-size: 12px; letter-spacing: .18em; }
+      .session { color: var(--muted); font-size: 11px; text-align: right; }
+      .panel { border: 1px solid var(--line); background: var(--panel); }
+      .panel-title { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); color: var(--muted); background: var(--panel-strong); font-size: 11px; letter-spacing: .17em; }
+      .lights { display: flex; gap: 7px; margin-right: 4px; }
+      .light { width: 9px; height: 9px; border-radius: 50%; }
+      .light.mag { background: var(--danger); }.light.amber { background: var(--amber); }.light.green { background: var(--green-bright); }
+      .eyebrow { color: var(--green); font-size: 12px; letter-spacing: .29em; text-transform: none; }
+      .title { margin: 18px 0 4px; font-size: clamp(42px, 10vw, 56px); line-height: 1; letter-spacing: .04em; }
+      .title-mark { color: var(--danger); }
+      .subtitle { color: var(--muted); font-size: 14px; }
+      .lead { max-width: 620px; color: var(--muted); font-size: 13px; line-height: 1.65; }
+      .intro { margin-top: 40px; text-align: center; animation: rise .5s; }
+      .hero { max-width: 420px; margin: 40px auto 0; }
+      .hero-main { padding: 22px; }
+      .hero-side { margin-top: 14px; padding: 14px 16px; }
+      .status { display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+      .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 14px currentColor; }
+      .dot.ready { background: var(--green-bright); }
+      .rule { height: 1px; margin: 18px 0; background: var(--line); }
+      .menu { display: grid; gap: 10px; margin-top: 20px; }
+      .button { min-height: 44px; padding: 11px 16px; border: 1px solid var(--line); color: var(--text); background: transparent; text-align: left; letter-spacing: .06em; transition: border-color .15s, background .15s; }
+      .button:hover { border-color: var(--green); background: rgb(11 31 23 / 72%); }
+      .button.primary { border-color: transparent; color: #05140d; background: var(--green-bright); font-weight: 800; }
+      .button.primary:hover { background: #9dffc5; }
+      .button:disabled { cursor: not-allowed; opacity: .45; transform: none; }
+      .meta { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+      .metric { padding: 10px; border: 1px solid var(--line); background: #000; }
+      .metric b { display: block; margin-top: 5px; color: var(--green-bright); font-size: 17px; }
+      .metric span { color: var(--muted); font-size: 10px; letter-spacing: .1em; }
+      .form-panel { max-width: 420px; margin: 40px auto 0; padding: 0; }
+      .form-body { padding: 22px; }
+      label { display: block; margin-top: 0; color: var(--muted); font-size: 11px; letter-spacing: .15em; }
+      .input-wrap { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 10px 12px; border: 1px solid var(--line); background: #000; }
+      .prompt { color: var(--green); }.cursor { color: var(--green); animation: blink 1s steps(1) infinite; }
+      input { width: 100%; padding: 0; border: 0; border-radius: 0; outline: 0; color: var(--text); background: transparent; font-size: 16px; }
+      .hint, .error { min-height: 21px; margin: 8px 0 0; font-size: 11px; line-height: 1.55; }
+      .hint { color: var(--muted); }
+      .error { color: var(--danger); }
+      .form-actions { display: flex; gap: 10px; margin-top: 25px; }
+      .form-actions .button { flex: 1; text-align: center; }
+      .placeholder { padding: clamp(28px, 7vw, 72px); text-align: center; animation: rise .4s; }
+      .placeholder h1 { margin: 12px 0; font-size: clamp(30px, 6vw, 54px); }
+      .crash { max-width: 650px; margin: 15vh auto 0; padding: 34px; border-color: var(--danger); }
+      .crash h1 { color: var(--danger); }
+      .small { color: var(--muted); font-size: 11px; line-height: 1.65; }
+      @keyframes blink { 50% { opacity: .25; } }
+      @keyframes flicker { 0%, 100% { opacity: 1; } 98% { opacity: .78; } }
+      @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+      @media (max-width: 720px) {
+        .shell { width: min(100% - 24px, 760px); padding-top: 16px; }
+        .topbar { align-items: flex-start; }
+        .hero { margin-top: 28px; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <button class="brand" type="button" data-route="/">ZERO DAY // ETHICAL OPS</button>
+        <div class="session" id="session-label">локальный режим</div>
+      </header>
+      <div id="app" aria-live="polite"></div>
+    </main>
+    <script>
+      const app = document.querySelector('#app');
+      const nicknameKey = 'zero-day.profile.nickname';
+      const nicknameDraftKey = 'zero-day.profile.nickname-draft';
+      const routes = new Set(['/', '/nickname', '/campaign', '/codex', '/settings']);
+      let contentState = { status: 'loading', vulnerabilities: 0, puzzles: 0 };
+
+      function escaped(value) {
+        const box = document.createElement('div');
+        box.textContent = value;
+        return box.innerHTML;
+      }
+
+      function nickname() { return localStorage.getItem(nicknameKey) || ''; }
+      function go(path) { location.hash = '#' + path; }
+      function path() {
+        const value = location.hash.slice(1) || '/';
+        return routes.has(value) ? value : '/';
+      }
+
+      function contentStatus() {
+        if (contentState.status === 'ready') {
+          return '<span class="dot ready"></span>контент готов к подключению';
+        }
+        if (contentState.status === 'offline') {
+          return '<span class="dot"></span>локальный режим: контент недоступен';
+        }
+        return '<span class="dot"></span>проверяем контент';
+      }
+
+      function renderStart() {
+        const saved = nickname();
+        app.innerHTML = `
+          <section class="intro">
+            <div class="eyebrow">zero@day:~$ ./start --brief</div>
+            <h1 class="title">ZERO<span class="title-mark">_</span>DAY</h1>
+            <div class="subtitle">симулятор этичного пентеста</div>
+          </section>
+          <section class="hero">
+            <div class="panel hero-main">
+              <div class="panel-title"><span class="lights"><i class="light mag"></i><i class="light amber"></i><i class="light green"></i></span>ВХОД ОПЕРАТОРА</div>
+              <div class="form-body">
+                <label for="menu-nickname">НИКНЕЙМ <span style="color:var(--green);font-size:10px">(для сохранения прогресса)</span></label>
+                <div class="input-wrap"><span class="prompt">&gt;</span><input id="menu-nickname" maxlength="16" value="${escaped(saved)}" placeholder="operator_42" /><span class="cursor">▍</span></div>
+                <nav class="menu" aria-label="Главное меню">
+                  <button class="button primary" id="new-game" type="button" data-route="/nickname">НОВАЯ ИГРА</button>
+                  <button class="button" type="button" data-route="/campaign" ${saved ? '' : 'disabled'}>ПРОДОЛЖИТЬ ${saved ? '' : '— нет сохранения'}</button>
+                  <button class="button" type="button" data-route="/codex">КОДЕКС</button>
+                  <button class="button" type="button" data-route="/settings">НАСТРОЙКИ</button>
+                </nav>
+                <p class="small">Прогресс хранится в этом браузере. Кампания останется доступна без сервера.</p>
+              </div>
+            </div>
+            <aside class="panel hero-side">
+              <div>
+                <div class="eyebrow">Статус системы</div>
+                <div class="rule"></div>
+                <div class="status" id="content-status">${contentStatus()}</div>
+                <p class="small" id="content-detail">Загрузчик читает доступные каталоги отдельно от интерфейса.</p>
+              </div>
+              <div class="meta">
+                <div class="metric"><span>СТЕК</span><b>SPA</b></div>
+                <div class="metric"><span>СЕССИЯ</span><b>${saved ? 'ЕСТЬ' : 'НОВАЯ'}</b></div>
+              </div>
+            </aside>
+          </section>`;
+        updateContentDetail();
+        document.querySelector('#new-game').addEventListener('click', () => {
+          sessionStorage.setItem(nicknameDraftKey, document.querySelector('#menu-nickname').value.trim());
+        });
+      }
+
+      function renderNickname() {
+        const saved = sessionStorage.getItem(nicknameDraftKey) || nickname();
+        app.innerHTML = `
+          <section class="panel form-panel">
+            <div class="panel-title"><span class="lights"><i class="light mag"></i><i class="light amber"></i><i class="light green"></i></span>ПРОФИЛЬ ОПЕРАТОРА</div>
+            <div class="form-body">
+              <p class="lead" style="margin-top:0">Имя появится в диалогах и итоговом отчёте.</p>
+              <form id="nickname-form" novalidate>
+                <label for="nickname">НИКНЕЙМ</label>
+                <div class="input-wrap"><span class="prompt">&gt;</span><input id="nickname" name="nickname" maxlength="16" autocomplete="nickname" value="${escaped(saved)}" placeholder="operator_42" /><span class="cursor">▍</span></div>
+                <p class="hint">От 2 до 16 символов: кириллица, латиница, цифры, _ и -.</p>
+                <p class="error" id="nickname-error"></p>
+                <div class="form-actions">
+                  <button class="button" type="button" data-route="/">НАЗАД</button>
+                  <button class="button primary" type="submit">СОХРАНИТЬ И ПРОДОЛЖИТЬ</button>
+                </div>
+              </form>
+            </div>
+          </section>`;
+        document.querySelector('#nickname-form').addEventListener('submit', (event) => {
+          event.preventDefault();
+          const value = document.querySelector('#nickname').value.trim();
+          const message = validateNickname(value);
+          document.querySelector('#nickname-error').textContent = message;
+          if (message) return;
+          localStorage.setItem(nicknameKey, value);
+          sessionStorage.removeItem(nicknameDraftKey);
+          updateSessionLabel();
+          go('/campaign');
+        });
+        document.querySelector('#nickname').focus();
+      }
+
+      function validateNickname(value) {
+        if (value.length < 2 || value.length > 16) return 'Никнейм должен содержать от 2 до 16 символов.';
+        if (!/^[A-Za-zА-Яа-яЁё0-9_-]+$/.test(value)) return 'Используй только буквы, цифры, _ и -.';
+        return '';
+      }
+
+      function renderPlaceholder(name, text) {
+        app.innerHTML = `
+          <section class="panel placeholder">
+            <div class="eyebrow">Каркас SPA</div>
+            <h1>${name}</h1>
+            <p class="lead" style="margin: 0 auto 28px">${text}</p>
+            <button class="button primary" type="button" data-route="/">В ГЛАВНОЕ МЕНЮ</button>
+          </section>`;
+      }
+
+      function render() {
+        updateSessionLabel();
+        try {
+          const current = path();
+          if (current === '/') renderStart();
+          if (current === '/nickname') renderNickname();
+          if (current === '/campaign') renderPlaceholder('КАМПАНИЯ', 'Здесь появятся карта кейсов и выбор задания.');
+          if (current === '/codex') renderPlaceholder('КОДЕКС', 'Здесь появится справочник учебных слабостей и защитных мер.');
+          if (current === '/settings') renderPlaceholder('НАСТРОЙКИ', 'Здесь появятся параметры интерфейса, звука и доступности.');
+          bindRoutes();
+        } catch (error) {
+          app.innerHTML = `<section class="panel crash"><div class="eyebrow">Ошибка интерфейса</div><h1>ЭКРАН НЕДОСТУПЕН</h1><p class="lead">Вернись в главное меню. Состояние профиля сохранено локально.</p><button class="button primary" type="button" data-route="/">ВЕРНУТЬСЯ</button></section>`;
+          bindRoutes();
+          console.error(error);
+        }
+      }
+
+      function bindRoutes() {
+        document.querySelectorAll('[data-route]').forEach((element) => {
+          element.addEventListener('click', () => go(element.dataset.route));
+        });
+      }
+
+      function updateSessionLabel() {
+        const value = nickname();
+        document.querySelector('#session-label').textContent = value ? `профиль: ${value}` : 'локальный режим';
+      }
+
+      function updateContentDetail() {
+        const detail = document.querySelector('#content-detail');
+        if (!detail) return;
+        if (contentState.status === 'ready') {
+          detail.textContent = `Найдено: слабостей ${contentState.vulnerabilities}, головоломок ${contentState.puzzles}.`;
+        }
+        if (contentState.status === 'offline') {
+          detail.textContent = 'Срез работает без контента. Запусти через локальный сервер для проверки загрузчика.';
+        }
+      }
+
+      async function loadContent() {
+        try {
+          const [vulnerabilities, puzzles] = await Promise.all([
+            fetch('../../content/catalog/vulnerabilities.json').then((response) => response.json()),
+            fetch('../../content/catalog/puzzles.json').then((response) => response.json())
+          ]);
+          contentState = { status: 'ready', vulnerabilities: vulnerabilities.items.length, puzzles: puzzles.items.length };
+        } catch {
+          contentState = { status: 'offline', vulnerabilities: 0, puzzles: 0 };
+        }
+        if (path() === '/') render();
+      }
+
+      window.addEventListener('hashchange', render);
+      window.addEventListener('error', () => render());
+      render();
+      loadContent();
+    </script>
+  </body>
+</html>
