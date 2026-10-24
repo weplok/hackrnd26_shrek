@@ -8,11 +8,13 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "typecheck": "tsc --project tsconfig.json --noEmit"
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "storybook": "storybook dev --port 6007",
+    "storybook:build": "storybook build"
   },
   "dependencies": {
-    "@zero-day/ui": "workspace:*",
     "@zero-day/engine": "workspace:*",
+    "@zero-day/ui": "workspace:*",
     "mitt": "^3.0.1",
     "react": "18.3.1",
     "react-dom": "18.3.1",
@@ -20,9 +22,11 @@
     "zustand": "^5.0.11"
   },
   "devDependencies": {
+    "@storybook/react-vite": "^10.6.3",
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
     "@vitejs/plugin-react": "4.3.4",
+    "storybook": "^10.6.3",
     "typescript": "5.7.2",
     "vite": "6.0.5",
     "vitest": "2.1.8"

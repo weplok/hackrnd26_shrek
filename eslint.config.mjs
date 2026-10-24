@@ -18,6 +18,7 @@ export default tseslint.config(
       '.opencode/**',
       '.pnpm-store/**',
       'packages/ui/storybook-static/**',
+      'apps/web/storybook-static/**',
       'beta/**',
       'docs/**',
       'backend_api/content/models/**',
