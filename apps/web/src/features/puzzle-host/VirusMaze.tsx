@@ -23,7 +23,7 @@ const MAZE = [
 ];
 const W = MAZE[0]?.length ?? 0;
 const H = MAZE.length;
-const STEP_MS = 150;
+const STEP_MS = 300;
 const PAC_EVERY = 2;
 const START_LENGTH = 3;
 const DIRS: Cell[] = [
