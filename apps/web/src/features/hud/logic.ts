@@ -8,7 +8,8 @@ type FlipperLine = Flipper['lines'][number];
 type TrackId = Case['tracks'][number]['id'];
 
 export function hasFlipperJoined(flags: GameState['flags'], level: number): boolean {
-  return flags.flipperJoined || level >= 2;
+  // Flipper is on screen from level 1 on: on level 1 it plays the tutor.
+  return flags.flipperJoined || level >= 1;
 }
 
 export function getFlipperMood(tracks: Readonly<Record<string, number>>): FlipperMood {
@@ -35,7 +36,10 @@ export function findFlipperLine(
   lastSpokenTick: number | undefined,
 ): FlipperLine | undefined {
   return lines.find((line) => {
-    if (lastSpokenTick !== undefined && state.tick - lastSpokenTick < Math.max(3, line.cooldownTicks)) return false;
+    // Tutorial lines (level 1 only) may follow one another with no forced gap, so the
+    // step-by-step onboarding is not swallowed by the global anti-spam floor.
+    const cooldown = line.maxLevel === 1 ? line.cooldownTicks : Math.max(3, line.cooldownTicks);
+    if (lastSpokenTick !== undefined && state.tick - lastSpokenTick < cooldown) return false;
     if (line.trigger.event !== event.type) return false;
     if (line.minLevel !== undefined && level < line.minLevel) return false;
     if (line.maxLevel !== undefined && level > line.maxLevel) return false;

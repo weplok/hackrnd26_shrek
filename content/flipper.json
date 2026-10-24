@@ -2,6 +2,72 @@
   "schemaVersion": 1,
   "lines": [
     {
+      "id": "tut_welcome",
+      "trigger": {
+        "event": "ScanOpened"
+      },
+      "text": [
+        "Первый выход. Это скан: веди ползунок на пик сигнала — живой порт только один."
+      ],
+      "cooldownTicks": 0,
+      "maxLevel": 1
+    },
+    {
+      "id": "tut_hypothesis",
+      "trigger": {
+        "event": "NodeScanned"
+      },
+      "text": [
+        "Разведал. Теперь гипотеза: впиши в терминал узел и СЛ-xx — слабость узла."
+      ],
+      "cooldownTicks": 0,
+      "maxLevel": 1
+    },
+    {
+      "id": "tut_puzzle",
+      "trigger": {
+        "event": "PuzzleOpened"
+      },
+      "text": [
+        "Слабость в деле. Реши мини-игру — и узел наш. Промах не карает, но шумит."
+      ],
+      "cooldownTicks": 0,
+      "maxLevel": 1
+    },
+    {
+      "id": "tut_node_taken",
+      "trigger": {
+        "event": "ExploitSucceeded"
+      },
+      "text": [
+        "Узел взят. Открываются соседи — иди по карте дальше, к цели."
+      ],
+      "cooldownTicks": 0,
+      "maxLevel": 1
+    },
+    {
+      "id": "tut_clue",
+      "trigger": {
+        "event": "CluesFound"
+      },
+      "text": [
+        "Это зацепка — легла на доску улик. Из зацепок потом собираются ключи к замкам."
+      ],
+      "cooldownTicks": 0,
+      "maxLevel": 1
+    },
+    {
+      "id": "tut_objective",
+      "trigger": {
+        "event": "ObjectiveCompleted"
+      },
+      "text": [
+        "Задача закрыта. Следи за списком целей справа — он ведёт к финалу кейса."
+      ],
+      "cooldownTicks": 0,
+      "maxLevel": 1
+    },
+    {
       "id": "case_start",
       "trigger": {
         "event": "CaseStarted"

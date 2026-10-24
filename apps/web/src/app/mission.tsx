@@ -44,7 +44,9 @@ export function MissionPage({
   const start = useCaseStore((state) => state.start);
   const resume = useCaseStore((state) => state.resume);
   const dispatch = useCaseStore((state) => state.dispatch);
+  const hasStory = (caseData?.story?.length ?? 0) > 0;
   const [briefing, setBriefing] = useState(() => unfinishedRun(repository, caseId) === null);
+  const [storyDone, setStoryDone] = useState(() => !(hasStory && unfinishedRun(repository, caseId) === null));
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
   function begin(): void {
@@ -52,6 +54,7 @@ export function MissionPage({
     useSocial.getState().reset();
     start({ caseId, content, difficulty: level.difficulty });
     setSelectedNodeId(null);
+    setStoryDone(!hasStory);
     setBriefing(true);
   }
 
@@ -172,7 +175,19 @@ export function MissionPage({
 
       <PuzzleHost />
       <AttackNotice />
-      {briefing && (
+      {briefing && hasStory && !storyDone && (
+        <StoryOverlay
+          title={caseData.title}
+          slides={caseData.story ?? []}
+          onContinue={() => {
+            setStoryDone(true);
+          }}
+          onExit={() => {
+            navigate('/campaign');
+          }}
+        />
+      )}
+      {briefing && (storyDone || !hasStory) && (
         <BriefOverlay
           caseData={caseData}
           caseId={caseId}
@@ -432,6 +447,58 @@ function Overlay({ title, tone, children }: { title: string; tone?: 'danger' | '
         {children}
       </Panel>
     </div>
+  );
+}
+
+function StoryOverlay({
+  title,
+  slides,
+  onContinue,
+  onExit,
+}: {
+  title: string;
+  slides: string[];
+  onContinue: () => void;
+  onExit: () => void;
+}): ReactNode {
+  const [shown, setShown] = useState(1);
+  const atEnd = shown >= slides.length;
+  return (
+    <Overlay title={title}>
+      <p className="overlay__tag">{t.storyTag}</p>
+      <div className="intro-brief__lines" aria-live="polite">
+        {slides.slice(0, shown).map((line) => (
+          <p key={line} className="intro-brief__line intro-brief__line--main">
+            {line}
+          </p>
+        ))}
+      </div>
+      <div className="form-actions">
+        <Button
+          type="button"
+          variant="primary"
+          onClick={() => {
+            if (atEnd) onContinue();
+            else setShown((count) => count + 1);
+          }}
+        >
+          {atEnd ? t.storyToBrief : t.storyNext}
+        </Button>
+        {!atEnd && (
+          <Button
+            type="button"
+            onClick={() => {
+              setShown(slides.length);
+            }}
+          >
+            {t.storySkip}
+          </Button>
+        )}
+        <Button type="button" onClick={onExit}>
+          {ru.back}
+        </Button>
+      </div>
+    </Overlay>
   );
 }
 
