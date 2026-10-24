@@ -5,7 +5,7 @@ import type { GameProps } from './game';
 
 type Cell = [number, number];
 type Status = 'ready' | 'run' | 'won' | 'lost';
-type World = { snake: Cell[]; dir: Cell; next: Cell; pac: Cell; apples: Cell[]; grow: number; tick: number };
+type World = { snake: Cell[]; dir: Cell; next: Cell; pac: Cell; pacPrev: Cell; apples: Cell[]; grow: number; tick: number };
 
 const text = ru.puzzle;
 const MAZE = [
@@ -64,6 +64,7 @@ function freshWorld(): World {
     dir: [1, 0],
     next: [1, 0],
     pac: [...PAC_START],
+    pacPrev: [...PAC_START],
     apples: APPLES.map((a): Cell => [...a]),
     grow: 0,
     tick: 0,
@@ -72,25 +73,15 @@ function freshWorld(): World {
 
 const snapshot = (world: World): World => ({ ...world, snake: [...world.snake], apples: [...world.apples] });
 
-/** First step of the shortest path from `from` to `to`; the antivirus always takes it. */
-function chase(from: Cell, to: Cell): Cell {
-  const key = ([x, y]: Cell): number => y * W + x;
-  const prev = new Map<number, Cell>([[key(from), from]]);
-  const queue: Cell[] = [from];
-  while (queue.length > 0) {
-    const cur = queue.shift() as Cell;
-    if (same(cur, to)) break;
-    for (const [dx, dy] of DIRS) {
-      const nxt: Cell = [cur[0] + dx, cur[1] + dy];
-      if (isWall(nxt) || prev.has(key(nxt))) continue;
-      prev.set(key(nxt), cur);
-      queue.push(nxt);
-    }
-  }
-  let cur = to;
-  if (!prev.has(key(cur))) return from;
-  while (!same(prev.get(key(cur)) ?? from, from)) cur = prev.get(key(cur)) ?? from;
-  return cur;
+/** Random step that never goes straight back, unless the antivirus is in a dead end. */
+function wander(world: World): void {
+  const open = DIRS.map(([dx, dy]): Cell => [world.pac[0] + dx, world.pac[1] + dy]).filter((cell) => !isWall(cell));
+  const forward = open.filter((cell) => !same(cell, world.pacPrev));
+  const choices = forward.length > 0 ? forward : open;
+  const next = choices[Math.floor(Math.random() * choices.length)];
+  if (!next) return;
+  world.pacPrev = world.pac;
+  world.pac = next;
 }
 
 function advance(world: World): Status {
@@ -109,7 +100,7 @@ function advance(world: World): Status {
     else world.snake.pop();
   }
   world.tick += 1;
-  if (world.tick % PAC_EVERY === 0) world.pac = chase(world.pac, world.snake[0] ?? START);
+  if (world.tick % PAC_EVERY === 0) wander(world);
   if (world.snake.some((seg) => same(seg, world.pac))) return 'lost';
   if (world.apples.length === 0 && same(world.snake[0] ?? START, FINISH)) return 'won';
   return 'run';
@@ -145,6 +136,17 @@ export function VirusMaze({ puzzle, onCancel, onSubmit }: GameProps): ReactNode 
       if (!dir) return;
       event.preventDefault();
       world.current.next = dir;
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [status]);
+
+  useEffect(() => {
+    if (status === 'run' || status === 'won') return;
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.code !== 'Space' && event.code !== 'Enter' && event.code !== 'NumpadEnter') return;
+      event.preventDefault();
+      start();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
