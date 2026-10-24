@@ -1,7 +1,7 @@
 // Command pipeline (TZ 7.2–7.3): validate → handler → events derived from the state diff.
 import type { Content, GameState } from './types.ts';
-import { scan, hypothesize, submitPuzzle, cancelPuzzle, restoreCheckpoint, DEFAULT_FAIL_HINT } from './engine.ts';
-import { verifyPuzzle } from './puzzles.ts';
+import { scan, hypothesize, submitPuzzle, cancelPuzzle, restoreCheckpoint, failHint } from './engine.ts';
+import { verifyPuzzle } from './puzzles/index.ts';
 
 export type Command =
   | { type: 'ScanNode'; node: string }
@@ -30,7 +30,7 @@ export type GameEvent =
   | { type: 'PuzzleOpened'; node: string; vuln: string }
   | { type: 'PuzzleCancelled'; node: string }
   | { type: 'PuzzleSolved'; node: string }
-  | { type: 'PuzzleFailed'; node: string }
+  | { type: 'PuzzleFailed'; node: string; attemptsLeft: number }
   | { type: 'ExploitSucceeded'; node: string; vuln: string }
   | { type: 'ExploitMismatched'; node: string; vuln: string; failHint: string }
   | { type: 'NodeCompromised'; node: string }
@@ -107,17 +107,17 @@ function primaryEvents(content: Content, prev: GameState, next: GameState, cmd: 
       const inst = prev.activePuzzle;
       if (!inst) return [];
       const node = inst.nodeId;
-      if (!verifyPuzzle(inst, cmd.answer)) return [{ type: 'PuzzleFailed', node }];
+      if (!verifyPuzzle(inst, cmd.answer))
+        return [{ type: 'PuzzleFailed', node, attemptsLeft: next.activePuzzle?.attemptsLeft ?? 0 }];
       if (next.nodes[node]?.compromised && !prev.nodes[node]?.compromised)
         return [
           { type: 'PuzzleSolved', node },
           { type: 'ExploitSucceeded', node, vuln: inst.vuln },
         ];
       const n = content.cases[prev.caseId]?.nodes.find((x) => x.id === node);
-      const failHint = n?.failHints[inst.vuln] ?? DEFAULT_FAIL_HINT;
       return [
         { type: 'PuzzleSolved', node },
-        { type: 'ExploitMismatched', node, vuln: inst.vuln, failHint },
+        { type: 'ExploitMismatched', node, vuln: inst.vuln, failHint: failHint(n, inst) },
       ];
     }
   }

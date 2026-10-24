@@ -13,6 +13,7 @@ import type {
   Interludes,
   Flipper,
 } from './content/types.gen.ts';
+import type { Knobs, PuzzleBody } from './puzzles/types.ts';
 
 export type {
   Case,
@@ -90,15 +91,14 @@ export interface NpcRuntime {
 
 export type Phase = 'briefing' | 'playing' | 'report' | 'won' | 'caught';
 
-export interface PuzzleInstance {
+export interface PuzzleInstance extends PuzzleBody {
   nodeId: string;
   vuln: string;
   archetype: string;
   title: string;
-  prompt: string;
-  options: { id: string; label: string }[];
-  multi: boolean; // select multiple (legend-mosaic)
-  correct: string[]; // option ids that are correct
+  genuine: boolean; // vuln is on the node; UI must not show it before the verdict
+  knobs: Knobs;
+  attemptsLeft: number;
 }
 
 export interface LogEntry {

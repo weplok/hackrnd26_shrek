@@ -88,13 +88,18 @@ void test('solved puzzle for the wrong vuln reports mismatch with failHint', () 
   assert.equal(r.state.nodes.wifi?.compromised, false);
 });
 
-void test('wrong answer fails the puzzle and makes noise', () => {
+void test('wrong answer costs an attempt and makes noise; last attempt closes the puzzle', () => {
   let s = start();
   s = E.apply(content, s, { type: 'ScanNode', node: 'wifi' }).state;
   s = E.apply(content, s, { type: 'ProposeHypothesis', node: 'wifi', vuln: 'SL-02' }).state;
+  const attempts = s.activePuzzle?.attemptsLeft ?? 0;
+  assert.equal(attempts, 6);
   const wrong = s.activePuzzle?.options.find((o) => !s.activePuzzle?.correct.includes(o.id))?.id ?? '';
   const r = E.apply(content, s, { type: 'SubmitPuzzle', answer: [wrong] });
-  assert.equal(r.events[0]?.type, 'PuzzleFailed');
+  assert.deepEqual(r.events[0], { type: 'PuzzleFailed', node: 'wifi', attemptsLeft: attempts - 1 });
   assert.ok(types(r.events).includes('Ticked'));
-  assert.equal(r.state.activePuzzle, null);
+  assert.equal(r.state.activePuzzle?.attemptsLeft, attempts - 1);
+  s = r.state;
+  for (let i = 1; i < attempts; i++) s = E.apply(content, s, { type: 'SubmitPuzzle', answer: [wrong] }).state;
+  assert.equal(s.activePuzzle, null);
 });

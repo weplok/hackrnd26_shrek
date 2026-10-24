@@ -25,7 +25,8 @@ export {
   profileStyle,
 } from './engine.ts';
 export type { AlarmLevel } from './engine.ts';
-export { generatePuzzle, verifyPuzzle } from './puzzles.ts';
+export { generatePuzzle, verifyPuzzle, checkPuzzle, puzzleLogic, PUZZLES } from './puzzles/index.ts';
+export type { PuzzleLogic, PuzzleBody, PuzzleOption, VerifyResult, GenerateCtx } from './puzzles/index.ts';
 export { apply, validate } from './commands.ts';
 export type { Command, GameEvent, RejectReason, StepResult } from './commands.ts';
 export { resolveNpcTurn } from './npc.ts';

@@ -2,11 +2,16 @@
 import type { Content, GameState, Case, ContentNode, PuzzleInstance, Difficulty, NodeRuntime } from './types.ts';
 import { evalCondition } from './conditions.ts';
 import { applyEffects, clamp } from './effects.ts';
-import { generatePuzzle, verifyPuzzle } from './puzzles.ts';
+import { generatePuzzle, checkPuzzle, puzzleLogic, DEFAULT_FAIL_HINT } from './puzzles/index.ts';
 import { resolveNpcTurn } from './npc.ts';
 
 const NOISE: Record<string, number> = { quiet: 4, moderate: 9, loud: 16 };
-export const DEFAULT_FAIL_HINT = 'Узел не поддался: приём не подошёл.';
+export { DEFAULT_FAIL_HINT };
+
+/** Content failHint for the guessed vuln, else the archetype's own explanation. */
+export function failHint(n: ContentNode | undefined, inst: PuzzleInstance): string {
+  return n?.failHints[inst.vuln] ?? puzzleLogic(inst.archetype).explainMismatch(inst);
+}
 
 function getCase(content: Content, s: GameState): Case {
   const c = content.cases[s.caseId];
@@ -252,7 +257,12 @@ export function hypothesize(content: Content, state: GameState, nodeId: string, 
   const title = content.puzzles[vuln]?.title ?? vuln;
   const ex = n.exploits.find((e) => e.vuln === vuln);
   let inst: PuzzleInstance;
-  [s.rng, inst] = generatePuzzle(s.rng, arch, title, ex?.puzzleParams ?? {}, ex?.knobs, nodeId, vuln);
+  // TZ 7.5: level knobs for the archetype, overridden by the node's exploit knobs
+  const knobs = { ...s.difficulty.puzzleKnobs[arch], ...ex?.knobs };
+  [s.rng, inst] = generatePuzzle(s.rng, arch, title, ex?.puzzleParams ?? {}, knobs, nodeId, vuln, {
+    genuine: !!ex,
+    label: (id) => node(c, id)?.label ?? id,
+  });
   s.activePuzzle = inst;
   s.log.push({ t: `$ гипотеза: ${n.label} → ${vuln}`, kind: 'cmd' });
   return s;
@@ -271,13 +281,18 @@ export function submitPuzzle(content: Content, state: GameState, selected: strin
   const c = getCase(content, s);
   const n = node(c, inst.nodeId);
   if (!n) return s;
-  const solved = verifyPuzzle(inst, selected);
-  s.activePuzzle = null;
-  if (!solved) {
-    s.log.push({ t: '✗ головоломка не решена.', kind: 'bad' });
-    stepAlarm(s, s.difficulty.wrongGuessNoise, n.id);
+  const result = checkPuzzle(inst, selected);
+  if (!result.solved) {
+    const left = inst.attemptsLeft - 1;
+    s.activePuzzle = left > 0 ? { ...inst, attemptsLeft: left } : null;
+    s.log.push({
+      t: left > 0 ? `✗ не вышло, попыток осталось: ${String(left)}.` : '✗ головоломка не решена.',
+      kind: 'bad',
+    });
+    stepAlarm(s, s.difficulty.wrongGuessNoise * puzzleLogic(inst.archetype).noise(result, inst.knobs), n.id);
     return s;
   }
+  s.activePuzzle = null;
   const ex = n.exploits.find((e) => e.vuln === inst.vuln);
   const reqOk = ex ? evalCondition(ex.requires, s) : false;
   if (ex && reqOk) {
@@ -287,7 +302,7 @@ export function submitPuzzle(content: Content, state: GameState, selected: strin
     compromise(content, s, n);
     stepAlarm(s, noise, n.id);
   } else {
-    const hint = n.failHints[inst.vuln] ?? DEFAULT_FAIL_HINT;
+    const hint = failHint(n, inst);
     s.log.push({ t: `✗ не та слабость. ${hint}`, kind: 'bad' });
     stepAlarm(s, s.difficulty.wrongGuessNoise, n.id);
   }
