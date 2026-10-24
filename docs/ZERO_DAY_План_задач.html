@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ZERO DAY: порядок задач</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: swimlanes. Columns = team lanes, rows = sequential steps; one row runs in parallel. */
+:root {
+  --bg: #f3f5f7; --surface: #ffffff; --fg: #17202a; --muted: #5d6b78; --line: #d8dee4;
+  --eng: #2f6fd6; --web: #8a4fd0; --be: #c27a12; --cnt: #13897a; --crit: #d23a3a;
+  --eng-soft: #e6eefb; --web-soft: #f1e9fa; --be-soft: #faf0de; --cnt-soft: #def3ef; --crit-soft: #fbe5e5;
+  --f-body: "Onest", system-ui, sans-serif; --f-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #11161c; --surface: #19212a; --fg: #e4e9ee; --muted: #93a1ae; --line: #2a3541;
+  --eng: #6aa0f5; --web: #b78bf0; --be: #e6a54a; --cnt: #45c2b0; --crit: #f07070;
+  --eng-soft: #1b2a40; --web-soft: #2a2140; --be-soft: #33281a; --cnt-soft: #15302d; --crit-soft: #3a1d1f;
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #11161c; --surface: #19212a; --fg: #e4e9ee; --muted: #93a1ae; --line: #2a3541;
+  --eng: #6aa0f5; --web: #b78bf0; --be: #e6a54a; --cnt: #45c2b0; --crit: #f07070;
+  --eng-soft: #1b2a40; --web-soft: #2a2140; --be-soft: #33281a; --cnt-soft: #15302d; --crit-soft: #3a1d1f;
+  color-scheme: dark }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 14px; line-height: 1.45; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-block: 28px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 28px; }
+h1 { font-size: 26px; margin: 0; text-wrap: balance; }
+h2 { font-size: 19px; margin: 0; text-wrap: balance; }
+.lead { color: var(--muted); max-width: 70ch; margin: 6px 0 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; font-size: 13px; }
+.legend span { display: inline-flex; gap: 6px; align-items: center; }
+.dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.rules { display: grid; gap: 4px; margin: 0; padding-left: 18px; color: var(--muted); }
+.rules b { color: var(--fg); }
+.now { background: var(--crit-soft); border: 1px solid var(--crit); border-radius: 10px; padding: 12px 16px; }
+.now b { font-family: var(--f-mono); }
+.ms { display: grid; gap: 10px; }
+.ms-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; }
+.tag { font-family: var(--f-mono); font-size: 12px; font-weight: 700; padding: 2px 7px; border-radius: 5px; background: var(--fg); color: var(--bg); }
+.prio { font-size: 12px; color: var(--muted); }
+.grid { display: grid; grid-template-columns: 78px repeat(4, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface); }
+.grid > div { padding: 10px; border-top: 1px solid var(--line); border-left: 1px solid var(--line); min-width: 0; display: grid; gap: 6px; align-content: start; }
+.grid > .hd { border-top: 0; font-family: var(--f-mono); font-weight: 700; font-size: 12px; letter-spacing: .06em; padding-block: 8px; }
+.grid > .first { border-left: 0; }
+.hd.eng { color: var(--eng); } .hd.web { color: var(--web); } .hd.be { color: var(--be); } .hd.cnt { color: var(--cnt); }
+.step { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.step b { display: block; font-size: 18px; color: var(--fg); }
+.task { border-radius: 7px; padding: 7px 9px; display: grid; gap: 2px; }
+.task.eng { background: var(--eng-soft); } .task.web { background: var(--web-soft); } .task.be { background: var(--be-soft); } .task.cnt { background: var(--cnt-soft); }
+.task.crit { outline: 2px solid var(--crit); outline-offset: -2px; }
+.task.cont { opacity: .62; }
+.id { font-family: var(--f-mono); font-weight: 700; font-size: 12.5px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.task.eng .id { color: var(--eng); } .task.web .id { color: var(--web); } .task.be .id { color: var(--be); } .task.cnt .id { color: var(--cnt); }
+.badge { font-size: 10px; font-weight: 700; letter-spacing: .04em; padding: 1px 5px; border-radius: 4px; background: var(--crit); color: var(--surface); }
+.badge.c { background: var(--muted); }
+.name { font-size: 13px; }
+.after { font-size: 11.5px; color: var(--muted); font-family: var(--f-mono); }
+.note { font-size: 12.5px; color: var(--muted); font-style: italic; }
+.lane-lbl { display: none; }
+.gate { border: 1px dashed var(--muted); border-radius: 10px; padding: 10px 14px; font-size: 13px; }
+.gate b { font-family: var(--f-mono); }
+.cut { color: var(--crit); font-weight: 700; }
+@media (max-width: 760px) {
+  .grid { grid-template-columns: 1fr; }
+  .grid > .hd { display: none; }
+  .grid > div { border-left: 0; }
+  .grid > div.empty { display: none; }
+  .step { background: var(--bg); }
+  .step b { display: inline; margin-right: 6px; }
+  .lane-lbl { display: block; font-family: var(--f-mono); font-size: 11px; font-weight: 700; letter-spacing: .06em; }
+  .lane-lbl.eng { color: var(--eng); } .lane-lbl.web { color: var(--web); } .lane-lbl.be { color: var(--be); } .lane-lbl.cnt { color: var(--cnt); }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>ZERO DAY: порядок задач</h1>
+    <p class="lead">Читать сверху вниз. Шаги идут строго по очереди. Всё, что стоит в одной строке, делается параллельно. Колонка — дорожка команды. Основано на <code>docs/ZERO_DAY_Задачи.md</code>.</p>
+  </header>
+
+  <div class="legend">
+    <span><i class="dot" style="background:var(--eng)"></i>ENG — техлид / FE-1</span>
+    <span><i class="dot" style="background:var(--web)"></i>WEB — FE-2</span>
+    <span><i class="dot" style="background:var(--be)"></i>BE — backend / инфра</span>
+    <span><i class="dot" style="background:var(--cnt)"></i>CNT — геймдизайн, дизайн, QA</span>
+    <span><i class="dot" style="outline:2px solid var(--crit);outline-offset:-2px"></i>критический путь: задержка сдвигает сдачу</span>
+    <span><i class="dot" style="background:var(--muted);opacity:.6"></i>продолжение с прошлого шага</span>
+  </div>
+
+  <ul class="rules">
+    <li><b>Задача стартует, как только закрыто всё из «после».</b> Ждать конца шага не нужно.</li>
+    <li><b>Контрольная точка</b> закрывает этап. Если сроки горят, всё после M2 режется с конца: дуэль, потом Уровень 3, потом живая LLM.</li>
+  </ul>
+
+  <div class="now">Сейчас: <b>шаг 1 — T-A1</b>. Одновременно CNT может писать T-G8 и черновики текстов T-D1.</div>
+
+  <div id="plan" class="wrap" style="padding:0;gap:28px"></div>
+</div>
+
+<script>
+const N = {
+  A1:'Монорепо: pnpm + uv, структура папок, Makefile', A2:'Линтеры, strict-типы, pre-commit', A3:'JSON Schema контента + кодоген TS и Pydantic',
+  A4:'content-tools: валидатор, линтер ссылок, стоп-словарь', A5:'Каркас FastAPI: config, логи, /healthz, /sessions, rate limit', A6:'Каркас SPA: роутинг, тема, экран никнейма, загрузчик',
+  A7:'Docker Compose + профиль offline', A8:'CI: lint → types → контент → тесты → сборка → смоук', A9:'Дизайн-система shared/ui + Storybook',
+  A10:'VPS: Caddy, домен, HTTPS, /ws и /mcp', A11:'LICENSE, .env.example, gitleaks, README',
+  B1:'Типы состояния, RNG, apply-каркас', B2:'Тревога, шкалы, откат к чекпоинту', B3:'Команды scan/hypothesis/submit/cancel + события',
+  B4:'Язык условий и эффектов + тесты', B5:'Реестр головоломок + архетипы', B6:'Двойной замок, сегменты, ключи, pivoting',
+  B7:'Scope и развилка последствий', B8:'Диалоговый движок NPC (scripted)', B9:'Отчёт, ранги, профиль, Кодекс', B10:'Солвер контента (BFS)',
+  C1:'game-session: стор, dispatch, шина эффектов', C2:'Карта сети на React Flow', C3:'Жетоны улик, сборка ключей, замки', C4:'Терминал: парсер, автодополнение',
+  C5:'puzzle-host + view головоломок', C6:'HUD: шкалы, цели, Флиппер', C7:'Чат: мессенджер, DialogueProvider', C8:'Scope-диалог и карта последствий',
+  C9:'Отчёт + Кодекс + экспорт PNG', C10:'Сохранения: чекпоинты, миграции', C11:'Мобильная раскладка «Игра»', C12:'Аудио: музыка, звуки, громкость',
+  D1:'Каталог СЛ (13) + карточки Кодекса', D2:'Кейс L2C1 «Колледж»', D3:'Реплики Флиппера + карты последствий', D4:'Кейс L1C1 «Сосед»',
+  D4b:'Кейс L1C2 «Друг» + интерлюдия', D5:'Кейс L2C2 «Банк»', D6:'Кейсы L3C1, L3C2 + головоломки 10, 11', D7:'СЛ-10 и СЛ-11 без таймера',
+  D8:'Арт: спрайт Флиппера, иллюстрации брифов',
+  E1:'LlmClient + адаптер + FakeLlm', E2:'Конвейер POST /npc/turn', E3:'Бюджеты LLM, метрики, инциденты', E4:'LlmProvider на клиенте + fallback', E5:'Eval-набор NPC, golden-фикстуры',
+  F1:'Домен дуэли + 5 верификаторов', F2:'Матчмейкинг, комнаты, WS', F3:'Клиент дуэли', F4:'MCP-сервер + бот', F5:'Воркер ИИ-игрока',
+  G1:'Телеметрия', G2:'Prometheus + алерты', G3:'E2E Playwright', G4:'a11y, Lighthouse, size-limit', G5:'Нагрузочный тест k6',
+  G6:'Плейтесты + отчёт', G7:'Презентация', G8:'Ответ жюри про вымышленный техслой'
+};
+const CRIT = new Set(['A1','A3','B1','B3','B5','C5','D4','B10','D2','G3','G7']);
+// t(id, after, extra-name, continued)
+const t = (id, after, x, cont) => ({ id, after, x, cont });
+const c = (id, x) => t(id, '', x, true);
+
+const PLAN = [
+  { tag:'M0', title:'Каркас', prio:'P0', rows:[
+    { eng:['Ставит окружение, читает ТЗ'], web:['Ставит окружение, читает ТЗ'],
+      be:[t('A1','—')], cnt:[t('G8','—'), t('D1','—','черновик текстов, без схемы')] },
+    { eng:[t('A3','T-A1')], web:[t('A6','T-A1')], be:[t('A5','T-A1'), t('A2','T-A1'), t('A11','T-A1')],
+      cnt:[c('D1','черновик'), t('D3','—','черновик текстов'), t('D8','—','эскизы')] },
+    { eng:[t('A4','T-A3')], web:[t('A9','T-A6')], be:[t('A7','T-A5, T-A6')], cnt:[c('D1','перенос в JSON по схеме')] },
+    { eng:[t('B1','T-A3')], web:[c('A9'), 'Дальше ждёт T-B3'], be:[t('A8','T-A7'), t('A10','T-A7')], cnt:[c('D1')] },
+  ], gate:'<b>Готово M0:</b> docker compose up показывает экран никнейма; CI зелёный; сайт открывается по домену через HTTPS.' },
+
+  { tag:'M1', title:'Вертикальный срез на «Соседе»', prio:'P0', rows:[
+    { eng:[t('B3','T-B1')], web:['Ждёт T-B3'], be:[t('G1','T-A5'), t('E1','T-A5','задел')],
+      cnt:[t('D4','T-D1'), c('D3'), t('D8','T-A9','финальный арт')] },
+    { eng:[t('B2','T-B1'), t('B4','T-B1')], web:[t('C1','T-B3')], be:['Помогает ENG с T-B4', c('G1')], cnt:[c('D4'), c('D3'), c('D8')] },
+    { eng:[t('B5','T-B3, T-B4','сначала архетипы 01, 02')], web:[t('C2','T-C1'), t('C4','T-C1'), t('C6','T-C1')], be:[c('E1')], cnt:[c('D4')] },
+    { eng:[c('B5','архетипы 01, 02')], web:[t('C5','T-C1, T-B5','view 01, 02')], be:[], cnt:[c('D4')] },
+  ], gate:'<b>Готово M1:</b> «Сосед» проходится от брифа до закрытия: скан → гипотеза → «Колесо» → узел взят → тревога растёт → откат при 100.' },
+
+  { tag:'M2', title:'«Колледж» целиком — минимум для сдачи', prio:'P0', rows:[
+    { eng:[t('B5','','архетипы 04–08'), t('B6','T-B3'), t('B7','T-B3'), t('B8','T-B4'), t('B9','T-B3')],
+      web:[t('C10','T-C1'), c('C5','view 04–08 по мере готовности')], be:[t('G4','T-A8'), 'Помогает WEB с T-C10'], cnt:[t('D2','T-D1','каркас JSON')] },
+    { eng:[t('B10','T-B5, T-B6')], web:[t('C3','T-C2, T-B6'), t('C7','T-C1, T-B8'), t('C8','T-C1, T-B7'), t('C9','T-C1, T-B9')],
+      be:[t('E2','T-E1, T-B8','задел')], cnt:[c('D2')] },
+    { eng:['Помогает с T-D2'], web:[t('C11','T-C2 … T-C7')], be:[c('E2')], cnt:[c('D2','проверка солвером T-B10')] },
+  ], gate:'<b>Готово M2:</b> «Сосед» → «Колледж» проходится на десктопе и телефоне без ошибок; солвер доказывает ≥ 2 пути. <span class="cut">Если сроки горят — всё ниже режется с конца.</span>' },
+
+  { tag:'M3', title:'Кампания и полировка ядра', prio:'P1', rows:[
+    { eng:[t('D5','T-D1, T-B5','движковая часть: шкалы, охотник, 09, 12, 13')], web:[t('C12','T-C1'), 'view 03, 09, 12, 13'],
+      be:[t('G3','M2','смоук-e2e')], cnt:[t('D4b','T-D1, T-B10'), c('D5','контент «Банка»'), t('G6','M2','плейтест 1')] },
+  ] },
+
+  { tag:'M4 + M5', title:'Живые NPC и Уровень 3 — две независимые ветки', prio:'P2', rows:[
+    { eng:['Ждёт T-D7'], web:['Ждёт T-E2'], be:[c('E2','довести до конца')], cnt:[t('D7','T-D1')] },
+    { eng:[t('D6','T-D5, T-D7','движковая часть')], web:[t('E4','T-E2, T-C7')], be:[t('E3','T-E2'), t('E5','T-E2'), t('G2','T-A5')], cnt:[c('D6','контент')] },
+  ] },
+
+  { tag:'M6', title:'Дуэль и MCP — последней', prio:'P3', rows:[
+    { eng:['Все вместе: закрыть вопрос Q-5a ТЗ (реалтайм или одновременные ходы)'], web:[], be:[], cnt:[] },
+    { eng:[], web:[], be:[t('F1','T-A5, Q-5a')], cnt:[] },
+    { eng:[], web:[], be:[t('F2','T-F1')], cnt:[] },
+    { eng:[], web:[t('F3','T-F2')], be:[t('F4','T-F2')], cnt:[] },
+    { eng:[], web:[], be:[t('F5','T-F4, T-E1'), t('G5','T-F2, T-E2')], cnt:[] },
+  ] },
+
+  { tag:'M7', title:'Презентация', prio:'P0', rows:[
+    { eng:[], web:[], be:[c('G3','полный набор')], cnt:[t('G6','M2, M3','плейтест 2')] },
+    { eng:[], web:[], be:[], cnt:[t('G7','T-G3, T-G6')] },
+  ] },
+];
+
+const LANES = [['eng','ENG'],['web','WEB'],['be','BE'],['cnt','CNT']];
+const esc = s => String(s).replace(/[&<>]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[ch]));
+function card(it, lane) {
+  if (typeof it === 'string') return `<div class="note">${esc(it)}</div>`;
+  const crit = CRIT.has(it.id) && !it.cont;
+  return `<div class="task ${lane}${crit ? ' crit' : ''}${it.cont ? ' cont' : ''}">
+    <div class="id">T-${it.id}${crit ? '<span class="badge">КРИТ</span>' : ''}${it.cont ? '<span class="badge c">ПРОДОЛЖ.</span>' : ''}</div>
+    <div class="name">${esc(N[it.id])}${it.x ? ` — <i>${esc(it.x)}</i>` : ''}</div>
+    ${it.after ? `<div class="after">после: ${esc(it.after)}</div>` : ''}
+  </div>`;
+}
+let n = 0, html = '';
+for (const ms of PLAN) {
+  let g = `<div class="hd first"></div>` + LANES.map(([k, l]) => `<div class="hd ${k}">${l}</div>`).join('');
+  for (const r of ms.rows) {
+    n++;
+    g += `<div class="step first"><b>${n}</b>шаг</div>`;
+    for (const [k, l] of LANES) {
+      const items = r[k] || [];
+      g += `<div class="${items.length ? '' : 'empty'}">${items.length ? `<span class="lane-lbl ${k}">${l}</span>` : ''}${items.map(i => card(i, k)).join('')}</div>`;
+    }
+  }
+  html += `<section class="ms">
+    <div class="ms-head"><span class="tag">${ms.tag}</span><h2>${esc(ms.title)}</h2><span class="prio">${ms.prio}</span></div>
+    <div class="grid">${g}</div>
+    ${ms.gate ? `<div class="gate">${ms.gate}</div>` : ''}
+  </section>`;
+}
+document.getElementById('plan').innerHTML = html;
+</script>
+</body>
+</html>
