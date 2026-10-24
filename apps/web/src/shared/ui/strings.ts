@@ -219,7 +219,6 @@ export const ru = {
     bruteTries: (count: number) => `Проверок: ${String(count)}.`,
     bruteOpen: 'Код подобран. Замок открыт.',
     bruteCheck: 'Проверить',
-    bruteKeys: '↑ / W — больше · ↓ / S — меньше · ← / A и → / D — выбор барабана · Enter — проверить',
     virusRules: 'Ты вирус-змейка. Собери 3 яблока и доберись до выхода. Не попадись антивирусу: он бродит по лабиринту. Пробел или Enter — старт, стрелки или WASD — движение.',
     virusField: 'Лабиринт заражения',
     virusMove: { ArrowUp: 'Вверх', ArrowLeft: 'Влево', ArrowDown: 'Вниз', ArrowRight: 'Вправо' },
