@@ -7,6 +7,7 @@ import { readNickname, saveNickname } from '../shared/profile/storage';
 import { validateNickname, type NicknameError } from '../shared/profile/nickname';
 import { createAnonymousSession, type SessionState } from '../shared/session/createSession';
 import { ru } from '../shared/ui/strings';
+import { TelemetryClient } from '../telemetry';
 
 type ContentState = { status: 'loading' } | { status: 'ready'; summary: ContentSummary } | { status: 'offline' };
 
@@ -17,24 +18,47 @@ type BootstrapState = {
 
 const initialBootstrapState: BootstrapState = {
   content: { status: 'loading' },
-  session: 'offline',
+  session: { id: '', status: 'offline' },
 };
 
 export function App(): ReactNode {
   const [bootstrap, setBootstrap] = useState<BootstrapState>(initialBootstrapState);
+  const [telemetry, setTelemetry] = useState<TelemetryClient | null>(null);
 
   useEffect(() => {
+    let disposed = false;
+    let stopTelemetry: (() => void) | undefined;
+
     void Promise.allSettled([loadContentSummary(), createAnonymousSession()]).then(([content, session]) => {
+      if (disposed) return;
+      const sessionState = session.status === 'fulfilled' ? session.value : { id: crypto.randomUUID(), status: 'offline' as const };
+      const client = new TelemetryClient({
+        clientVersion: 'dev',
+        sessionId: sessionState.id,
+        getContext: () => ({}),
+      });
+      stopTelemetry = client.start();
+      if (sessionState.status === 'offline') client.track('offline_mode', { reason: 'backend_unavailable' });
+      void client.flush();
       setBootstrap({
         content: content.status === 'fulfilled' ? { status: 'ready', summary: content.value } : { status: 'offline' },
-        session: session.status === 'fulfilled' ? session.value : 'offline',
+        session: sessionState,
       });
+      setTelemetry(client);
     });
+
+    return () => {
+      disposed = true;
+      stopTelemetry?.();
+    };
   }, []);
 
   return (
     <BrowserRouter>
-      <ErrorBoundary fallback={renderRootError}>
+      <ErrorBoundary
+        fallback={renderRootError}
+        {...(telemetry ? { onError: (error: Error): void => telemetry.captureError(error) } : {})}
+      >
         <ApplicationRoutes bootstrap={bootstrap} />
       </ErrorBoundary>
     </BrowserRouter>
@@ -298,6 +322,7 @@ function ContentStatusPanel({
     : ru.contentOfflineDetail;
 
   return (
+<<<<<<< HEAD
     <Panel aria-live="polite" className="status-panel">
       <div className="status-line">
         <span className={`status-dot ${ready ? 'status-dot--ready' : ''}`} />
@@ -322,6 +347,17 @@ function ContentStatusPanel({
         <div className="metric">
           <span>{ru.metricsApi}</span>
           <strong>{session === 'ready' ? ru.apiOnline : ru.apiOffline}</strong>
+=======
+    <aside className="panel status-panel" aria-live="polite">
+      <div className="panel-body">
+        <div className="status-line"><span className={`status-dot ${ready ? 'status-dot--ready' : ''}`} />{statusText}</div>
+        <p className="fine-print">{detail}</p>
+        <div className="metrics">
+          <div className="metric"><span>{ru.metricsStack}</span><strong>{ru.stackValue}</strong></div>
+          <div className="metric"><span>{ru.metricsSession}</span><strong>{hasSave ? ru.sessionExisting : ru.sessionNew}</strong></div>
+          <div className="metric"><span>{ru.metricsApi}</span><strong>{session.status === 'ready' ? ru.apiOnline : ru.apiOffline}</strong></div>
+          <div className="metric"><span>{ru.metricsContent}</span><strong>{ready ? ru.contentReadyMetric : ru.contentLocalMetric}</strong></div>
+>>>>>>> 84bd3b718dd548edc9348f57816780e69f50a093
         </div>
       </div>
     </Panel>

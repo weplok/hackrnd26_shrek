@@ -3,6 +3,7 @@ import { Component, type ErrorInfo, type ReactNode } from 'react';
 type Props = {
   children: ReactNode;
   fallback: (error: Error, retry: () => void) => ReactNode;
+  onError?: (error: Error) => void;
   resetKey?: string;
 };
 
@@ -17,6 +18,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public override componentDidCatch(error: Error, info: ErrorInfo): void {
     console.error(error, info);
+    this.props.onError?.(error);
   }
 
   public override componentDidUpdate(previousProps: Props): void {

@@ -50,25 +50,35 @@ export class TelemetryClient {
     this.endpoint = options.endpoint ?? "/telemetry";
   }
 
-  start(): void {
-    window.addEventListener("error", (event) => this.captureError(event.error ?? event.message));
-    window.addEventListener("unhandledrejection", (event) => this.captureError(event.reason));
-    window.addEventListener("pagehide", () => {
+  start(): () => void {
+    const onError = (event: ErrorEvent): void => this.captureError(event.error ?? event.message);
+    const onUnhandledRejection = (event: PromiseRejectionEvent): void => this.captureError(event.reason);
+    const onPageHide = (): void => {
       void this.flush(true);
-    });
+    };
+    window.addEventListener('error', onError);
+    window.addEventListener('unhandledrejection', onUnhandledRejection);
+    window.addEventListener('pagehide', onPageHide);
+
+    return () => {
+      window.removeEventListener('error', onError);
+      window.removeEventListener('unhandledrejection', onUnhandledRejection);
+      window.removeEventListener('pagehide', onPageHide);
+    };
   }
 
   track(eventType: TelemetryEventName, payload: TelemetryPayload = {}): void {
     const context = this.options.getContext();
-    this.events.push({
+    const event: TelemetryEvent = {
       event_id: crypto.randomUUID(),
       event_type: eventType,
       occurred_at: new Date().toISOString(),
       session_id: this.options.sessionId,
       client_version: this.options.clientVersion,
-      case_id: context.caseId,
       payload,
-    });
+    };
+    if (context.caseId) event.case_id = context.caseId;
+    this.events.push(event);
   }
 
   async flush(useBeacon = false): Promise<void> {
@@ -93,7 +103,7 @@ export class TelemetryClient {
     }
   }
 
-  private captureError(error: unknown): void {
+  public captureError(error: unknown): void {
     const context = this.options.getContext();
     const stack = error instanceof Error ? error.stack ?? error.message : String(error);
     this.track("client_error", {
