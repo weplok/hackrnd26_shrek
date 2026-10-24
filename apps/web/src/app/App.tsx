@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import { Button, Meter, Panel } from '@zero-day/ui';
+import { Button, Panel } from '@zero-day/ui';
 import { ErrorBoundary } from './ErrorBoundary';
 import { loadContentSummary, type ContentSummary } from '../shared/content/loadContent';
 import { readNickname, saveNickname } from '../shared/profile/storage';
@@ -57,7 +57,13 @@ export function App(): ReactNode {
     <BrowserRouter>
       <ErrorBoundary
         fallback={renderRootError}
-        {...(telemetry ? { onError: (error: Error): void => telemetry.captureError(error) } : {})}
+        {...(telemetry
+          ? {
+              onError: (error: Error): void => {
+                telemetry.captureError(error);
+              },
+            }
+          : {})}
       >
         <ApplicationRoutes bootstrap={bootstrap} />
       </ErrorBoundary>
@@ -322,19 +328,12 @@ function ContentStatusPanel({
     : ru.contentOfflineDetail;
 
   return (
-<<<<<<< HEAD
     <Panel aria-live="polite" className="status-panel">
       <div className="status-line">
         <span className={`status-dot ${ready ? 'status-dot--ready' : ''}`} />
         {statusText}
       </div>
       <p className="fine-print">{detail}</p>
-      <Meter
-        label={ru.metricsContent}
-        status={ready ? 'secure' : 'warning'}
-        value={ready ? 100 : 35}
-        valueText={ready ? ru.contentReadyMetric : ru.contentLocalMetric}
-      />
       <div className="metrics">
         <div className="metric">
           <span>{ru.metricsStack}</span>
@@ -346,18 +345,11 @@ function ContentStatusPanel({
         </div>
         <div className="metric">
           <span>{ru.metricsApi}</span>
-          <strong>{session === 'ready' ? ru.apiOnline : ru.apiOffline}</strong>
-=======
-    <aside className="panel status-panel" aria-live="polite">
-      <div className="panel-body">
-        <div className="status-line"><span className={`status-dot ${ready ? 'status-dot--ready' : ''}`} />{statusText}</div>
-        <p className="fine-print">{detail}</p>
-        <div className="metrics">
-          <div className="metric"><span>{ru.metricsStack}</span><strong>{ru.stackValue}</strong></div>
-          <div className="metric"><span>{ru.metricsSession}</span><strong>{hasSave ? ru.sessionExisting : ru.sessionNew}</strong></div>
-          <div className="metric"><span>{ru.metricsApi}</span><strong>{session.status === 'ready' ? ru.apiOnline : ru.apiOffline}</strong></div>
-          <div className="metric"><span>{ru.metricsContent}</span><strong>{ready ? ru.contentReadyMetric : ru.contentLocalMetric}</strong></div>
->>>>>>> 84bd3b718dd548edc9348f57816780e69f50a093
+          <strong>{session.status === 'ready' ? ru.apiOnline : ru.apiOffline}</strong>
+        </div>
+        <div className="metric">
+          <span>{ru.metricsContent}</span>
+          <strong>{ready ? ru.contentReadyMetric : ru.contentLocalMetric}</strong>
         </div>
       </div>
     </Panel>

@@ -55,6 +55,7 @@
 ### EPIC C — Клиент игры (M1–M2)
 
 - [ ] **T-C1** · game-session: стор Zustand, dispatch, шина эффектов · WEB · M · P0 · *после:* T-B3 · в работе: Android
+  - Прогресс: добавлены Zustand-стор, dispatch через engine.apply и шина событий mitt; исправлены конфликт-маркеры SPA. Тесты и production-сборка пройдены; осталось ревью вторым человеком и стейджинг по DoD.
 - [ ] **T-C2** · network-map на React Flow: узлы, состояния, сегменты · WEB · L · P0 · *после:* T-C1
   - в работе: weplok
   - Прогресс: назначено weplok; осталось реализовать network-map.
