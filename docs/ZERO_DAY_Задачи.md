@@ -53,7 +53,7 @@
 
 ### EPIC C — Клиент игры (M1–M2)
 
-- [x] **T-C1** · game-session: стор Zustand, dispatch, шина эффектов · WEB · M · P0 · *после:* T-B3
+- [ ] **T-C1** · game-session: стор Zustand, dispatch, шина эффектов · WEB · M · P0 · *после:* T-B3 · в работе: Android
 - [ ] **T-C2** · network-map на React Flow: узлы, состояния, сегменты · WEB · L · P0 · *после:* T-C1
 - [ ] **T-C3** · Жетоны улик, сборка ключей (drag + тач/клавиатура), замки · WEB · M · P0 · *после:* T-C2, T-B6
 - [ ] **T-C4** · terminal: парсер синтаксиса, автодополнение, контекстное меню узла · WEB · M · P0 · *после:* T-C1
