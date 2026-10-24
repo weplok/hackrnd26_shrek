@@ -254,14 +254,15 @@
   width: 100%;
   height: 100%;
 }
-.ddos-storm__link { stroke: var(--color-line); stroke-width: 0.4; stroke-dasharray: 1.5 1.5; }
-.ddos-storm__wave {
-  fill: rgb(255 77 94 / 12%);
+.ddos-storm__ball {
+  fill: rgb(255 77 94 / 22%);
   stroke: #ff4d5e;
   stroke-width: 0.8;
+  cursor: pointer;
+  touch-action: manipulation;
 }
-.ddos-storm__wave--echo { fill: none; stroke-width: 0.4; opacity: 0.6; }
-.ddos-storm__wave--hit { stroke: #ffd400; fill: rgb(255 212 0 / 14%); }
+.ddos-storm__stage:not(.ddos-storm__stage--run) .ddos-storm__ball { cursor: default; }
+.ddos-storm__ball--hit { stroke: #ffd400; fill: rgb(255 212 0 / 22%); }
 .ddos-storm__core {
   fill: #08140f;
   stroke: var(--color-green-bright);
@@ -275,18 +276,25 @@
 @keyframes ddos-down {
   50% { opacity: 0.3; }
 }
-.ddos-storm__server {
+.ddos-storm__down {
   position: absolute;
-  width: 2.75rem;
-  height: 2.75rem;
-  transform: translate(-50%, -50%);
-  border: 1px solid #ff4d5e;
-  color: var(--color-text);
-  background: #1a0508;
-  font: 700 0.9rem var(--font-mono);
-  touch-action: manipulation;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.75rem;
+  color: #ff4d5e;
+  font: 700 0.95rem var(--font-mono);
+  text-align: center;
+  background: rgb(0 0 0 / 75%);
 }
-.ddos-storm__server:active:not(:disabled) { transform: translate(-50%, -50%) scale(0.92); }
+.ddos-storm__down-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ff8a95, #ff4d5e 45%, #4a0a12);
+  box-shadow: 0 0 1.5rem #ff4d5e;
+}
 .inject-paint__stage {
   position: relative;
   height: 12.5rem;
@@ -306,6 +314,21 @@
   transition: transform 0.6s cubic-bezier(0.6, 0, 0.3, 1), opacity 0.6s;
 }
 .inject-paint__card--sheet { background: #f2f2ee; }
+.inject-paint__stage--ready .inject-paint__card--target { filter: brightness(0.06); }
+.inject-paint__overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+.inject-paint__count {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.75rem;
+  color: var(--color-green-bright);
+  font: 700 2rem var(--font-mono);
+}
+.inject-paint__stage--ready .inject-paint__card--sheet,
 .inject-paint__stage--show .inject-paint__card--sheet { transform: translate(-200%, -50%); opacity: 0; }
 .inject-paint__stage--draw .inject-paint__card--target { transform: translate(100%, -50%); opacity: 0; }
 .inject-paint__stage--check .inject-paint__card--sheet,
