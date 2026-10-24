@@ -219,7 +219,8 @@
         { "$ref": "#/definitions/EffectAddTrack" },
         { "$ref": "#/definitions/EffectUnlockCodex" },
         { "$ref": "#/definitions/EffectFlipperSay" },
-        { "$ref": "#/definitions/EffectCompleteObjective" }
+        { "$ref": "#/definitions/EffectCompleteObjective" },
+        { "$ref": "#/definitions/EffectCompromiseNode" }
       ]
     },
     "Effects": { "type": "array", "items": { "$ref": "#/definitions/Effect" } },
@@ -279,6 +280,13 @@
       "type": "object",
       "properties": { "completeObjective": { "$ref": "#/definitions/Id" } },
       "required": ["completeObjective"],
+      "additionalProperties": false
+    },
+    "EffectCompromiseNode": {
+      "description": "Take a node as if the player broke it, running its onCompromise; for alternative paths to the same result.",
+      "type": "object",
+      "properties": { "compromiseNode": { "$ref": "#/definitions/Id" } },
+      "required": ["compromiseNode"],
       "additionalProperties": false
     },
     "Difficulty": {
