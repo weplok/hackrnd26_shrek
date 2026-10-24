@@ -26,7 +26,7 @@
 
 ### EPIC A — Каркас и платформа (M0)
 
-- [ ] **T-A1** · Монорепо: pnpm workspaces + uv, структура папок, Makefile · INF · M · P0 · *после:* —
+- [ ] **T-A1** · Монорепо: pnpm workspaces + uv, структура папок, Makefile · INF · M · P0 · *после:* — · в работе: misterEugene
 - [ ] **T-A2** · Линтеры/форматтеры/strict-типы, pre-commit · INF · S · P0 · *после:* T-A1
 - [ ] **T-A3** · JSON Schema контента (v1) + кодоген TS и Pydantic · CNT · L · P0 · *после:* T-A1
 - [ ] **T-A4** · content-tools: валидатор схем + линтер ссылок + стоп-словарь · CNT · M · P0 · *после:* T-A3

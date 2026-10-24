@@ -38,6 +38,7 @@ Boundaries: Write code, comments, commits, and docs in normal style.
 - Unfinished task: keep `- [ ]` and add sub-line `  - Прогресс: сделано …; осталось …`.
 - Finished task: switch to `- [x]` and remove progress sub-line. Done means Definition of Done from TZ section 13.4.
 - Work outside any task: tell developer and propose a new task line. Do not add it silently.
+- Task status page: `docs/ZERO_DAY_План_задач.html`. Mirror every tracker status change there too. Taking a task: add `ID: '<owner>'` to `WIP`. Finished task: remove it from `WIP`, add ID to `DONE`. Never update only one of the two files.
 - Commit tracker changes together with related code.
 
 # Authorship and style

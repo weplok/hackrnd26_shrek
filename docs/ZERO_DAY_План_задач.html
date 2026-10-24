@@ -54,6 +54,10 @@ h2 { font-size: 19px; margin: 0; text-wrap: balance; }
 .task.eng .id { color: var(--eng); } .task.web .id { color: var(--web); } .task.be .id { color: var(--be); } .task.cnt .id { color: var(--cnt); }
 .badge { font-size: 10px; font-weight: 700; letter-spacing: .04em; padding: 1px 5px; border-radius: 4px; background: var(--crit); color: var(--surface); }
 .badge.c { background: var(--muted); }
+.badge.ok { background: var(--cnt); }
+.badge.w { background: var(--be); }
+.task.done { opacity: .5; }
+.task.done .name { text-decoration: line-through; }
 .name { font-size: 13px; }
 .after { font-size: 11.5px; color: var(--muted); font-family: var(--f-mono); }
 .note { font-size: 12.5px; color: var(--muted); font-style: italic; }
@@ -95,7 +99,7 @@ h2 { font-size: 19px; margin: 0; text-wrap: balance; }
     <li><b>Контрольная точка</b> закрывает этап. Если сроки горят, всё после M2 режется с конца: дуэль, потом Уровень 3, потом живая LLM.</li>
   </ul>
 
-  <div class="now">Сейчас: <b>шаг 1 — T-A1</b>. Одновременно CNT может писать T-G8 и черновики текстов T-D1.</div>
+  <div class="now" id="now"></div>
 
   <div id="plan" class="wrap" style="padding:0;gap:28px"></div>
 </div>
@@ -121,6 +125,9 @@ const N = {
   G6:'Плейтесты + отчёт', G7:'Презентация', G8:'Ответ жюри про вымышленный техслой'
 };
 const CRIT = new Set(['A1','A3','B1','B3','B5','C5','D4','B10','D2','G3','G7']);
+// Task status: keep in sync with docs/ZERO_DAY_Задачи.md.
+const DONE = new Set([]);
+const WIP = { A1: 'misterEugene' };
 // t(id, after, extra-name, continued)
 const t = (id, after, x, cont) => ({ id, after, x, cont });
 const c = (id, x) => t(id, '', x, true);
@@ -180,8 +187,9 @@ const esc = s => String(s).replace(/[&<>]/g, ch => ({'&':'&amp;','<':'&lt;','>':
 function card(it, lane) {
   if (typeof it === 'string') return `<div class="note">${esc(it)}</div>`;
   const crit = CRIT.has(it.id) && !it.cont;
-  return `<div class="task ${lane}${crit ? ' crit' : ''}${it.cont ? ' cont' : ''}">
-    <div class="id">T-${it.id}${crit ? '<span class="badge">КРИТ</span>' : ''}${it.cont ? '<span class="badge c">ПРОДОЛЖ.</span>' : ''}</div>
+  const done = DONE.has(it.id), wip = !done && WIP[it.id];
+  return `<div class="task ${lane}${crit ? ' crit' : ''}${it.cont ? ' cont' : ''}${done ? ' done' : ''}">
+    <div class="id">T-${it.id}${crit ? '<span class="badge">КРИТ</span>' : ''}${it.cont ? '<span class="badge c">ПРОДОЛЖ.</span>' : ''}${done ? '<span class="badge ok">ГОТОВО</span>' : ''}${wip ? `<span class="badge w">В РАБОТЕ: ${esc(wip)}</span>` : ''}</div>
     <div class="name">${esc(N[it.id])}${it.x ? ` — <i>${esc(it.x)}</i>` : ''}</div>
     ${it.after ? `<div class="after">после: ${esc(it.after)}</div>` : ''}
   </div>`;
@@ -204,6 +212,8 @@ for (const ms of PLAN) {
   </section>`;
 }
 document.getElementById('plan').innerHTML = html;
+const wipList = Object.entries(WIP).filter(([id]) => !DONE.has(id)).map(([id, who]) => `<b>T-${id}</b> (${esc(who)})`);
+document.getElementById('now').innerHTML = `В работе: ${wipList.join(', ') || 'ничего'}. Готово задач: <b>${DONE.size} из ${Object.keys(N).length}</b>.`;
 </script>
 </body>
 </html>
