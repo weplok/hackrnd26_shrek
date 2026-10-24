@@ -5,7 +5,7 @@ import { seeded, type GameProps } from './game';
 import type { PuzzleInstance } from '@zero-day/engine';
 
 type Phase = 'show' | 'draw' | 'check' | 'fail' | 'pass';
-type Ink = 0 | 1 | 2;
+type Ink = 0 | 1;
 
 const text = ru.puzzle;
 const SIZE = 5;
@@ -20,12 +20,12 @@ function picture(puzzle: PuzzleInstance): Ink[] {
     for (let y = 0; y < SIZE; y++) {
       for (let x = 0; x <= SIZE >> 1; x++) {
         const r = rand();
-        const ink: Ink = r < 0.28 ? 1 : r < 0.46 ? 2 : 0;
+        const ink: Ink = r < 0.42 ? 1 : 0;
         cells[y * SIZE + x] = ink;
         cells[y * SIZE + (SIZE - 1 - x)] = ink;
       }
     }
-    if (cells.includes(1) && cells.includes(2) && cells.filter(Boolean).length >= 6) return cells;
+    if (cells.filter(Boolean).length >= 6) return cells;
   }
 }
 
@@ -52,7 +52,6 @@ function Grid({ cells, onPaint }: { cells: Ink[]; onPaint?: ((index: number) => 
 export function InjectionPaint({ puzzle, onCancel, onSubmit }: GameProps): ReactNode {
   const [target] = useState(() => picture(puzzle));
   const [sheet, setSheet] = useState<Ink[]>(blank);
-  const [brush, setBrush] = useState<1 | 2>(1);
   const [phase, setPhase] = useState<Phase>('show');
 
   useEffect(() => {
@@ -70,7 +69,7 @@ export function InjectionPaint({ puzzle, onCancel, onSubmit }: GameProps): React
   }, [phase, sheet, target, onSubmit, puzzle.correct]);
 
   function paint(index: number): void {
-    setSheet((cells) => cells.map((ink, i) => (i === index ? (ink === brush ? 0 : brush) : ink)));
+    setSheet((cells) => cells.map((ink, i) => (i === index ? (ink ? 0 : 1) : ink)));
   }
 
   return (
@@ -83,19 +82,6 @@ export function InjectionPaint({ puzzle, onCancel, onSubmit }: GameProps): React
         <div className="inject-paint__card inject-paint__card--sheet">
           <Grid cells={sheet} onPaint={phase === 'draw' ? paint : undefined} />
         </div>
-      </div>
-      <div className="inject-paint__brushes" aria-label={text.injectBrush}>
-        {([1, 2] as const).map((ink) => (
-          <button
-            aria-pressed={brush === ink}
-            className={`inject-paint__brush inject-paint__cell--${String(ink)}${brush === ink ? ' inject-paint__brush--on' : ''}`}
-            key={ink}
-            onClick={() => setBrush(ink)}
-            type="button"
-          >
-            {text.injectInk[ink]}
-          </button>
-        ))}
       </div>
       <p className="puzzle-host__attempts">{text.injectPhase[phase]}</p>
       <div className="puzzle-actions">

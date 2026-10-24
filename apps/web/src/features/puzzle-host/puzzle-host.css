@@ -328,17 +328,3 @@
   background: transparent;
 }
 .inject-paint__cell--1 { background: var(--color-green-bright); }
-.inject-paint__cell--2 { background: var(--color-magenta); }
-.inject-paint__brushes {
-  display: flex;
-  justify-content: center;
-  gap: var(--space-2);
-}
-.inject-paint__brush {
-  min-width: 6rem;
-  min-height: 2.25rem;
-  border: 2px solid transparent;
-  color: #000;
-  font: 700 0.75rem var(--font-mono);
-}
-.inject-paint__brush--on { border-color: var(--color-text); }

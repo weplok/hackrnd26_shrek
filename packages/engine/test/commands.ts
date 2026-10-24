@@ -50,11 +50,8 @@ void test('scan reveals neighbours and clues; repeat scan only adds noise', () =
   assert.equal(again.state.nodes.wifi?.alertLevel, 'detected');
 });
 
-void test('hypothesis needs a scanned node and a single active puzzle', () => {
-  let s = start();
-  const unscanned = E.apply(content, s, { type: 'ProposeHypothesis', node: 'wifi', vuln: 'SL-02' });
-  assert.deepEqual(unscanned.events, [{ type: 'CommandRejected', reason: 'not-scanned' }]);
-  s = scanNode(s, 'wifi');
+void test('hypothesis works without a scan and allows a single active puzzle', () => {
+  const s = start();
   const r = E.apply(content, s, { type: 'ProposeHypothesis', node: 'wifi', vuln: 'SL-02' });
   assert.deepEqual(r.events, [{ type: 'PuzzleOpened', node: 'wifi', vuln: 'SL-02' }]);
   assert.equal(

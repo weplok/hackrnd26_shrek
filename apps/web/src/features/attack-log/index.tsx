@@ -1,0 +1,136 @@
+import { useEffect, type ReactNode } from 'react';
+import { create } from 'zustand';
+import { Panel, Toast } from '@zero-day/ui';
+import type { Case, Content, GameState } from '@zero-day/engine';
+import { ru } from '../../shared/ui/strings';
+import './attack-log.css';
+
+// Each attack method covers a group of weakness archetypes.
+export const ATTACKS = [
+  { id: 'brute', archetypes: ['brute', 'crypto'] },
+  { id: 'virus', archetypes: ['rootkit', 'evasion'] },
+  { id: 'ddos', archetypes: ['scan', 'wipe'] },
+  { id: 'social', archetypes: ['phish'] },
+  { id: 'injection', archetypes: ['exploit'] },
+] as const;
+
+export type AttackId = (typeof ATTACKS)[number]['id'];
+type Outcome = 'ok' | 'fail';
+type Results = Record<string, Partial<Record<AttackId, Outcome>>>;
+type Notice = { id: number; ok: boolean; node: string; attack: AttackId };
+
+const t = ru.attackLog;
+// Lives outside GameState so checkpoint rollbacks and case switches keep it.
+const storageKey = 'zero-day.attack-log';
+
+function load(): Results {
+  try {
+    return JSON.parse(window.localStorage.getItem(storageKey) ?? '{}') as Results;
+  } catch {
+    return {};
+  }
+}
+
+type AttackLogStore = {
+  results: Results;
+  notice: Notice | null;
+  dismiss: () => void;
+};
+
+export const useAttackLog = create<AttackLogStore>((set) => ({
+  results: load(),
+  notice: null,
+  dismiss: () => {
+    set({ notice: null });
+  },
+}));
+
+const rowKey = (caseId: string, node: string): string => `${caseId}:${node}`;
+
+/** Records the outcome once an attack puzzle closes (solved or out of attempts). */
+export function recordAttack(content: Content, before: GameState, after: GameState): void {
+  const puzzle = before.activePuzzle;
+  if (!puzzle || puzzle.action === 'scan' || after.activePuzzle) return;
+  const archetype = content.vulnerabilities[puzzle.vuln]?.archetype;
+  const attack = ATTACKS.find((item) => (item.archetypes as readonly string[]).includes(archetype ?? ''))?.id;
+  if (!attack) return;
+  const ok = after.technicalSuccesses > before.technicalSuccesses;
+  const key = rowKey(before.caseId, puzzle.nodeId);
+  const { results } = useAttackLog.getState();
+  const row = results[key] ?? {};
+  const next = { ...results, [key]: { ...row, [attack]: ok || row[attack] === 'ok' ? 'ok' : 'fail' } } as Results;
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(next));
+  } catch {
+    // storage blocked: keep the table in memory only
+  }
+  const label = content.cases[before.caseId]?.nodes.find((node) => node.id === puzzle.nodeId)?.label ?? puzzle.nodeId;
+  useAttackLog.setState({ results: next, notice: { id: Date.now(), ok, node: label, attack } });
+}
+
+export function AttackNotice(): ReactNode {
+  const notice = useAttackLog((state) => state.notice);
+  const dismiss = useAttackLog((state) => state.dismiss);
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(dismiss, 3500);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [notice, dismiss]);
+  if (!notice) return null;
+  return (
+    <div className="attack-notice">
+      <Toast key={notice.id} title={notice.ok ? t.ok : t.fail} variant={notice.ok ? 'success' : 'danger'}>
+        {t.notice(ru.nodeMenu.attacks[notice.attack], notice.node)}
+      </Toast>
+    </div>
+  );
+}
+
+export function AttackTable({ caseData, caseRun }: { caseData: Case; caseRun: GameState }): ReactNode {
+  const results = useAttackLog((state) => state.results);
+  const rows = caseData.nodes.filter(
+    (node) =>
+      node.kind !== 'person' &&
+      !node.lock &&
+      (caseRun.nodes[node.id]?.revealed || results[rowKey(caseRun.caseId, node.id)]),
+  );
+
+  return (
+    <Panel className="attack-table" title={t.title}>
+      <div className="attack-table__scroll">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">{t.node}</th>
+              {ATTACKS.map((attack) => (
+                <th key={attack.id} scope="col">
+                  {ru.nodeMenu.attacks[attack.id]}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((node) => {
+              const row = results[rowKey(caseRun.caseId, node.id)] ?? {};
+              return (
+                <tr key={node.id}>
+                  <th scope="row">{node.label}</th>
+                  {ATTACKS.map((attack) => {
+                    const outcome = row[attack.id];
+                    return (
+                      <td key={attack.id} className={outcome ? `attack-table__cell--${outcome}` : undefined}>
+                        {outcome === 'ok' ? '✓' : outcome === 'fail' ? '✗' : ''}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Panel>
+  );
+}

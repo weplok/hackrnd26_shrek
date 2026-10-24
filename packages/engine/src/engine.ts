@@ -292,10 +292,6 @@ export function hypothesize(content: Content, state: GameState, nodeId: string, 
     return s;
   }
   if (n.kind === 'person' || n.lock) return s;
-  if (!nodeRt(s, nodeId).scanned) {
-    s.log.push({ t: 'Сначала осмотри узел (скан).', kind: 'bad' });
-    return s;
-  }
   const arch = content.puzzles[vuln]?.archetype ?? 'default';
   const title = content.puzzles[vuln]?.title ?? vuln;
   const ex = n.exploits.find((e) => e.vuln === vuln);

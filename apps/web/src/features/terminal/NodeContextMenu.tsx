@@ -1,17 +1,9 @@
 import type { ReactNode } from 'react';
 import type { Vulnerability } from '@zero-day/engine';
+import { ATTACKS } from '../attack-log';
 import { ru } from '../../shared/ui/strings';
 
 const t = ru.nodeMenu;
-
-// Each attack method covers a group of weakness archetypes.
-const ATTACKS = [
-  { id: 'brute', archetypes: ['brute', 'crypto'] },
-  { id: 'virus', archetypes: ['rootkit', 'evasion'] },
-  { id: 'ddos', archetypes: ['scan', 'wipe'] },
-  { id: 'social', archetypes: ['phish'] },
-  { id: 'injection', archetypes: ['exploit'] },
-] as const;
 
 export interface NodeContextMenuProps {
   node: string;

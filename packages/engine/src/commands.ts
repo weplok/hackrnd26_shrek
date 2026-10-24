@@ -102,7 +102,6 @@ export function validate(content: Content, s: GameState, cmd: Command): RejectRe
       if (cmd.type === 'ScanNode') return null;
       if (needsScopeConfirm(s, n)) return null;
       if (n.kind === 'person' || n.lock) return 'not-exploitable';
-      if (!s.nodes[cmd.node]?.scanned) return 'not-scanned';
       return null;
     }
     case 'SubmitPuzzle':

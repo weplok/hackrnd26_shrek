@@ -1,6 +1,7 @@
 import { apply, createGame, startCase } from '@zero-day/engine';
 import type { Command, Content, Difficulty, GameState, StepResult } from '@zero-day/engine';
 import { create } from 'zustand';
+import { recordAttack } from '../attack-log';
 import { gameSessionEffects } from './effects';
 
 export type StartCaseInput = {
@@ -33,6 +34,7 @@ export function createGameSessionStore() {
 
       const result = apply(content, caseRun, command);
       set({ caseRun: result.state });
+      if (command.type === 'SubmitPuzzle') recordAttack(content, caseRun, result.state);
       for (const event of result.events) {
         gameSessionEffects.emit('engine-event', { event, state: result.state });
       }

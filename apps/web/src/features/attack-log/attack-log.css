@@ -1,0 +1,47 @@
+.attack-notice {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 60;
+  max-width: min(22rem, calc(100vw - 2rem));
+}
+
+.attack-table__scroll {
+  overflow-x: auto;
+}
+
+.attack-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.attack-table th,
+.attack-table td {
+  padding: 0.375rem 0.5rem;
+  border: 1px solid var(--color-line);
+  text-align: center;
+}
+
+.attack-table th[scope='row'] {
+  text-align: left;
+}
+
+.attack-table thead th {
+  color: var(--color-muted);
+  font-weight: 600;
+}
+
+.attack-table__cell--ok {
+  color: var(--color-green-bright);
+  font-weight: 700;
+}
+
+.attack-table__cell--fail {
+  color: var(--color-magenta);
+  font-weight: 700;
+}
+
+.attack-table {
+  margin-top: var(--space-3);
+}

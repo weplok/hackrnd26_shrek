@@ -5,6 +5,7 @@ import { answerReport, closeChat, noiseSources, openChat, present, profileStyle,
 import type { Case, Command, Content, GameState } from '@zero-day/engine';
 import { useCaseStore } from '../features/game-session';
 import { HudBar, ObjectiveTracker, Flipper, hasFlipperJoined } from '../features/hud';
+import { AttackNotice, AttackTable } from '../features/attack-log';
 import { NetworkMap } from '../features/network-map/NetworkMap';
 import { startAutosave, withCaseRun, type SaveRepository } from '../features/persistence';
 import { PuzzleHost } from '../features/puzzle-host';
@@ -136,6 +137,7 @@ export function MissionPage({
             onSelectNode={setSelectedNodeId}
             selectedNodeId={selectedNodeId}
           />
+          {levelIndex === 0 && <AttackTable caseData={caseData} caseRun={caseRun} />}
         </div>
         <div className="mission__side">
           <NodeInspector
@@ -166,6 +168,7 @@ export function MissionPage({
       </div>
 
       <PuzzleHost />
+      <AttackNotice />
       {briefing && (
         <BriefOverlay
           caseData={caseData}

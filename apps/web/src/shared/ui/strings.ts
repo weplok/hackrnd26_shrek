@@ -135,10 +135,17 @@ export const ru = {
     puzzle: (node: string, vuln: string) => `Гипотеза ${node} ${vuln}: программа запущена.`,
     codex: (vuln: string, title: string) => `Кодекс ${vuln}: ${title}.`,
   },
+  attackLog: {
+    title: 'ПРИМЕНЁННЫЕ АТАКИ',
+    node: 'Узел',
+    ok: 'УСПЕШНО',
+    fail: 'НЕУСПЕШНО',
+    notice: (attack: string, node: string) => `${attack} → ${node}`,
+  },
   nodeMenu: {
     title: 'УЗЕЛ',
     label: (node: string) => `Действия с узлом ${node}`,
-    scan: 'Сканировать',
+    scan: 'Сканирование',
     attacks: {
       brute: 'Брутфорс',
       virus: 'Заражение вирусом',
@@ -217,8 +224,6 @@ export const ru = {
     ddosLost: 'Минута вышла. DDoS не удался.',
     injectRules: 'Запомни рисунок и повтори его на чистом листе. Инъекция пройдёт, только если твой рисунок ляжет точно в исходный.',
     injectCell: (row: number, col: number) => `Клетка ${String(row)}:${String(col)}`,
-    injectBrush: 'Цвет кисти',
-    injectInk: { 1: 'Зелёный', 2: 'Пурпурный' },
     injectCheck: 'Внедрить',
     injectPhase: {
       show: 'Запоминай рисунок...',
