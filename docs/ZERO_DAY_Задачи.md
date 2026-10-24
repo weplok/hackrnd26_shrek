@@ -29,7 +29,7 @@
 - [x] **T-A1** · Монорепо: pnpm workspaces + uv, структура папок, Makefile · INF · M · P0 · *после:* —
 - [ ] **T-A2** · Линтеры/форматтеры/strict-типы, pre-commit · INF · S · P0 · *после:* T-A1
 - [x] **T-A3** · JSON Schema контента (v1) + кодоген TS и Pydantic · CNT · L · P0 · *после:* T-A1
-- [ ] **T-A4** · content-tools: валидатор схем + линтер ссылок + стоп-словарь · CNT · M · P0 · *после:* T-A3
+- [ ] **T-A4** · content-tools: валидатор схем + линтер ссылок + стоп-словарь · CNT · M · P0 · *после:* T-A3 · в работе: Lolik
 - [ ] **T-A5** · Каркас FastAPI: config, логи, ошибки, /healthz, POST /sessions, rate limit · API · L · P0 · *после:* T-A1
 - [ ] **T-A6** · Каркас SPA: роутинг, тема/токены, ErrorBoundary, экран никнейма, загрузчик контента · WEB · L · P0 · *после:* T-A1
 - [ ] **T-A7** · Docker Compose (web на Caddy + api + redis + postgres + migrate) + профиль offline · INF · L · P0 · *после:* T-A5, T-A6
@@ -40,7 +40,7 @@
 
 ### EPIC B — Движок (M1–M2)
 
-- [ ] **T-B1** · Типы состояния, RNG (mulberry32), apply-каркас · ENG · M · P0 · *после:* T-A3
+- [ ] **T-B1** · Типы состояния, RNG (mulberry32), apply-каркас · ENG · M · P0 · *после:* T-A3 · в работе: Lolik
 - [ ] **T-B2** · Система тревоги + базовые шкалы, откат к чекпоинту (начало шага кейса) · ENG · S · P0 · *после:* T-B1
 - [ ] **T-B3** · Команды scan/hypothesis/submit/cancel + события · ENG · M · P0 · *после:* T-B1
 - [ ] **T-B4** · Язык условий и эффектов + тесты · ENG · M · P0 · *после:* T-B1

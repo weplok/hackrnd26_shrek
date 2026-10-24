@@ -1,0 +1,202 @@
+{
+  "schemaVersion": 1,
+  "lines": [
+    {
+      "id": "case_start",
+      "trigger": {
+        "event": "CaseStarted"
+      },
+      "text": [
+        "Новый заказ. Ошейник на месте, нюх тоже. Поехали."
+      ],
+      "cooldownTicks": 0
+    },
+    {
+      "id": "first_scan",
+      "trigger": {
+        "event": "NodeScanned"
+      },
+      "text": [
+        "Спокойно принюхиваюсь. Пока тихо.",
+        "Осмотрелись. Запоминай, что увидел."
+      ],
+      "cooldownTicks": 3
+    },
+    {
+      "id": "clue_found",
+      "trigger": {
+        "event": "CluesFound"
+      },
+      "text": [
+        "Зацепка. На доску её.",
+        "Нашли что-то полезное — тащи на доску улик."
+      ],
+      "cooldownTicks": 2
+    },
+    {
+      "id": "key_built",
+      "trigger": {
+        "event": "KeyAssembled"
+      },
+      "text": [
+        "Ключ сложился. Чисто сработано."
+      ],
+      "cooldownTicks": 2
+    },
+    {
+      "id": "combine_fail",
+      "trigger": {
+        "event": "CombineFailed"
+      },
+      "text": [
+        "Не склеилось. Не те обрывки."
+      ],
+      "cooldownTicks": 1
+    },
+    {
+      "id": "scope_warn",
+      "trigger": {
+        "event": "ScopeWarning"
+      },
+      "text": [
+        "Р-р-р. Это не наше. За договором не лезь."
+      ],
+      "cooldownTicks": 0
+    },
+    {
+      "id": "scope_violated",
+      "trigger": {
+        "event": "ScopeViolated"
+      },
+      "text": [
+        "Ты перешёл черту. Так нельзя."
+      ],
+      "cooldownTicks": 0
+    },
+    {
+      "id": "alarm_mid",
+      "trigger": {
+        "event": "TrackChanged",
+        "when": {
+          "trackAbove": {
+            "track": "alarm",
+            "value": 45
+          }
+        }
+      },
+      "text": [
+        "Уши торчком. Шумим."
+      ],
+      "cooldownTicks": 2
+    },
+    {
+      "id": "alarm_high",
+      "trigger": {
+        "event": "TrackChanged",
+        "when": {
+          "trackAbove": {
+            "track": "alarm",
+            "value": 75
+          }
+        }
+      },
+      "text": [
+        "Гав! Гав! Нас почти засекли — тише!"
+      ],
+      "cooldownTicks": 1
+    },
+    {
+      "id": "alarm_calm",
+      "trigger": {
+        "event": "TrackChanged",
+        "when": {
+          "trackBelow": {
+            "track": "alarm",
+            "value": 20
+          }
+        }
+      },
+      "text": [
+        "Выдохнули. Можно снова работать."
+      ],
+      "cooldownTicks": 3
+    },
+    {
+      "id": "puzzle_fail",
+      "trigger": {
+        "event": "ExploitMismatched"
+      },
+      "text": [
+        "Не та догадка. Но узел сам подсказал, в чём дело."
+      ],
+      "cooldownTicks": 1
+    },
+    {
+      "id": "node_taken",
+      "trigger": {
+        "event": "ExploitSucceeded"
+      },
+      "text": [
+        "Есть. Узел наш.",
+        "Взяли. Иди по связям дальше."
+      ],
+      "cooldownTicks": 1
+    },
+    {
+      "id": "npc_suspicious",
+      "trigger": {
+        "event": "NpcSuspicionChanged",
+        "when": {
+          "trackAbove": {
+            "track": "alarm",
+            "value": 30
+          }
+        }
+      },
+      "text": [
+        "Он напрягся. Сбавь напор."
+      ],
+      "cooldownTicks": 1
+    },
+    {
+      "id": "lock_half",
+      "trigger": {
+        "event": "SocketFilled"
+      },
+      "text": [
+        "Одно гнездо замка заполнено. Нужно второе."
+      ],
+      "cooldownTicks": 1
+    },
+    {
+      "id": "lock_open",
+      "trigger": {
+        "event": "LockOpened"
+      },
+      "text": [
+        "Оба ключа на месте. Дверь открыта."
+      ],
+      "cooldownTicks": 1
+    },
+    {
+      "id": "case_done",
+      "trigger": {
+        "event": "CaseCompleted"
+      },
+      "text": [
+        "Дело закрыто, дыры заткнули. Хороший день, напарник."
+      ],
+      "cooldownTicks": 0
+    },
+    {
+      "id": "caught",
+      "trigger": {
+        "event": "Caught"
+      },
+      "text": [
+        "Нас вычислили. Откатываемся к последней точке."
+      ],
+      "cooldownTicks": 0
+    }
+  ]
+}

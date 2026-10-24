@@ -1,0 +1,68 @@
+{
+  "npc": "marina",
+  "role": "Секретарь деканата",
+  "archetype": "timid",
+  "holds": [
+    "marina_phrase"
+  ],
+  "suspicion": {
+    "start": 25,
+    "fail_at": 100
+  },
+  "requires": {
+    "legend": [
+      "legend_it"
+    ],
+    "clues": [
+      "dept_list"
+    ]
+  },
+  "tones": [
+    "friendly",
+    "business",
+    "urgent",
+    "flattery"
+  ],
+  "replies": {
+    "greeting": "Деканат, Марина. Я вас слушаю… только у меня много работы.",
+    "soft": "Ах, вы из подрядчиков по договору… хорошо, вот фраза для подтверждения, как просили.",
+    "nervous": "Ой, я не уверена, что должна это говорить… вы точно от наших?",
+    "closed": "Нет-нет, я лучше позвоню начальству."
+  },
+  "rules": [
+    {
+      "if": {
+        "tone": "friendly",
+        "has_key": "legend_it",
+        "has_clue": "dept_list"
+      },
+      "then": {
+        "suspicion": -10,
+        "reply": "soft",
+        "grant": [
+          "marina_phrase"
+        ]
+      }
+    },
+    {
+      "if": {
+        "tone": "business"
+      },
+      "then": {
+        "suspicion": 10,
+        "reply": "nervous"
+      }
+    },
+    {
+      "if": {
+        "tone": "urgent"
+      },
+      "then": {
+        "suspicion": 45,
+        "reply": "closed",
+        "flipper": "growl"
+      }
+    }
+  ],
+  "codex": "SL-09"
+}

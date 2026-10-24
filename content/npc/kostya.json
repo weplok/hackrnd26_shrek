@@ -1,0 +1,66 @@
+{
+  "npc": "kostya",
+  "role": "Студент-староста",
+  "archetype": "naive",
+  "holds": [
+    "admin_is_anton",
+    "dept_list"
+  ],
+  "suspicion": {
+    "start": 5,
+    "fail_at": 100
+  },
+  "requires": {
+    "legend": [],
+    "clues": []
+  },
+  "tones": [
+    "friendly",
+    "business",
+    "urgent",
+    "flattery"
+  ],
+  "replies": {
+    "greeting": "О, привет! Ты по IT, что ли? У нас тут вечно что-то глючит.",
+    "gives": "Антон у нас за сеть отвечает, он в серверной сидит. А кафедры вот так поделены, держи.",
+    "suspicious": "Да без проблем, чего ты… я ж просто говорю, кто где.",
+    "closed": "Ладно, мне на пару пора."
+  },
+  "rules": [
+    {
+      "if": {
+        "tone": "friendly"
+      },
+      "then": {
+        "suspicion": -5,
+        "reply": "gives",
+        "grant": [
+          "admin_is_anton",
+          "dept_list"
+        ]
+      }
+    },
+    {
+      "if": {
+        "tone": "business"
+      },
+      "then": {
+        "suspicion": 0,
+        "reply": "gives",
+        "grant": [
+          "dept_list"
+        ]
+      }
+    },
+    {
+      "if": {
+        "tone": "urgent"
+      },
+      "then": {
+        "suspicion": 10,
+        "reply": "suspicious"
+      }
+    }
+  ],
+  "codex": "SL-05"
+}
