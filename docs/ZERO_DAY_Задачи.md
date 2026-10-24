@@ -35,8 +35,7 @@
 - [x] **T-A7** · Docker Compose (web на Caddy + api + redis + postgres + migrate) + профиль offline · INF · L · P0 · *после:* T-A5, T-A6
 - [x] **T-A8** · CI-пайплайн (lint → types → контент → тесты → сборка → смоук) · INF · M · P0 · *после:* T-A7 · готово: weplok
 - [x] **T-A9** · Дизайн-система shared/ui + Storybook · WEB · M · P0 · *после:* T-A6
-- [ ] **T-A10** · VPS: Caddy на хосте, домен, Let's Encrypt, reverse proxy на localhost (проверить /ws и /mcp) · INF · S · P0 · *после:* T-A7 · в работе: misterEugene
-  - Прогресс: сделано infra/Caddyfile.host, web на 127.0.0.1, инструкция в README; развёрнуто на game.matedoc.ru (Caddy + Let's Encrypt, compose), /healthz 200 по HTTPS, /ws и /mcp проксируются до api; осталось подтвердить /ws и /mcp после появления эндпоинтов в api
+- [x] **T-A10** · VPS: Caddy на хосте, домен, Let's Encrypt, reverse proxy на localhost (проверить /ws и /mcp) · INF · S · P0 · *после:* T-A7
 - [x] **T-A11** · LICENSE (MIT), .env.example, gitleaks, README «запуск за 5 минут» · INF · S · P0 · *после:* T-A1
 
 ### EPIC B — Движок (M1–M2)
@@ -49,8 +48,7 @@
 - [x] **T-B6** · Двойной замок, сегменты/шлюз, сборка ключей, pivoting · ENG · M · P0 · *после:* T-B3
 - [x] **T-B7** · Система scope и развилка последствий · ENG · S · P0 · *после:* T-B3
 - [ ] **T-B8** · Диалоговый движок: таблица правил NPC (ScriptedProvider) · ENG · M · P0 · *после:* T-B4
-- [ ] **T-B9** · Отчёт, ранги, профиль, Кодекс-разблокировка · ENG · M · P0 · *после:* T-B3 · в работе: weplok
-  - Прогресс: реализованы отчёт, ранги, профиль, разблокировка Кодекса и миграция сохранения; engine-тесты, типы и content-check пройдены; осталось ревью и подключение UI в T-C9.
+- [x] **T-B9** · Отчёт, ранги, профиль, Кодекс-разблокировка · ENG · M · P0 · *после:* T-B3
 - [ ] **T-B10** · Солвер контента (BFS) в content-tools · QA · M · P0 · *после:* T-B5, T-B6
 
 ### EPIC C — Клиент игры (M1–M2)
