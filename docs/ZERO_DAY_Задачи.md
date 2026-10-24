@@ -35,7 +35,7 @@
 - [ ] **T-A7** · Docker Compose (web на Caddy + api + redis + postgres + migrate) + профиль offline · INF · L · P0 · *после:* T-A5, T-A6 · в работе: weplok
 - [ ] **T-A8** · CI-пайплайн (lint → types → контент → тесты → сборка → смоук) · INF · M · P0 · *после:* T-A7 · в работе: weplok
 - [ ] **T-A9** · Дизайн-система shared/ui + Storybook · WEB · M · P0 · *после:* T-A6 · в работе: Android
-  - Прогресс: задача взята; осталось определить состав shared/ui и настроить Storybook.
+  - Прогресс: созданы токены и компоненты `packages/ui`, Storybook, интеграция со стартовой SPA; пройдены lint, тесты и сборки. Осталось ревью вторым человеком и смоук на стейджинге.
 - [ ] **T-A10** · VPS: Caddy на хосте, домен, Let's Encrypt, reverse proxy на localhost (проверить /ws и /mcp) · INF · S · P0 · *после:* T-A7 · в работе: weplok
 - [x] **T-A11** · LICENSE (MIT), .env.example, gitleaks, README «запуск за 5 минут» · INF · S · P0 · *после:* T-A1
 

@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { Button, Meter, Panel } from '@zero-day/ui';
 import { ErrorBoundary } from './ErrorBoundary';
 import { loadContentSummary, type ContentSummary } from '../shared/content/loadContent';
 import { readNickname, saveNickname } from '../shared/profile/storage';
@@ -7,10 +8,7 @@ import { validateNickname, type NicknameError } from '../shared/profile/nickname
 import { createAnonymousSession, type SessionState } from '../shared/session/createSession';
 import { ru } from '../shared/ui/strings';
 
-type ContentState =
-  | { status: 'loading' }
-  | { status: 'ready'; summary: ContentSummary }
-  | { status: 'offline' };
+type ContentState = { status: 'loading' } | { status: 'ready'; summary: ContentSummary } | { status: 'offline' };
 
 type BootstrapState = {
   content: ContentState;
@@ -46,12 +44,54 @@ export function App(): ReactNode {
 function ApplicationRoutes({ bootstrap }: { bootstrap: BootstrapState }): ReactNode {
   return (
     <Routes>
-      <Route path="/" element={<Screen><StartPage bootstrap={bootstrap} /></Screen>} />
-      <Route path="/nickname" element={<Screen><NicknamePage /></Screen>} />
-      <Route path="/campaign" element={<Screen><PlaceholderPage title={ru.campaign} copy={ru.campaignCopy} /></Screen>} />
-      <Route path="/codex" element={<Screen><PlaceholderPage title={ru.codex} copy={ru.codexCopy} /></Screen>} />
-      <Route path="/settings" element={<Screen><PlaceholderPage title={ru.settings} copy={ru.settingsCopy} /></Screen>} />
-      <Route path="/about" element={<Screen><PlaceholderPage title={ru.about} copy={ru.aboutCopy} /></Screen>} />
+      <Route
+        path="/"
+        element={
+          <Screen>
+            <StartPage bootstrap={bootstrap} />
+          </Screen>
+        }
+      />
+      <Route
+        path="/nickname"
+        element={
+          <Screen>
+            <NicknamePage />
+          </Screen>
+        }
+      />
+      <Route
+        path="/campaign"
+        element={
+          <Screen>
+            <PlaceholderPage title={ru.campaign} copy={ru.campaignCopy} />
+          </Screen>
+        }
+      />
+      <Route
+        path="/codex"
+        element={
+          <Screen>
+            <PlaceholderPage title={ru.codex} copy={ru.codexCopy} />
+          </Screen>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <Screen>
+            <PlaceholderPage title={ru.settings} copy={ru.settingsCopy} />
+          </Screen>
+        }
+      />
+      <Route
+        path="/about"
+        element={
+          <Screen>
+            <PlaceholderPage title={ru.about} copy={ru.aboutCopy} />
+          </Screen>
+        }
+      />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
@@ -73,7 +113,9 @@ function PageLayout({ children }: { children: ReactNode }): ReactNode {
   return (
     <main className="app-shell">
       <header className="app-header">
-        <Link className="brand" to="/">ZERO DAY // ETHICAL OPS</Link>
+        <Link className="brand" to="/">
+          ZERO DAY // ETHICAL OPS
+        </Link>
         <span className="session-status">{nickname ? ru.localProfile(nickname) : ru.localMode}</span>
       </header>
       {children}
@@ -94,41 +136,75 @@ function StartPage({ bootstrap }: { bootstrap: BootstrapState }): ReactNode {
     <>
       <section className="intro">
         <div className="command">{ru.command}</div>
-        <h1 className="wordmark">ZERO<span className="wordmark__cursor">_</span>DAY</h1>
+        <h1 className="wordmark">
+          ZERO<span className="wordmark__cursor">_</span>DAY
+        </h1>
         <p className="subtitle">{ru.appSubtitle}</p>
       </section>
 
-      <section className="panel entry-panel" aria-labelledby="login-title">
-        <div className="panel-title" id="login-title"><PanelLights />{ru.loginTitle}</div>
-        <div className="panel-body">
-          <label className="form-label" htmlFor="start-nickname">
-            {ru.nicknameLabel} <span className="label-note">{ru.nicknameNote}</span>
-          </label>
-          <div className="terminal-input">
-            <span className="terminal-input__prompt">&gt;</span>
-            <input
-              id="start-nickname"
-              value={draftNickname}
-              maxLength={16}
-              autoComplete="nickname"
-              onChange={(event) => setDraftNickname(event.target.value)}
-              placeholder="operator_42"
-            />
-            <span className="terminal-input__cursor" aria-hidden="true">▍</span>
-          </div>
-          <nav className="actions" aria-label={ru.mainMenuLabel}>
-            <button className="button button--primary" type="button" onClick={beginNewGame}>{ru.newGame}</button>
-            <button className="button" type="button" disabled={!hasSave} onClick={() => navigate('/campaign')}>
-              {ru.continueGame} {!hasSave && ru.noSave}
-            </button>
-            <button className="button" type="button" disabled>{ru.duel}</button>
-            <button className="button" type="button" onClick={() => navigate('/codex')}>{ru.codex}</button>
-            <button className="button" type="button" onClick={() => navigate('/settings')}>{ru.settings}</button>
-            <button className="button" type="button" onClick={() => navigate('/about')}>{ru.about}</button>
-          </nav>
-          <p className="fine-print">{ru.savedProgress}</p>
+      <Panel className="entry-panel" title={ru.loginTitle}>
+        <label className="form-label" htmlFor="start-nickname">
+          {ru.nicknameLabel} <span className="label-note">{ru.nicknameNote}</span>
+        </label>
+        <div className="terminal-input">
+          <span className="terminal-input__prompt">&gt;</span>
+          <input
+            id="start-nickname"
+            value={draftNickname}
+            maxLength={16}
+            autoComplete="nickname"
+            onChange={(event) => {
+              setDraftNickname(event.target.value);
+            }}
+            placeholder="operator_42"
+          />
+          <span className="terminal-input__cursor" aria-hidden="true">
+            ▍
+          </span>
         </div>
-      </section>
+        <nav className="actions" aria-label={ru.mainMenuLabel}>
+          <Button type="button" variant="primary" onClick={beginNewGame}>
+            {ru.newGame}
+          </Button>
+          <Button
+            type="button"
+            disabled={!hasSave}
+            onClick={() => {
+              navigate('/campaign');
+            }}
+          >
+            {ru.continueGame} {!hasSave && ru.noSave}
+          </Button>
+          <Button type="button" disabled>
+            {ru.duel}
+          </Button>
+          <Button
+            type="button"
+            onClick={() => {
+              navigate('/codex');
+            }}
+          >
+            {ru.codex}
+          </Button>
+          <Button
+            type="button"
+            onClick={() => {
+              navigate('/settings');
+            }}
+          >
+            {ru.settings}
+          </Button>
+          <Button
+            type="button"
+            onClick={() => {
+              navigate('/about');
+            }}
+          >
+            {ru.about}
+          </Button>
+        </nav>
+        <p className="fine-print">{ru.savedProgress}</p>
+      </Panel>
 
       <ContentStatusPanel content={bootstrap.content} session={bootstrap.session} hasSave={hasSave} />
     </>
@@ -161,76 +237,107 @@ function NicknamePage(): ReactNode {
   }
 
   return (
-    <section className="panel entry-panel" aria-labelledby="profile-title">
-      <div className="panel-title" id="profile-title"><PanelLights />{ru.profileTitle}</div>
-      <div className="panel-body">
-        <p className="copy">{ru.nicknamePageCopy}</p>
-        <form onSubmit={submit} noValidate>
-          <label className="form-label" htmlFor="nickname">{ru.nicknameLabel}</label>
-          <div className="terminal-input">
-            <span className="terminal-input__prompt">&gt;</span>
-            <input
-              id="nickname"
-              value={nickname}
-              maxLength={16}
-              autoComplete="nickname"
-              onChange={(event) => {
-                setNickname(event.target.value);
-                setError(null);
-              }}
-              placeholder="operator_42"
-              autoFocus
-            />
-            <span className="terminal-input__cursor" aria-hidden="true">▍</span>
-          </div>
-          <p className="fine-print">{ru.nicknameHint}</p>
-          <p className="form-error" role="alert">{error ? ru.errors[error] : ''}</p>
-          <div className="form-actions">
-            <button className="button" type="button" onClick={() => navigate('/')}>{ru.back}</button>
-            <button className="button button--primary" type="submit">{ru.saveAndContinue}</button>
-          </div>
-        </form>
-      </div>
-    </section>
+    <Panel className="entry-panel" title={ru.profileTitle}>
+      <p className="copy">{ru.nicknamePageCopy}</p>
+      <form onSubmit={submit} noValidate>
+        <label className="form-label" htmlFor="nickname">
+          {ru.nicknameLabel}
+        </label>
+        <div className="terminal-input">
+          <span className="terminal-input__prompt">&gt;</span>
+          <input
+            id="nickname"
+            value={nickname}
+            maxLength={16}
+            autoComplete="nickname"
+            onChange={(event) => {
+              setNickname(event.target.value);
+              setError(null);
+            }}
+            placeholder="operator_42"
+          />
+          <span className="terminal-input__cursor" aria-hidden="true">
+            ▍
+          </span>
+        </div>
+        <p className="fine-print">{ru.nicknameHint}</p>
+        <p className="form-error" role="alert">
+          {error ? ru.errors[error] : ''}
+        </p>
+        <div className="form-actions">
+          <Button
+            type="button"
+            onClick={() => {
+              navigate('/');
+            }}
+          >
+            {ru.back}
+          </Button>
+          <Button type="submit" variant="primary">
+            {ru.saveAndContinue}
+          </Button>
+        </div>
+      </form>
+    </Panel>
   );
 }
 
-function ContentStatusPanel({ content, session, hasSave }: { content: ContentState; session: SessionState; hasSave: boolean }): ReactNode {
+function ContentStatusPanel({
+  content,
+  session,
+  hasSave,
+}: {
+  content: ContentState;
+  session: SessionState;
+  hasSave: boolean;
+}): ReactNode {
   const ready = content.status === 'ready';
   const statusText = ready ? ru.contentReady : content.status === 'offline' ? ru.contentOffline : ru.contentLoading;
-  const detail = ready ? ru.contentReadyDetail(content.summary.vulnerabilities, content.summary.puzzles) : ru.contentOfflineDetail;
+  const detail = ready
+    ? ru.contentReadyDetail(content.summary.vulnerabilities, content.summary.puzzles)
+    : ru.contentOfflineDetail;
 
   return (
-    <aside className="panel status-panel" aria-live="polite">
-      <div className="panel-body">
-        <div className="status-line"><span className={`status-dot ${ready ? 'status-dot--ready' : ''}`} />{statusText}</div>
-        <p className="fine-print">{detail}</p>
-        <div className="metrics">
-          <div className="metric"><span>{ru.metricsStack}</span><strong>{ru.stackValue}</strong></div>
-          <div className="metric"><span>{ru.metricsSession}</span><strong>{hasSave ? ru.sessionExisting : ru.sessionNew}</strong></div>
-          <div className="metric"><span>{ru.metricsApi}</span><strong>{session === 'ready' ? ru.apiOnline : ru.apiOffline}</strong></div>
-          <div className="metric"><span>{ru.metricsContent}</span><strong>{ready ? ru.contentReadyMetric : ru.contentLocalMetric}</strong></div>
+    <Panel aria-live="polite" className="status-panel">
+      <div className="status-line">
+        <span className={`status-dot ${ready ? 'status-dot--ready' : ''}`} />
+        {statusText}
+      </div>
+      <p className="fine-print">{detail}</p>
+      <Meter
+        label={ru.metricsContent}
+        status={ready ? 'secure' : 'warning'}
+        value={ready ? 100 : 35}
+        valueText={ready ? ru.contentReadyMetric : ru.contentLocalMetric}
+      />
+      <div className="metrics">
+        <div className="metric">
+          <span>{ru.metricsStack}</span>
+          <strong>{ru.stackValue}</strong>
+        </div>
+        <div className="metric">
+          <span>{ru.metricsSession}</span>
+          <strong>{hasSave ? ru.sessionExisting : ru.sessionNew}</strong>
+        </div>
+        <div className="metric">
+          <span>{ru.metricsApi}</span>
+          <strong>{session === 'ready' ? ru.apiOnline : ru.apiOffline}</strong>
         </div>
       </div>
-    </aside>
+    </Panel>
   );
 }
 
 function PlaceholderPage({ title, copy }: { title: string; copy: string }): ReactNode {
   return (
-    <section className="panel page-panel">
-      <div className="panel-title"><PanelLights />{ru.appName}</div>
-      <div className="panel-body">
-        <h1>{title}</h1>
-        <p className="copy">{copy}</p>
-        <Link className="button button--primary button--inline" to="/">{ru.backToMenu}</Link>
-      </div>
-    </section>
+    <Panel className="page-panel" title={ru.appName}>
+      <h1>{title}</h1>
+      <p className="copy">{copy}</p>
+      <Link className="zd-button zd-button--primary button-link" to="/">
+        {ru.backToMenu}
+      </Link>
+    </Panel>
   );
-}
-
-function PanelLights(): ReactNode {
-  return <span className="lights" aria-hidden="true"><i className="light light--magenta" /><i className="light light--amber" /><i className="light light--green" /></span>;
 }
 
 function renderRootError(_: Error, retry: () => void): ReactNode {
@@ -238,17 +345,28 @@ function renderRootError(_: Error, retry: () => void): ReactNode {
 }
 
 function renderScreenError(_: Error, retry: () => void): ReactNode {
-  return <main className="app-shell"><ErrorPage retry={retry} /></main>;
+  return (
+    <main className="app-shell">
+      <ErrorPage retry={retry} />
+    </main>
+  );
 }
 
 function ErrorPage({ retry }: { retry: () => void }): ReactNode {
   return (
-    <section className="panel page-panel error-panel">
-      <div className="panel-body">
-        <h1>{ru.screenErrorTitle}</h1>
-        <p className="copy">{ru.screenErrorCopy}</p>
-        <button className="button button--primary" type="button" onClick={() => { retry(); window.location.assign('/'); }}>{ru.backToMenu}</button>
-      </div>
-    </section>
+    <Panel className="page-panel error-panel" tone="danger">
+      <h1>{ru.screenErrorTitle}</h1>
+      <p className="copy">{ru.screenErrorCopy}</p>
+      <Button
+        type="button"
+        variant="primary"
+        onClick={() => {
+          retry();
+          window.location.assign('/');
+        }}
+      >
+        {ru.backToMenu}
+      </Button>
+    </Panel>
   );
 }

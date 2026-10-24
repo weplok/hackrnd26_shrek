@@ -17,6 +17,7 @@ export default tseslint.config(
       '.idea/**',
       '.opencode/**',
       '.pnpm-store/**',
+      'packages/ui/storybook-static/**',
       'beta/**',
       'docs/**',
       'backend_api/content/models/**',
@@ -51,6 +52,7 @@ export default tseslint.config(
         { type: 'web', pattern: 'apps/web/**' },
         { type: 'engine', pattern: 'packages/engine/**' },
         { type: 'content-tools', pattern: 'packages/content-tools/**' },
+        { type: 'ui', pattern: 'packages/ui/**' },
       ],
     },
     rules: {

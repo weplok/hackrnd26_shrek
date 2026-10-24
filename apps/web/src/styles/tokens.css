@@ -1,21 +1,23 @@
+@import '@zero-day/ui/styles.css';
+
 :root {
-  color-scheme: dark;
-  --color-bg: #000000;
-  --color-panel: #07140e;
-  --color-panel-raised: #0b1f17;
-  --color-line: #1b3b2c;
-  --color-text: #e8efe9;
-  --color-muted: #8aa399;
-  --color-green: #4a9a72;
-  --color-green-bright: #7cffb2;
+  --color-bg: var(--zd-color-bg);
+  --color-panel: var(--zd-color-panel);
+  --color-panel-raised: var(--zd-color-panel-raised);
+  --color-line: var(--zd-color-line);
+  --color-text: var(--zd-color-text);
+  --color-muted: var(--zd-color-muted);
+  --color-green: var(--zd-color-calm);
+  --color-green-bright: var(--zd-color-green-bright);
   --color-green-dim: #2f5e47;
-  --color-magenta: #e30b5c;
-  --color-amber: #e8b047;
-  --font-mono: "JetBrains Mono", "Cascadia Mono", ui-monospace, "Courier New", monospace;
-  --space-1: 0.5rem;
-  --space-2: 0.75rem;
-  --space-3: 1rem;
-  --space-4: 1.5rem;
-  --space-5: 2.5rem;
-  --focus-ring: 2px solid var(--color-green-bright);
+  --color-magenta: var(--zd-color-danger);
+  --color-amber: var(--zd-color-warning);
+  --font-ui: var(--zd-font-ui);
+  --font-mono: var(--zd-font-mono);
+  --space-1: var(--zd-space-1);
+  --space-2: var(--zd-space-2);
+  --space-3: var(--zd-space-3);
+  --space-4: var(--zd-space-4);
+  --space-5: var(--zd-space-5);
+  --focus-ring: var(--zd-focus-ring);
 }
