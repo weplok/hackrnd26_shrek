@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Flipper, GameEvent, GameState } from '@zero-day/engine';
-import { findFlipperLine, getFlipperMood, getTrackStatus } from './logic';
+import { findFlipperLine, getFlipperMood, getTrackStatus, hasFlipperJoined } from './logic';
 
 const state = {
   caseId: 'L1C1',
@@ -30,6 +30,12 @@ describe('HUD logic', () => {
     expect(getTrackStatus('alarm', 29)).toBe('calm');
     expect(getTrackStatus('alarm', 30)).toBe('warning');
     expect(getTrackStatus('alarm', 85)).toBe('danger');
+  });
+
+  it('shows Flipper from level two or after joining', () => {
+    expect(hasFlipperJoined({}, 1)).toBe(false);
+    expect(hasFlipperJoined({ flipperJoined: true }, 1)).toBe(true);
+    expect(hasFlipperJoined({}, 2)).toBe(true);
   });
 
   it('selects matching content line no more than once per three ticks', () => {

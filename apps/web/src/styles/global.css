@@ -226,6 +226,16 @@ a {
   text-align: center;
   animation: rise 0.4s;
 }
+.game-screen {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: 2rem;
+}
+.game-screen > .objective-tracker,
+.game-screen > .flipper {
+  width: 100%;
+  max-width: none;
+}
 .page-panel h1 {
   margin: 0 0 0.75rem;
   font-size: clamp(1.875rem, 6vw, 3.375rem);

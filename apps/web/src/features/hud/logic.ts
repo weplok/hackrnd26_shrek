@@ -7,6 +7,10 @@ export type FlipperMood = 'sleeping' | 'alert' | 'growling' | 'barking';
 type FlipperLine = Flipper['lines'][number];
 type TrackId = Case['tracks'][number]['id'];
 
+export function hasFlipperJoined(flags: GameState['flags'], level: number): boolean {
+  return flags.flipperJoined || level >= 2;
+}
+
 export function getFlipperMood(tracks: Readonly<Record<string, number>>): FlipperMood {
   const highestTrack = Math.max(0, ...Object.values(tracks));
   if (highestTrack >= 85) return 'barking';

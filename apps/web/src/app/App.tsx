@@ -8,6 +8,9 @@ import { validateNickname, type NicknameError } from '../shared/profile/nickname
 import { createAnonymousSession, type SessionState } from '../shared/session/createSession';
 import { ru } from '../shared/ui/strings';
 import { TelemetryClient } from '../telemetry';
+import { content } from '../content';
+import { GameHud } from '../features/hud';
+import { useCaseStore } from '../features/game-session';
 
 type ContentState = { status: 'loading' } | { status: 'ready'; summary: ContentSummary } | { status: 'offline' };
 
@@ -95,7 +98,7 @@ function ApplicationRoutes({ bootstrap }: { bootstrap: BootstrapState }): ReactN
         path="/campaign"
         element={
           <Screen>
-            <PlaceholderPage title={ru.campaign} copy={ru.campaignCopy} />
+            <GamePage />
           </Screen>
         }
       />
@@ -366,6 +369,35 @@ function PlaceholderPage({ title, copy }: { title: string; copy: string }): Reac
         {ru.backToMenu}
       </Link>
     </Panel>
+  );
+}
+
+function GamePage(): ReactNode {
+  const level = content.campaign.levels[0];
+  const caseId = level?.cases[0];
+  const caseData = caseId ? content.cases[caseId] : undefined;
+  const caseRun = useCaseStore((state) => state.caseRun);
+  const start = useCaseStore((state) => state.start);
+
+  useEffect(() => {
+    if (!caseId || !level || caseRun?.caseId === caseId) return;
+    start({ caseId, content, difficulty: level.difficulty });
+  }, [caseId, caseRun?.caseId, level, start]);
+
+  if (!caseData || !caseRun || caseRun.caseId !== caseId || !level) {
+    return <Panel className="page-panel" title={ru.appName}>{ru.contentLoading}</Panel>;
+  }
+
+  const levelNumber = content.campaign.levels.indexOf(level) + 1;
+
+  return (
+    <section className="game-screen" aria-label={ru.campaign}>
+      <GameHud caseData={caseData} caseRun={caseRun} flipper={content.flipper} level={levelNumber} />
+      <p className="copy">{caseData.brief.text}</p>
+      <Link className="zd-button button-link" to="/">
+        {ru.backToMenu}
+      </Link>
+    </section>
   );
 }
 
