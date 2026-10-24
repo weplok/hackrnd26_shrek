@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Button, Panel } from '@zero-day/ui';
+import type { Campaign, Case, Content } from '@zero-day/engine';
 import { ErrorBoundary } from './ErrorBoundary';
 import { loadContentSummary, type ContentSummary } from '../shared/content/loadContent';
 import { readNickname, saveNickname } from '../shared/profile/storage';
@@ -11,6 +12,28 @@ import { TelemetryClient } from '../telemetry';
 import { content } from '../content';
 import { GameHud } from '../features/hud';
 import { useCaseStore } from '../features/game-session';
+import { Terminal } from '../features/terminal';
+
+type CampaignStart = {
+  caseData: Case;
+  caseId: string;
+  level: Campaign['levels'][number];
+};
+
+function getCampaignStart(gameContent: Content): CampaignStart {
+  const level = gameContent.campaign.levels[0];
+  const caseId = level?.cases[0];
+  const caseData = caseId ? gameContent.cases[caseId] : undefined;
+
+  if (!level || !caseId || !caseData) {
+    throw new Error('Campaign has no playable case.');
+  }
+
+  return { caseData, caseId, level };
+}
+
+const gameContent = content;
+const campaignStart = getCampaignStart(gameContent);
 
 type ContentState = { status: 'loading' } | { status: 'ready'; summary: ContentSummary } | { status: 'offline' };
 
@@ -373,27 +396,26 @@ function PlaceholderPage({ title, copy }: { title: string; copy: string }): Reac
 }
 
 function GamePage(): ReactNode {
-  const level = content.campaign.levels[0];
-  const caseId = level?.cases[0];
-  const caseData = caseId ? content.cases[caseId] : undefined;
+  const { caseData, caseId, level } = campaignStart;
   const caseRun = useCaseStore((state) => state.caseRun);
   const start = useCaseStore((state) => state.start);
 
   useEffect(() => {
-    if (!caseId || !level || caseRun?.caseId === caseId) return;
-    start({ caseId, content, difficulty: level.difficulty });
+    if (caseRun?.caseId === caseId) return;
+    start({ caseId, content: gameContent, difficulty: level.difficulty });
   }, [caseId, caseRun?.caseId, level, start]);
 
-  if (!caseData || !caseRun || caseRun.caseId !== caseId || !level) {
+  if (!caseRun || caseRun.caseId !== caseId) {
     return <Panel className="page-panel" title={ru.appName}>{ru.contentLoading}</Panel>;
   }
 
-  const levelNumber = content.campaign.levels.indexOf(level) + 1;
+  const levelNumber = gameContent.campaign.levels.indexOf(level) + 1;
 
   return (
     <section className="game-screen" aria-label={ru.campaign}>
-      <GameHud caseData={caseData} caseRun={caseRun} flipper={content.flipper} level={levelNumber} />
+      <GameHud caseData={caseData} caseRun={caseRun} flipper={gameContent.flipper} level={levelNumber} />
       <p className="copy">{caseData.brief.text}</p>
+      <Terminal vulns={Object.values(gameContent.vulnerabilities)} />
       <Link className="zd-button button-link" to="/">
         {ru.backToMenu}
       </Link>
