@@ -14,7 +14,6 @@
   background: var(--color-panel-raised);
 }
 
-.network-map__eyebrow,
 .network-map__count,
 .network-map__legend,
 .network-map__node-status,
@@ -32,8 +31,10 @@
 }
 
 .network-map__header h2 {
-  margin: 0.2rem 0 0;
-  font-size: 1rem;
+  margin: 0;
+  color: var(--color-muted);
+  font: 700 0.6875rem/1.2 var(--font-mono);
+  letter-spacing: 0.15em;
 }
 
 .network-map__count {

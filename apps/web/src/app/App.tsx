@@ -9,7 +9,7 @@ import { GameHud } from '../features/hud';
 import { NetworkMap } from '../features/network-map/NetworkMap';
 import { SaveRepository, startAutosave } from '../features/persistence';
 import { PuzzleHost, ToolLab } from '../features/puzzle-host';
-import { Terminal } from '../features/terminal';
+import { NodeContextMenu, Terminal } from '../features/terminal';
 import { loadContentSummary, type ContentSummary } from '../shared/content/loadContent';
 import { readNickname, saveNickname } from '../shared/profile/storage';
 import { validateNickname, type NicknameError } from '../shared/profile/nickname';
@@ -408,48 +408,47 @@ function ContentStatusPanel({
   );
 }
 
-function NetworkMapPanel({ caseData, caseRun }: { caseData: Case; caseRun: GameState }): ReactNode {
+function NodeActionsPanel({
+  caseData,
+  caseRun,
+  selectedNodeId,
+  onClose,
+}: {
+  caseData: Case;
+  caseRun: GameState;
+  selectedNodeId: string | null;
+  onClose: () => void;
+}): ReactNode {
   const dispatch = useCaseStore((state) => state.dispatch);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [scopeWarning, setScopeWarning] = useState(false);
-
   const selectedNode = selectedNodeId ? caseData.nodes.find((node) => node.id === selectedNodeId) : undefined;
-  const selectedRuntime = selectedNode ? caseRun.nodes[selectedNode.id] : undefined;
 
   return (
-    <section className="campaign-map">
-      <div className="campaign-map__actions">
-        <p aria-live="polite" className="campaign-map__selection">
-          {selectedNode ? ru.networkMap.currentNode(selectedNode.label) : ru.networkMap.selectNode}
-        </p>
-        <Button
-          disabled={!selectedNode || !selectedRuntime || selectedRuntime.secured}
-          onClick={() => {
-            if (!selectedNode) return;
-            const result = dispatch({ type: 'ScanNode', node: selectedNode.id });
+    <Panel className="game-screen__node" title={ru.nodeMenu.title}>
+      {selectedNode && !caseRun.nodes[selectedNode.id]?.secured ? (
+        <NodeContextMenu
+          node={selectedNode.id}
+          label={selectedNode.label}
+          vulns={Object.values(gameContent.vulnerabilities)}
+          onScan={(node) => {
+            const result = dispatch({ type: 'ScanNode', node });
             setScopeWarning(Boolean(result?.state.pendingScope));
           }}
-          type="button"
-          variant="primary"
-        >
-          {ru.networkMap.scan}
-        </Button>
-      </div>
+          onHypothesis={(node, vuln) => {
+            const result = dispatch({ type: 'ProposeHypothesis', node, vuln });
+            setScopeWarning(Boolean(result?.state.pendingScope));
+          }}
+          onClose={onClose}
+        />
+      ) : (
+        <p className="campaign-map__selection">{ru.networkMap.selectNode}</p>
+      )}
       {scopeWarning ? (
         <p className="campaign-map__warning" role="status">
           {ru.networkMap.scopeWarning}
         </p>
       ) : null}
-      <NetworkMap
-        caseData={caseData}
-        gameState={caseRun}
-        onSelectNode={(nodeId) => {
-          setScopeWarning(false);
-          setSelectedNodeId(nodeId);
-        }}
-        selectedNodeId={selectedNodeId}
-      />
-    </section>
+    </Panel>
   );
 }
 
@@ -471,6 +470,7 @@ function GamePage(): ReactNode {
   const start = useCaseStore((state) => state.start);
   const resume = useCaseStore((state) => state.resume);
   const [loaded] = useState(() => saveRepository.load());
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
   useEffect(() => {
     if (caseRun?.caseId === caseId) return;
@@ -496,16 +496,36 @@ function GamePage(): ReactNode {
   return (
     <section className="game-screen" aria-label={ru.campaign}>
       <GameHud caseData={caseData} caseRun={caseRun} flipper={gameContent.flipper} level={levelNumber} />
-      <NetworkMapPanel caseData={caseData} caseRun={caseRun} />
-      {(loaded.status === 'case-reset' || loaded.status === 'corrupt') && (
-        <p className="fine-print" role="status">
-          {ru.saveCaseReset}
-        </p>
-      )}
-      <p className="copy">{caseData.brief.text}</p>
-      <Terminal vulns={Object.values(gameContent.vulnerabilities)} />
+      <div className="game-screen__map">
+        <NetworkMap
+          caseData={caseData}
+          gameState={caseRun}
+          onSelectNode={setSelectedNodeId}
+          selectedNodeId={selectedNodeId}
+        />
+      </div>
+      <Panel className="game-screen__brief" title={ru.briefTitle(caseData.brief.client)}>
+        <p className="copy">{caseData.brief.text}</p>
+        {(loaded.status === 'case-reset' || loaded.status === 'corrupt') && (
+          <p className="fine-print" role="status">
+            {ru.saveCaseReset}
+          </p>
+        )}
+      </Panel>
+      <NodeActionsPanel
+        key={selectedNodeId ?? ''}
+        caseData={caseData}
+        caseRun={caseRun}
+        selectedNodeId={selectedNodeId}
+        onClose={() => {
+          setSelectedNodeId(null);
+        }}
+      />
+      <div className="game-screen__terminal">
+        <Terminal vulns={Object.values(gameContent.vulnerabilities)} />
+      </div>
       <PuzzleHost />
-      <Link className="zd-button button-link" to="/">
+      <Link className="zd-button button-link game-screen__back" to="/">
         {ru.backToMenu}
       </Link>
     </section>

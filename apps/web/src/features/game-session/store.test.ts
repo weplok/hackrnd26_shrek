@@ -23,7 +23,6 @@ const content = {
       checkpoints: [],
       keyRecipes: [],
       objectives: [],
-      checkpoints: [],
       ranks: [],
       report: { findings: [] },
     },

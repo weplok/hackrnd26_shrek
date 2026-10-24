@@ -1,6 +1,15 @@
-import { Background, BackgroundVariant, Controls, Handle, Position, ReactFlow, type NodeProps } from '@xyflow/react';
+import {
+  Background,
+  BackgroundVariant,
+  Controls,
+  Handle,
+  Position,
+  ReactFlow,
+  useReactFlow,
+  type NodeProps,
+} from '@xyflow/react';
 import type { ReactNode } from 'react';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import type { Case, GameState } from '@zero-day/engine';
 import { ru } from '../../shared/ui/strings';
 import { buildNetworkMap, type NetworkFlowNode, type NetworkMapNode, type SegmentFlowNode } from './model';
@@ -45,10 +54,7 @@ export function NetworkMap({ caseData, gameState, onSelectNode, selectedNodeId }
   return (
     <section aria-label={ru.networkMap.title} className="network-map">
       <header className="network-map__header">
-        <div>
-          <span className="network-map__eyebrow">{ru.networkMap.eyebrow}</span>
-          <h2>{caseData.title}</h2>
-        </div>
+        <h2>{ru.networkMap.title}</h2>
         <span className="network-map__count">
           {ru.networkMap.count(nodes.filter((node) => node.type === 'network').length)}
         </span>
@@ -73,11 +79,24 @@ export function NetworkMap({ caseData, gameState, onSelectNode, selectedNodeId }
         >
           <Background color="var(--color-line)" gap={28} size={1} variant={BackgroundVariant.Dots} />
           <Controls aria-label={ru.networkMap.controlsLabel} showInteractive={false} />
+          <AutoFit nodeCount={nodes.length} />
         </ReactFlow>
       </div>
       <MapLegend />
     </section>
   );
+}
+
+// FR-027: recentre when scans reveal new nodes.
+function AutoFit({ nodeCount }: { nodeCount: number }): null {
+  const { fitView } = useReactFlow();
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => void fitView({ padding: 0.18, duration: 300 }));
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [fitView, nodeCount]);
+  return null;
 }
 
 type InteractiveNodeData = NetworkFlowNode['data'] & { onSelect: (nodeId: string) => void };

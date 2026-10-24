@@ -115,7 +115,7 @@ const N = {
   B7:'Scope и развилка последствий', B8:'Диалоговый движок NPC (scripted)', B9:'Отчёт, ранги, профиль, Кодекс', B10:'Солвер контента (BFS)',
   C1:'game-session: стор, dispatch, шина эффектов', C2:'Карта сети на React Flow', C3:'Жетоны улик, сборка ключей, замки', C4:'Терминал: парсер, автодополнение',
   C5:'puzzle-host + view 8 инструментов', C6:'HUD: шкалы, цели, Флиппер', C7:'Чат: мессенджер, DialogueProvider', C8:'Scope-диалог и карта последствий',
-  C9:'Отчёт + Кодекс + экспорт PNG', C10:'Сохранения: чекпоинты, миграции', C11:'Мобильная раскладка «Игра»', C12:'Аудио: музыка, звуки, громкость',
+  C9:'Отчёт + Кодекс + экспорт PNG', C10:'Сохранения: чекпоинты, миграции', C11:'Мобильная раскладка «Игра»', C12:'Аудио: музыка, звуки, громкость', C13:'Сборка экрана «Игра» (десктоп)',
   D1:'Каталог СЛ (13) + карточки Кодекса', D2:'Кейс L2C1 «Колледж»', D3:'Реплики Флиппера + карты последствий', D4:'Кейс L1C1 «Сосед»',
   D4b:'Кейс L1C2 «Друг» + интерлюдия', D5:'Кейс L2C2 «Банк»', D6:'Кейсы L3C1, L3C2 + головоломки 10, 11', D7:'СЛ-10 и СЛ-11 без таймера',
   D8:'Арт: спрайт Флиппера, иллюстрации брифов',
@@ -126,8 +126,8 @@ const N = {
 };
 const CRIT = new Set(['A1','A3','B1','B3','B5','C5','D4','B10','D2','G3','G7']);
 // Task status: keep in sync with docs/ZERO_DAY_Задачи.md.
-const DONE = new Set(['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'A11', 'B1', 'B2', 'B3', 'B4', 'B5', 'C1', 'C2', 'C4', 'C5', 'C6', 'C10', 'D1', 'D3', 'D4', 'D7', 'D8', 'E1', 'G1', 'G8']);
-const DONE_BY = { A4: 'misterEugene', A5: 'weplok', A6: 'Android', A7: 'weplok', A8: 'weplok', A9: 'Android', A11: 'weplok', B1: 'misterEugene', B2: 'Lolik', B3: 'misterEugene', B4: 'Lolik', B5: 'Lolik', C1: 'Android', C2: 'weplok', C4: 'Lolik', C5: 'Android', C6: 'Android', C10: 'Lolik', D1: 'misterEugene', D3: 'Lolik', D4: 'misterEugene', D7: 'Lolik', D8: 'Lolik', E1: 'weplok', G1: 'weplok', G8: 'misterEugene' };
+const DONE = new Set(['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'A11', 'B1', 'B2', 'B3', 'B4', 'B5', 'C1', 'C2', 'C4', 'C5', 'C6', 'C10', 'C13', 'D1', 'D3', 'D4', 'D7', 'D8', 'E1', 'G1', 'G8']);
+const DONE_BY = { C13: 'misterEugene', A4: 'misterEugene', A5: 'weplok', A6: 'Android', A7: 'weplok', A8: 'weplok', A9: 'Android', A11: 'weplok', B1: 'misterEugene', B2: 'Lolik', B3: 'misterEugene', B4: 'Lolik', B5: 'Lolik', C1: 'Android', C2: 'weplok', C4: 'Lolik', C5: 'Android', C6: 'Android', C10: 'Lolik', D1: 'misterEugene', D3: 'Lolik', D4: 'misterEugene', D7: 'Lolik', D8: 'Lolik', E1: 'weplok', G1: 'weplok', G8: 'misterEugene' };
 const WIP = { A10: 'misterEugene', B9: 'weplok', C9: 'weplok', G4: 'Lolik' };
 // t(id, after, extra-name, continued)
 const t = (id, after, x, cont) => ({ id, after, x, cont });
@@ -156,7 +156,7 @@ const PLAN = [
       web:[t('C10','T-C1'), c('C5','view 04–08 по мере готовности')], be:[t('G4','T-A8'), 'Помогает WEB с T-C10'], cnt:[t('D2','T-D1','каркас JSON')] },
     { eng:[t('B10','T-B5, T-B6')], web:[t('C3','T-C2, T-B6'), t('C7','T-C1, T-B8'), t('C8','T-C1, T-B7'), t('C9','T-C1, T-B9')],
       be:[t('E2','T-E1, T-B8','задел')], cnt:[c('D2')] },
-    { eng:['Помогает с T-D2'], web:[t('C11','T-C2 … T-C7')], be:[c('E2')], cnt:[c('D2','проверка солвером T-B10')] },
+    { eng:['Помогает с T-D2'], web:[t('C13','T-C2, T-C4, T-C5, T-C6'), t('C11','T-C2 … T-C7')], be:[c('E2')], cnt:[c('D2','проверка солвером T-B10')] },
   ], gate:'<b>Готово M2:</b> «Сосед» → «Колледж» проходится на десктопе и телефоне без ошибок; солвер доказывает ≥ 2 пути. <span class="cut">Если сроки горят — всё ниже режется с конца.</span>' },
 
   { tag:'M3', title:'Кампания и полировка ядра', prio:'P1', rows:[

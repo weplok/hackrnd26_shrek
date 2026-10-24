@@ -45,9 +45,9 @@ export const ru = {
   mainMenuLabel: 'Главное меню',
   campaign: 'КАМПАНИЯ',
   campaignCopy: 'Здесь появятся карта кейсов и выбор задания.',
+  briefTitle: (client: string) => `ЗАКАЗЧИК: ${client}`,
   networkMap: {
     title: 'КАРТА СЕТИ',
-    eyebrow: 'NETWORK MAP',
     count: (count: number) => `открыто узлов: ${count}`,
     canvasLabel: (caseTitle: string) => `Карта сети кейса ${caseTitle}`,
     controlsLabel: 'Масштаб карты',
@@ -130,6 +130,7 @@ export const ru = {
     codex: (vuln: string, title: string) => `Кодекс ${vuln}: ${title}.`,
   },
   nodeMenu: {
+    title: 'УЗЕЛ',
     label: (node: string) => `Действия с узлом ${node}`,
     scan: 'Сканировать',
     exploit: 'Применить слабость',

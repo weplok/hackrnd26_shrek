@@ -237,15 +237,59 @@ a {
   width: 100%;
   max-width: none;
 }
-.campaign-map {
-  margin-top: 1.5rem;
+.app-shell:has(> .game-screen) {
+  width: min(1440px, calc(100% - 2rem));
 }
-.campaign-map__actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin-bottom: 0.75rem;
+.game-screen__brief .copy {
+  margin: 0;
+}
+.game-screen__node .node-menu {
+  max-width: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+@media (min-width: 1024px) {
+  .game-screen {
+    grid-template-columns: 20rem minmax(0, 1fr) 22rem;
+    grid-template-rows: auto auto auto auto 1fr auto;
+    grid-template-areas:
+      'hud hud hud'
+      'map map brief'
+      'map map goals'
+      'map map node'
+      'map map .'
+      'flip term back';
+    align-items: start;
+  }
+  .game-screen > .hud-bar {
+    grid-area: hud;
+  }
+  .game-screen__map {
+    grid-area: map;
+  }
+  .game-screen__brief {
+    grid-area: brief;
+  }
+  .game-screen > .objective-tracker {
+    grid-area: goals;
+  }
+  .game-screen__node {
+    grid-area: node;
+  }
+  .game-screen > .flipper {
+    grid-area: flip;
+  }
+  .game-screen__terminal {
+    grid-area: term;
+  }
+  .game-screen:not(:has(> .flipper)) .game-screen__terminal {
+    grid-column: 1 / 3;
+  }
+  .game-screen__back {
+    grid-area: back;
+    align-self: end;
+  }
 }
 .campaign-map__selection,
 .campaign-map__warning {
@@ -310,10 +354,6 @@ a {
     padding-top: 1rem;
   }
   .form-actions {
-    flex-direction: column;
-  }
-  .campaign-map__actions {
-    align-items: stretch;
     flex-direction: column;
   }
 }

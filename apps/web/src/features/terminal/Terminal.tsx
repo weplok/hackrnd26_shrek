@@ -1,6 +1,6 @@
-import { useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import type { GameEvent, Vulnerability } from '@zero-day/engine';
-import { useCaseStore } from '../game-session';
+import { subscribeToGameEvents, useCaseStore } from '../game-session';
 import { ru } from '../../shared/ui/strings';
 import { complete, parseCommand, type ParseResult, type TerminalContext } from './parser';
 
@@ -76,6 +76,16 @@ export function Terminal({ vulns, onCodex }: TerminalProps): ReactNode {
     setLines((prev) => [...prev, ...texts.map((text) => ({ id: nextId.current++, kind, text }))].slice(-200));
   }
 
+  // Map actions dispatch outside the terminal; the log mirrors every engine event.
+  useEffect(
+    () =>
+      subscribeToGameEvents(({ event }) => {
+        const text = eventText(event);
+        if (text !== null) print(event.type === 'CommandRejected' ? 'error' : 'output', [text]);
+      }),
+    [],
+  );
+
   function run(input: string): void {
     print('input', [`> ${input}`]);
     const result = parseCommand(input, ctx);
@@ -97,9 +107,7 @@ export function Terminal({ vulns, onCodex }: TerminalProps): ReactNode {
             ? { type: 'ScanNode', node: result.node }
             : { type: 'ProposeHypothesis', node: result.node, vuln: result.vuln },
         );
-        const texts = (step?.events ?? []).map(eventText).filter((text): text is string => text !== null);
-        const rejected = step?.events.some((event) => event.type === 'CommandRejected') ?? true;
-        print(rejected ? 'error' : 'output', step ? texts : [t.rejected['not-playing']]);
+        if (!step) print('error', [t.rejected['not-playing']]);
       }
     }
   }
@@ -131,7 +139,7 @@ export function Terminal({ vulns, onCodex }: TerminalProps): ReactNode {
 
   return (
     <section className="terminal" aria-label={t.label}>
-      <div className="terminal__log" role="log" aria-live="polite">
+      <div className="terminal__log" role="log" aria-live="polite" hidden={lines.length === 0}>
         {lines.map((line) => (
           <p key={line.id} className={`terminal__line terminal__line--${line.kind}`}>
             {line.text}
