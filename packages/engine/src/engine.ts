@@ -30,7 +30,7 @@ export function createGame(content: Content, caseId: string, difficulty: Difficu
   if (!c) throw new Error(`unknown case ${caseId}`);
   const nodes: GameState['nodes'] = {};
   for (const n of c.nodes) {
-    nodes[n.id] = { revealed: !n.revealedBy, scanned: false, compromised: false, secured: false };
+    nodes[n.id] = { segment: n.segment, revealed: !n.revealedBy, scanned: false, compromised: false, secured: false };
   }
   const segmentsOpen: Record<string, boolean> = {};
   for (const seg of c.segments) segmentsOpen[seg.id] = seg.openAtStart;
@@ -39,7 +39,7 @@ export function createGame(content: Content, caseId: string, difficulty: Difficu
   const npc: GameState['npc'] = {};
   for (const id of c.npcs) {
     const cfg = content.npcs[id];
-    npc[id] = { suspicion: cfg?.suspicion.start ?? 10, locked: false, yielded: false };
+    npc[id] = { suspicion: cfg?.suspicion.start ?? 10, locked: false, yielded: false, revealedFacts: {} };
   }
   const sockets: GameState['sockets'] = {};
   for (const n of c.nodes) {
@@ -374,6 +374,7 @@ export function present(
   s.log.push({ t: `[чат ${cfg.role}] ${cfg.replies[out.replyKey] ?? '…'}`, kind: out.grant.length ? 'ok' : 'sys' });
   if (out.grant.length) {
     rt.yielded = true;
+    for (const fact of out.grant) rt.revealedFacts[fact] = true;
     compromise(content, s, pnode); // node.onCompromise grants the held clue
   }
   if (rt.suspicion >= cfg.suspicion.fail_at) {

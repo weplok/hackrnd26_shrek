@@ -74,6 +74,7 @@ export interface Content {
 export type TrackId = 'alarm' | 'logs' | 'antifraud' | 'attention';
 
 export interface NodeRuntime {
+  segment: string;
   revealed: boolean;
   scanned: boolean;
   compromised: boolean;
@@ -84,6 +85,7 @@ export interface NpcRuntime {
   suspicion: number;
   locked: boolean;
   yielded: boolean;
+  revealedFacts: Record<string, boolean>; // clue ids the NPC gave away
 }
 
 export type Phase = 'briefing' | 'playing' | 'report' | 'won' | 'caught';

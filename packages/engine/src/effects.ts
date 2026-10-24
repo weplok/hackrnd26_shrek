@@ -1,4 +1,4 @@
-// Apply content Effects to game state (mutating a draft). Pure helpers.
+// Apply content Effects to game state (mutating a draft). The effect set is closed (TZ 6.2).
 import type { Effect, GameState } from './types.ts';
 
 // compromiseNode needs the engine's compromise flow (onCompromise chain), so it comes in as a callback.
@@ -44,6 +44,9 @@ function applyEffect(e: Effect, s: GameState, compromiseNode: (id: string) => vo
     s.objectives[e.completeObjective] = true;
   } else if ('compromiseNode' in e) {
     compromiseNode(e.compromiseNode);
+  } else {
+    const unknown: never = e;
+    throw new Error(`unknown effect: ${JSON.stringify(unknown)}`);
   }
 }
 
