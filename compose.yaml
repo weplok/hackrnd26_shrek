@@ -32,6 +32,8 @@ services:
       # Claude Code LLM (fallback or, with PRIORITY, primary). HOME points at the
       # mounted credentials so the CLI runs authorized inside the container.
       HOME: /root
+      # Skip autoupdater/telemetry/error-reporting startup traffic to cut per-call latency.
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
       CLAUDE_CODE_FALLBACK: ${CLAUDE_CODE_FALLBACK:-}
       CLAUDE_CODE_PRIORITY: ${CLAUDE_CODE_PRIORITY:-}
       CLAUDE_CODE_MODEL: ${CLAUDE_CODE_MODEL:-}
