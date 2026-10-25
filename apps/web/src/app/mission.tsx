@@ -307,6 +307,17 @@ function NodeInspector({
             );
           })}
         </div>
+      ) : npc ? (
+        <Button
+          type="button"
+          variant="primary"
+          disabled={!playing}
+          onClick={() => {
+            run((c, s) => openChat(c, s, npc));
+          }}
+        >
+          {t.talk}
+        </Button>
       ) : node.kind === 'person' ? (
         <NodeContextMenu
           node={node.id}
@@ -319,17 +330,6 @@ function NodeInspector({
           onSocial={(id) => void useSocial.getState().open(caseRun.caseId, id)}
           onClose={onClose}
         />
-      ) : npc ? (
-        <Button
-          type="button"
-          variant="primary"
-          disabled={!playing}
-          onClick={() => {
-            run((c, s) => openChat(c, s, npc));
-          }}
-        >
-          {t.talk}
-        </Button>
       ) : (
         <NodeContextMenu
           node={node.id}
