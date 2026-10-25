@@ -265,7 +265,10 @@ function completeScan(content: Content, s: GameState, nodeId: string): void {
     }
   }
   const sl = n.exploits[0]?.vuln;
-  if (sl) s.log.push({ t: `[scan] ${n.label}: слабость ${sl}.`, kind: 'sys' });
+  if (sl) {
+    const name = content.vulnerabilities[sl]?.title ?? sl;
+    s.log.push({ t: `[scan] ${n.label}: слабость — ${name} (${sl}).`, kind: 'sys' });
+  }
   stepAlarm(s, n.scanNoise, nodeId);
   recompute(content, s);
 }
@@ -328,6 +331,7 @@ export function submitPuzzle(content: Content, state: GameState, selected: strin
   const c = getCase(content, s);
   const n = node(c, inst.nodeId);
   if (!n) return s;
+  const methodTitle = content.vulnerabilities[inst.vuln]?.title ?? inst.vuln;
   const result = checkPuzzle(inst, selected);
   if (!result.solved && inst.archetype === 'scan') {
     s.log.push({ t: `✗ ${puzzleLogic(inst.archetype).explainMismatch(inst)}`, kind: 'bad' });
@@ -337,7 +341,10 @@ export function submitPuzzle(content: Content, state: GameState, selected: strin
     const left = inst.attemptsLeft - 1;
     s.activePuzzle = left > 0 ? { ...inst, attemptsLeft: left } : null;
     s.log.push({
-      t: left > 0 ? `✗ не вышло, попыток осталось: ${String(left)}.` : '✗ головоломка не решена.',
+      t:
+        left > 0
+          ? `✗ приём «${methodTitle}» к узлу ${n.label} не вышел, попыток осталось: ${String(left)}.`
+          : `✗ приём «${methodTitle}» к узлу ${n.label}: не удалось.`,
       kind: 'bad',
     });
     nodeRt(s, n.id).alertLevel = 'detected';
@@ -352,6 +359,7 @@ export function submitPuzzle(content: Content, state: GameState, selected: strin
   const ex = n.exploits.find((e) => e.vuln === inst.vuln);
   const reqOk = ex ? evalCondition(ex.requires, s) : false;
   if (ex && reqOk) {
+    s.log.push({ t: `✓ приём «${methodTitle}» к узлу ${n.label}: успешно.`, kind: 'ok' });
     const vulnInfo = content.vulnerabilities[inst.vuln];
     const noise = NOISE[vulnInfo?.noiseProfile ?? 'moderate'] ?? 9;
     if (!s.successfulVulnerabilities.includes(inst.vuln)) s.successfulVulnerabilities.push(inst.vuln);
@@ -364,7 +372,7 @@ export function submitPuzzle(content: Content, state: GameState, selected: strin
   } else {
     nodeRt(s, n.id).alertLevel = 'detected';
     const hint = failHint(n, inst);
-    s.log.push({ t: `✗ не та слабость. ${hint}`, kind: 'bad' });
+    s.log.push({ t: `✗ приём «${methodTitle}» к узлу ${n.label}: не сработал, не та слабость. ${hint}`, kind: 'bad' });
     stepAlarm(s, s.difficulty.wrongGuessNoise, n.id);
   }
   recompute(content, s);
