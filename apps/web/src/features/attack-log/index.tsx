@@ -112,12 +112,7 @@ export function AttackNotice(): ReactNode {
 
 export function AttackTable({ caseData, caseRun }: { caseData: Case; caseRun: GameState }): ReactNode {
   const results = useAttackLog((state) => state.results);
-  const rows = caseData.nodes.filter(
-    (node) =>
-      node.kind !== 'person' &&
-      !node.lock &&
-      (caseRun.nodes[node.id]?.revealed || results[rowKey(caseRun.caseId, node.id)]),
-  );
+  const rows = caseData.nodes.filter((node) => node.inScope && node.kind !== 'person' && !node.lock);
 
   return (
     <Panel className="attack-table" title={t.title}>
