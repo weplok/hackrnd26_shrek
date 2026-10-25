@@ -20,7 +20,7 @@ export type SocialChat = {
 type Chats = Record<string, SocialChat>;
 export type SocialMode = 'ai' | 'classic';
 
-const REPLY_TIMEOUT_MS = 90_000;
+const REPLY_TIMEOUT_MS = 190_000;
 
 type SocialStore = {
   chats: Chats;

@@ -40,12 +40,13 @@ class Settings:
     rate_limit_window_seconds: int = 60
     session_rate_limit: int = 10
     dialogue_rate_limit: int = 20
-    llm_request_timeout_seconds: int = 25
-    dialogue_timeout_seconds: int = 80
+    llm_request_timeout_seconds: int = 60
+    dialogue_timeout_seconds: int = 180
+    npc_max_tokens: int = 400
+    judge_max_tokens: int = 200
     telemetry_retention_days: int = 30
     redis_url: str = ""
-    llm_timeout_seconds: int = 90
-    llm_max_retries: int = 1
+    llm_max_retries: int = 0
 
     def _llm_values(self) -> dict[str, str]:
         return {
@@ -89,8 +90,10 @@ class Settings:
             rate_limit_window_seconds=_positive_int("RATE_LIMIT_WINDOW_SECONDS", 60),
             session_rate_limit=_positive_int("SESSION_RATE_LIMIT", 10),
             dialogue_rate_limit=_positive_int("DIALOGUE_RATE_LIMIT", 20),
-            llm_request_timeout_seconds=_positive_int("LLM_REQUEST_TIMEOUT_SECONDS", 25),
-            dialogue_timeout_seconds=_positive_int("DIALOGUE_TIMEOUT_SECONDS", 80),
+            llm_request_timeout_seconds=_positive_int("LLM_REQUEST_TIMEOUT_SECONDS", 60),
+            dialogue_timeout_seconds=_positive_int("DIALOGUE_TIMEOUT_SECONDS", 180),
+            npc_max_tokens=_positive_int("NPC_MAX_TOKENS", 400),
+            judge_max_tokens=_positive_int("JUDGE_MAX_TOKENS", 200),
             telemetry_retention_days=_positive_int("TELEMETRY_RETENTION_DAYS", 30),
             redis_url=os.getenv("REDIS_URL", "").strip(),
         )

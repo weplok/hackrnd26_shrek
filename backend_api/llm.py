@@ -21,7 +21,9 @@ class ModelError(RuntimeError):
 
 
 class LlmClient(Protocol):
-    async def complete(self, model: str, messages: list[dict[str, str]], temperature: float) -> str: ...
+    async def complete(
+        self, model: str, messages: list[dict[str, str]], temperature: float, max_tokens: int | None = None
+    ) -> str: ...
 
 
 class OpenAICompatibleLlm:
@@ -31,16 +33,19 @@ class OpenAICompatibleLlm:
         self.client = AsyncOpenAI(
             base_url=settings.base_url,
             api_key=settings.api_key,
-            timeout=settings.llm_timeout_seconds,
+            timeout=settings.llm_request_timeout_seconds,
             max_retries=settings.llm_max_retries,
         )
 
-    async def complete(self, model: str, messages: list[dict[str, str]], temperature: float) -> str:
+    async def complete(
+        self, model: str, messages: list[dict[str, str]], temperature: float, max_tokens: int | None = None
+    ) -> str:
         try:
             result = await self.client.chat.completions.create(
                 model=model,
                 messages=cast(list[ChatCompletionMessageParam], messages),
                 temperature=temperature,
+                **({"max_tokens": max_tokens} if max_tokens else {}),
             )
         except Exception as error:
             raise ModelError("OpenAI-compatible API request failed") from error
@@ -58,7 +63,9 @@ class FakeLlm:
         self._responses = iter(responses)
         self.calls: list[tuple[str, list[dict[str, str]], float]] = []
 
-    async def complete(self, model: str, messages: list[dict[str, str]], temperature: float) -> str:
+    async def complete(
+        self, model: str, messages: list[dict[str, str]], temperature: float, max_tokens: int | None = None
+    ) -> str:
         self.calls.append((model, messages, temperature))
         try:
             response = next(self._responses)
@@ -85,12 +92,14 @@ class CircuitBreakingLlm:
         self._consecutive_failures = 0
         self._opened_at: float | None = None
 
-    async def complete(self, model: str, messages: list[dict[str, str]], temperature: float) -> str:
+    async def complete(
+        self, model: str, messages: list[dict[str, str]], temperature: float, max_tokens: int | None = None
+    ) -> str:
         now = self.clock()
         if self._opened_at is not None and now - self._opened_at < self.recovery_seconds:
             raise ModelError("LLM circuit breaker is open")
         try:
-            response = await self.client.complete(model, messages, temperature)
+            response = await self.client.complete(model, messages, temperature, max_tokens)
         except ModelError:
             self._consecutive_failures += 1
             if self._consecutive_failures >= self.failure_threshold:

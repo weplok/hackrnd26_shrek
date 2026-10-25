@@ -20,7 +20,9 @@ class FakeChatClient:
     def __init__(self, responses: list[str]) -> None:
         self.responses = iter(responses)
 
-    async def complete(self, model: str, messages: list[dict[str, str]], temperature: float) -> str:
+    async def complete(
+        self, model: str, messages: list[dict[str, str]], temperature: float, max_tokens: int | None = None
+    ) -> str:
         return next(self.responses)
 
 
