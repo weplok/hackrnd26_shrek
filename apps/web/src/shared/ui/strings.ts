@@ -211,6 +211,7 @@ export const ru = {
     objectiveDone: 'Выполнено',
     flipper: 'ФЛИППЕР',
     flipperReady: 'На связи. Следим за обстановкой.',
+    flipperStuck: 'Застрял? Открой узел, сканируй, потом жми атаку. Промахи не карают — пробуй ещё.',
     achievement: 'АЧИВКА',
     moods: {
       sleeping: 'спит спокойно',

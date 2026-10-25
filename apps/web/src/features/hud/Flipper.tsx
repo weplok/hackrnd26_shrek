@@ -9,6 +9,23 @@ import './hud.css';
 
 const SPRITE_SOURCE = '/assets/flipper/flipper-states-sketch.png';
 
+// Events that mean the player is struggling vs. making progress. After a few failures
+// in a row with no progress between them, Flipper volunteers an explicit next-step hint.
+const FAIL_EVENTS = new Set(['CommandRejected', 'PuzzleFailed', 'ExploitMismatched', 'CombineFailed']);
+const PROGRESS_EVENTS = new Set([
+  'NodeScanned',
+  'CluesFound',
+  'ExploitSucceeded',
+  'PuzzleSolved',
+  'KeyAssembled',
+  'SocketFilled',
+  'LockOpened',
+  'ObjectiveCompleted',
+  'NodeSecured',
+  'CaseCompleted',
+]);
+const STUCK_AFTER_FAILS = 3;
+
 type FlipperProps = {
   caseId: string;
   level: number;
@@ -19,6 +36,7 @@ type FlipperProps = {
 export function Flipper({ caseId, level, lines, tracks }: FlipperProps): ReactNode {
   const [line, setLine] = useState<{ caseId: string; text: string } | null>(null);
   const lastSpoken = useRef<{ caseId: string; tick: number } | undefined>(undefined);
+  const failStreak = useRef(0);
   const mood = getFlipperMood(tracks);
   const latestAchievement = useAchievements((state) => state.latest);
   const [badge, setBadge] = useState<Achievement | null>(null);
@@ -35,8 +53,21 @@ export function Flipper({ caseId, level, lines, tracks }: FlipperProps): ReactNo
   }, [latestAchievement]);
 
   useEffect(() => {
+    failStreak.current = 0;
     return subscribeToGameEvents(({ event, state }) => {
       if (state.caseId !== caseId) return;
+
+      if (PROGRESS_EVENTS.has(event.type)) failStreak.current = 0;
+      if (FAIL_EVENTS.has(event.type)) {
+        failStreak.current += 1;
+        // Enough stumbles in a row: hand the player a concrete next step, cooldown aside.
+        if (failStreak.current >= STUCK_AFTER_FAILS) {
+          failStreak.current = 0;
+          lastSpoken.current = { caseId, tick: state.tick };
+          setLine({ caseId, text: ru.hud.flipperStuck });
+          return;
+        }
+      }
 
       const lastSpokenTick = lastSpoken.current?.caseId === caseId ? lastSpoken.current.tick : undefined;
       const nextLine = findFlipperLine(lines, event, state, level, lastSpokenTick);

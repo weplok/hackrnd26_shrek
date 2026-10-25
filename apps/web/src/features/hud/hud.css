@@ -98,6 +98,7 @@
 
 .flipper__sprite {
   position: relative;
+  align-self: start;
   aspect-ratio: 3 / 2;
   overflow: hidden;
   background: #18120d;
@@ -108,6 +109,24 @@
   width: 200%;
   max-width: none;
   height: auto;
+}
+
+/* Gentle breathing while Flipper dozes; scale-only so no neighbour sprite bleeds in. */
+@media (prefers-reduced-motion: no-preference) {
+  .flipper__sprite-image--sleeping {
+    animation: flipper-breathe 4.5s ease-in-out infinite;
+    transform-origin: 50% 50%;
+  }
+}
+
+@keyframes flipper-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.018);
+  }
 }
 
 .flipper__sprite-image--alert {
