@@ -306,7 +306,7 @@ export function hypothesize(content: Content, state: GameState, nodeId: string, 
     label: (id) => node(c, id)?.label ?? id,
   });
   s.activePuzzle = inst;
-  s.log.push({ t: `$ гипотеза: ${n.label} → ${vuln}`, kind: 'cmd' });
+  s.log.push({ t: `$ гипотеза: ${n.label} → ${content.vulnerabilities[vuln]?.title ?? vuln}`, kind: 'cmd' });
   return s;
 }
 

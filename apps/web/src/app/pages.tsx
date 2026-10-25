@@ -95,7 +95,6 @@ export function ContractsPage({
 }): ReactNode {
   const navigate = useNavigate();
   const order = caseOrder(content);
-  const codexTotal = Object.keys(content.codex).length;
   const t = ru.contracts;
 
   return (
@@ -113,7 +112,7 @@ export function ContractsPage({
             {t.demo}
           </Button>
           <Link className="zd-button button-link" to="/codex">
-            {t.codex(save.codex.length, codexTotal)}
+            {t.codex}
           </Link>
           <Link className="zd-button button-link" to="/">
             {t.menu}
@@ -178,64 +177,44 @@ export function ContractsPage({
   );
 }
 
-export function CodexPage({ content, opened }: { content: Content; opened: readonly string[] }): ReactNode {
-  const ids = Object.keys(content.codex).sort();
-  const [selected, setSelected] = useState(ids.find((id) => opened.includes(id)) ?? ids[0] ?? '');
-  const card = content.codex[selected];
-  const known = opened.includes(selected);
-  const t = ru.codexPage;
+export function CodexPage(): ReactNode {
+  const t = ru.tools;
+  const [selected, setSelected] = useState<string>(t.items[0]?.id ?? '');
+  const tool = t.items.find((item) => item.id === selected) ?? t.items[0];
 
   return (
     <Panel className="codex" title={t.title}>
       <p className="copy">{t.copy}</p>
       <div className="codex__body">
         <nav className="codex__list" aria-label={t.list}>
-          {ids.map((id) => (
+          {t.items.map((item) => (
             <button
-              key={id}
+              key={item.id}
               type="button"
-              className={`codex__item${id === selected ? ' codex__item--active' : ''}`}
-              aria-current={id === selected}
+              className={`codex__item${item.id === selected ? ' codex__item--active' : ''}`}
+              aria-current={item.id === selected}
               onClick={() => {
-                setSelected(id);
+                setSelected(item.id);
               }}
             >
-              {content.codex[id]?.method ?? id} {opened.includes(id) ? '' : '🔒'}
+              {item.name}
             </button>
           ))}
         </nav>
         <article className="codex__card">
-          {card && known ? (
+          {tool && (
             <>
-              <h2 className="codex__method">{card.method}</h2>
-              <p className="codex__summary">{card.summary}</p>
-              <p className="codex__weakness">
-                {t.weakness}: {content.vulnerabilities[card.id]?.title ?? card.id}
-                <span className="codex__id"> · {card.id}</span>
+              <h2 className="codex__method">{tool.name}</h2>
+              <p className="codex__summary">{tool.what}</p>
+              <h3>{t.commandLabel}</h3>
+              <p className="copy">
+                <code>{tool.command}</code>
               </p>
-              <h3>{t.term}</h3>
-              <p className="copy">{card.realTerm}</p>
-              <h3>{t.why}</h3>
-              <p className="copy">{card.whyItWorks}</p>
-              <h3>{t.defense}</h3>
-              <p className="copy">{card.defense}</p>
-              <h3>{t.realCase}</h3>
-              <p className="copy">{card.realCase}</p>
-              <h3>{t.law}</h3>
-              <p className="copy">{card.law}</p>
-              <h3>{t.more}</h3>
-              <ul>
-                {card.learnMore.map((link) => (
-                  <li key={link.url}>
-                    <a href={link.url} target="_blank" rel="noreferrer">
-                      {link.title}
-                    </a>
-                  </li>
-                ))}
-              </ul>
+              <h3>{t.exampleLabel}</h3>
+              <p className="copy">
+                <code>{tool.example}</code>
+              </p>
             </>
-          ) : (
-            <p className="copy">{t.locked}</p>
           )}
         </article>
       </div>
