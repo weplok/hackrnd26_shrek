@@ -11,6 +11,7 @@ import { startAutosave, withCaseRun, type SaveRepository } from '../features/per
 import { PuzzleHost } from '../features/puzzle-host';
 import { socialKey, useSocial, type SocialMode } from '../features/social';
 import { NodeContextMenu, Terminal } from '../features/terminal';
+import { TutorialCoach } from '../features/tutorial';
 import { ru } from '../shared/ui/strings';
 import { caseOrder } from './pages';
 
@@ -186,6 +187,14 @@ export function MissionPage({
       <div className="mission__terminal">
         <Terminal vulns={Object.values(content.vulnerabilities)} caseData={caseData} />
       </div>
+
+      {!briefing && (storyDone || !hasStory) && (
+        <TutorialCoach
+          level={levelNumber}
+          phase={caseRun.phase}
+          blocked={Boolean(caseRun.activePuzzle || caseRun.activeChat || caseRun.pendingScope)}
+        />
+      )}
 
       <PuzzleHost />
       <AttackNotice />

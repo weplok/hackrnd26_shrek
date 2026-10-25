@@ -1,0 +1,95 @@
+.coach {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+}
+
+.coach__backdrop,
+.coach__dim {
+  position: fixed;
+  background: rgba(3, 8, 6, 0.72);
+  pointer-events: auto;
+}
+
+.coach__backdrop {
+  inset: 0;
+}
+
+.coach__ring {
+  position: fixed;
+  border: 2px solid var(--color-green-bright);
+  border-radius: 6px;
+  box-shadow: 0 0 0 2px rgba(3, 8, 6, 0.6), 0 0 18px var(--color-green-bright);
+  pointer-events: none;
+}
+
+.coach__card {
+  position: fixed;
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  padding: var(--space-3);
+  background: var(--color-panel-raised);
+  border: 1px solid var(--color-green);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+  font-family: var(--font-ui);
+  color: var(--color-text);
+  pointer-events: auto;
+}
+
+.coach__step {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: var(--color-green-bright);
+}
+
+.coach__title {
+  margin: 0 0 var(--space-2);
+  font-size: 1.05rem;
+  color: var(--color-text);
+}
+
+.coach__body {
+  margin: 0 0 var(--space-3);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--color-muted);
+}
+
+.coach__actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.coach__skip,
+.coach__next {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: var(--space-1) var(--space-3);
+}
+
+.coach__skip {
+  background: transparent;
+  border: 1px solid var(--color-line);
+  color: var(--color-muted);
+}
+
+.coach__next {
+  background: var(--color-green);
+  border: 1px solid var(--color-green-bright);
+  color: var(--color-bg);
+  font-weight: 600;
+}
+
+.coach__next:hover,
+.coach__skip:hover {
+  filter: brightness(1.12);
+}

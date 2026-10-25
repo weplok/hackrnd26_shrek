@@ -191,6 +191,13 @@ export const ru = {
     close: 'Закрыть',
     terminalHint: (command: string) => `Применить можно только из терминала внизу. Введите: ${command}`,
   },
+  tutorial: {
+    label: 'Обучение',
+    step: (n: number, total: number) => `ШАГ ${String(n)}/${String(total)}`,
+    skip: 'ПРОПУСТИТЬ',
+    next: 'ДАЛЕЕ →',
+    done: 'ПОНЯТНО',
+  },
   hud: {
     objectives: 'ЦЕЛИ',
     objectiveDone: 'Выполнено',
