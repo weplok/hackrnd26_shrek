@@ -168,6 +168,7 @@ export const ru = {
     trust: (value: number | null) => `ДОВЕРИЕ: ${value === null ? '?' : String(value)}`,
     placeholder: 'Сообщение собеседнику',
     send: 'ОТПРАВИТЬ',
+    replay: 'ПЕРЕИГРАТЬ',
     typing: 'собеседник печатает…',
     connecting: 'подключение…',
     empty: 'Напиши первое сообщение.',

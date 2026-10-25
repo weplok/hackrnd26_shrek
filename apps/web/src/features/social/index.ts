@@ -30,6 +30,7 @@ type SocialStore = {
   open: (caseId: string, nodeId: string) => Promise<void>;
   close: () => void;
   send: (content: Content, caseId: string, nodeId: string, text: string) => Promise<void>;
+  replay: (caseId: string, nodeId: string) => Promise<void>;
   reset: () => void;
 };
 
@@ -172,6 +173,22 @@ export const useSocial = create<SocialStore>((set, get) => {
       if (caseRun?.caseId === caseId) {
         useCaseStore.setState({ caseRun: socialOutcome(content, caseRun, nodeId, verdict) });
       }
+    },
+    replay: async (caseId, nodeId) => {
+      const key = socialKey(caseId, nodeId);
+      const chat = get().chats[key];
+      if (!chat?.npcId || chat.pending) return;
+      // A fresh session wipes the NPC's server-side memory so the dialogue starts over.
+      const session = await createAnonymousSession();
+      if (get().chats[key]?.npcId !== chat.npcId) return;
+      update(key, {
+        sessionId: session.id,
+        messages: [],
+        trust: null,
+        verdict: 'continue',
+        pending: false,
+        unread: false,
+      });
     },
     reset: () => {
       persist({});

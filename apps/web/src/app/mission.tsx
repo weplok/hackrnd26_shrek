@@ -781,6 +781,17 @@ function SocialOverlay({
         </form>
       )}
       <div className="form-actions">
+        {chat?.npcId && chat.messages.length > 0 && caseRun.phase === 'playing' && (
+          <Button
+            type="button"
+            disabled={chat.pending}
+            onClick={() => {
+              void useSocial.getState().replay(caseRun.caseId, nodeId);
+            }}
+          >
+            {st.replay}
+          </Button>
+        )}
         <Button
           type="button"
           onClick={() => {
