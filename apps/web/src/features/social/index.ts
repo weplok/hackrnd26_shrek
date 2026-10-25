@@ -73,9 +73,14 @@ function fetchNpcIds(): Promise<string[]> {
   return npcIds;
 }
 
-function pickNpc(ids: string[], taken: string[]): string {
-  const free = ids.filter((id) => !taken.includes(id));
-  const pool = free.length ? free : ids;
+const caseNpcPrefix: Record<string, Record<string, string>> = {
+  L2C1: { kostya: 'kostya', marina: 'maria', anton: 'anton' },
+};
+
+function pickNpc(ids: string[], taken: string[], prefix: string): string {
+  const own = ids.filter((id) => new RegExp(`^${prefix}\\d+$`).test(id));
+  const free = own.filter((id) => !taken.includes(id));
+  const pool = free.length ? free : own;
   return pool[Math.floor(Math.random() * pool.length)] ?? '';
 }
 
@@ -107,7 +112,7 @@ export const useSocial = create<SocialStore>((set, get) => {
         .map(([, chat]) => chat.npcId);
       const [ids, session] = await Promise.all([fetchNpcIds().catch(() => [] as string[]), createAnonymousSession()]);
       if (get().chats[key]?.npcId) return;
-      const npcId = pickNpc(ids, taken);
+      const npcId = pickNpc(ids, taken, caseNpcPrefix[caseId]?.[nodeId] ?? 'emp');
       const chat: SocialChat = {
         npcId,
         sessionId: session.id,
