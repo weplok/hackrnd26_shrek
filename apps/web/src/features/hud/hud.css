@@ -148,6 +148,45 @@
   line-height: 1.5;
 }
 
+.flipper__achievement {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 0.15rem;
+  margin-top: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--color-green-bright);
+  background: rgba(0, 0, 0, 0.35);
+  animation: flipper-achievement-in 0.25s ease-out;
+}
+
+.flipper__achievement-tag {
+  color: var(--color-green-bright);
+  font: 0.625rem/1.2 var(--font-mono);
+  letter-spacing: 0.18em;
+}
+
+.flipper__achievement-title {
+  color: var(--color-text);
+  font-size: 0.9375rem;
+}
+
+.flipper__achievement-desc {
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+@keyframes flipper-achievement-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media (max-width: 375px) {
   .flipper {
     grid-template-columns: 1fr;

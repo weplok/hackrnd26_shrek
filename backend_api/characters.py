@@ -60,6 +60,9 @@ class CharacterRepository:
             paths[npc_id] = target
         return paths
 
+    def ids(self) -> list[str]:
+        return list(self._paths)
+
     def get(self, npc_id: str) -> CharacterProfile:
         path = self._paths.get(npc_id)
         if path is None:

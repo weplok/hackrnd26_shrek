@@ -103,7 +103,9 @@ class AppContractTests(unittest.TestCase):
             )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"answer": "Здравствуйте.", "verdict": "continue"})
+        body = response.json()
+        self.assertIsInstance(body.pop("trust_points"), int)
+        self.assertEqual(body, {"answer": "Здравствуйте.", "verdict": "continue"})
 
     def test_dialogue_accepts_common_judge_formatting(self) -> None:
         fake_client = FakeChatClient(["True.", "Здравствуйте.", '```json\n{"verdict":"continue","trust_change":0}\n```'])

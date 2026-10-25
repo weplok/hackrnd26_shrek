@@ -45,3 +45,8 @@
 .attack-table {
   margin-top: var(--space-3);
 }
+
+.attack-table__row--locked {
+  color: var(--color-muted);
+  opacity: 0.55;
+}

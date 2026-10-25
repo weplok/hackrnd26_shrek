@@ -18,12 +18,13 @@ from redis.asyncio import Redis
 
 from .characters import CharacterNotFoundError, CharacterProfileError, CharacterRepository
 from .config import ConfigurationError, Settings
-from .llm import CircuitBreakingLlm, LlmClient, ModelError, OpenAICompatibleLlm
+from .llm import ClaudeCodeLlm, CircuitBreakingLlm, FallbackLlm, LlmClient, ModelError, OpenAICompatibleLlm
 from .rate_limit import FixedWindowRateLimiter, RateLimitExceeded, RedisFixedWindowRateLimiter
 from .schemas import (
     DialogueRequest,
     DialogueResponse,
     HealthResponse,
+    NpcListResponse,
     SessionResponse,
     TelemetryRequest,
     TelemetryResponse,
@@ -41,6 +42,18 @@ if not request_logger.handlers:
     request_logger.addHandler(handler)
 request_logger.setLevel(logging.INFO)
 request_logger.propagate = False
+
+
+def build_llm_client(settings: Settings) -> LlmClient:
+    if settings.claude_code_priority:
+        claude = ClaudeCodeLlm(settings)
+        if settings.openai_configured():
+            return FallbackLlm(claude, CircuitBreakingLlm(OpenAICompatibleLlm(settings)))
+        return claude
+    primary = CircuitBreakingLlm(OpenAICompatibleLlm(settings))
+    if settings.claude_code_fallback:
+        return FallbackLlm(primary, ClaudeCodeLlm(settings))
+    return primary
 
 
 def create_app(settings: Settings | None = None, client: LlmClient | None = None) -> FastAPI:
@@ -61,13 +74,13 @@ def create_app(settings: Settings | None = None, client: LlmClient | None = None
     def get_service() -> DialogueService:
         if app.state.service is None:
             runtime_settings = get_settings()
-            if app.state.client is None:
+            if app.state.client is None and not runtime_settings.claude_code_priority:
                 runtime_settings.require_llm()
             app.state.service = DialogueService(
                 settings=runtime_settings,
                 characters=CharacterRepository(runtime_settings.npc_ids_path),
                 sessions=SessionStore(runtime_settings.session_db_path),
-                client=app.state.client or CircuitBreakingLlm(OpenAICompatibleLlm(runtime_settings)),
+                client=app.state.client or build_llm_client(runtime_settings),
             )
         return cast(DialogueService, app.state.service)
 
@@ -206,6 +219,10 @@ def create_app(settings: Settings | None = None, client: LlmClient | None = None
         )
         session = await get_anonymous_sessions().create()
         return SessionResponse(session_id=session.session_id, expires_at=session.expires_at)
+
+    @app.get("/api/v1/npcs", response_model=NpcListResponse)
+    async def list_npcs() -> NpcListResponse:
+        return NpcListResponse(npc_ids=CharacterRepository(get_settings().npc_ids_path).ids())
 
     @app.post("/dialogue", response_model=DialogueResponse)
     async def dialogue(payload: DialogueRequest, request: Request) -> DialogueResponse:

@@ -14,6 +14,7 @@ export type NetworkNodeData = {
   alertLevel: NodeAlertLevel;
   ariaLabel: string;
   disabled: boolean;
+  done: boolean;
   inScope: boolean;
   isGateway: boolean;
   kind: ContentNode['kind'];
@@ -42,6 +43,11 @@ function visualState(runtime: NodeRuntime): NetworkVisualState {
   if (runtime.compromised) return 'compromised';
   if (runtime.scanned) return 'scanned';
   return 'untouched';
+}
+
+// Done once the node is taken over by any of its attacks; scanning is optional.
+function isDone(runtime: NodeRuntime): boolean {
+  return runtime.secured || runtime.compromised;
 }
 
 function isGateway(node: ContentNode): boolean {
@@ -113,6 +119,7 @@ export function buildNetworkMap(caseData: Case, gameState: GameState, selectedNo
         alertLevel: runtime.alertLevel,
         ariaLabel: nodeAriaLabel(node, runtime, locked, gateway),
         disabled: locked,
+        done: !node.inScope || isDone(runtime),
         inScope: node.inScope,
         isGateway: gateway,
         kind: node.kind,

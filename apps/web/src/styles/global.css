@@ -433,6 +433,11 @@ a {
   border-color: var(--color-green);
   outline: none;
 }
+.node-menu__hint {
+  margin: 0.5rem 0 0;
+  color: var(--color-amber);
+  font-size: 0.875rem;
+}
 .node-menu__id {
   color: var(--color-green);
   font-family: var(--font-mono);

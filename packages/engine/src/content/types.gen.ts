@@ -117,6 +117,7 @@ export interface Case {
   schemaVersion: 1;
   id: string;
   title: string;
+  story?: string[];
   brief: Brief;
   scope: Scope;
   difficulty?: DifficultyOverride;

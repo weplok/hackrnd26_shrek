@@ -7,6 +7,7 @@
     "schemaVersion": { "$ref": "common.schema.json#/definitions/SchemaVersion" },
     "id": { "$ref": "common.schema.json#/definitions/CaseId" },
     "title": { "$ref": "common.schema.json#/definitions/Text" },
+    "story": { "type": "array", "items": { "$ref": "common.schema.json#/definitions/Text" } },
     "brief": { "$ref": "#/definitions/Brief" },
     "scope": { "$ref": "#/definitions/Scope" },
     "difficulty": { "$ref": "common.schema.json#/definitions/DifficultyOverride" },

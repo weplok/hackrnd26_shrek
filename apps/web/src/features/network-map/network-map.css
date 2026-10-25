@@ -108,6 +108,7 @@
 }
 
 .network-map__node-button {
+  position: relative;
   display: grid;
   width: 100%;
   min-height: 5.75rem;
@@ -125,6 +126,12 @@
 .network-map__node-kind {
   color: var(--color-green);
   font: 1.125rem/1 var(--font-mono);
+}
+
+.network-map__node-id {
+  color: var(--color-green);
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
 }
 
 .network-map__node-label {
@@ -158,15 +165,15 @@
   border-color: var(--color-green);
 }
 
-.network-map__node--compromised,
+.network-map__node--compromised:not(.network-map__node--pending),
 .network-map__node--secured {
   border: 2px solid var(--color-green-bright);
   animation: none;
   background: #0c2a1d;
 }
 
-.network-map__node--compromised .network-map__node-kind,
-.network-map__node--compromised .network-map__node-status {
+.network-map__node--compromised:not(.network-map__node--pending) .network-map__node-kind,
+.network-map__node--compromised:not(.network-map__node--pending) .network-map__node-status {
   color: var(--color-green-bright);
 }
 
@@ -257,8 +264,7 @@
   }
 }
 
-.network-map__node--untouched:not(.network-map__node--locked),
-.network-map__node--scanned:not(.network-map__node--locked) {
+.network-map__node--pending:not(.network-map__node--locked) {
   animation: node-pulse 1.6s ease-out infinite;
 }
 
@@ -280,4 +286,15 @@
       0 0 0 0 rgb(59 156 255 / 0%),
       0 0 0.5rem 0.125rem rgb(59 156 255 / 40%);
   }
+}
+
+.network-map__node-unread {
+  position: absolute;
+  top: -0.25rem;
+  right: -0.25rem;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 50%;
+  background: var(--color-amber);
+  box-shadow: 0 0 0 2px var(--color-panel);
 }

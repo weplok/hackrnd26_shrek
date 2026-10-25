@@ -20,13 +20,24 @@ services:
       dockerfile: backend_api/Dockerfile
     environment:
       REDIS_URL: redis://redis:6379/0
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL:?set OPENAI_BASE_URL}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:?set OPENAI_API_KEY}
-      NPC_MODEL: ${NPC_MODEL:?set NPC_MODEL}
-      INJECTION_JUDGE_MODEL: ${INJECTION_JUDGE_MODEL:?set INJECTION_JUDGE_MODEL}
-      ALARM_JUDGE_MODEL: ${ALARM_JUDGE_MODEL:?set ALARM_JUDGE_MODEL}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      NPC_MODEL: ${NPC_MODEL:-}
+      INJECTION_JUDGE_MODEL: ${INJECTION_JUDGE_MODEL:-}
+      ALARM_JUDGE_MODEL: ${ALARM_JUDGE_MODEL:-}
+      # Claude Code LLM (fallback or, with PRIORITY, primary). HOME points at the
+      # mounted credentials so the CLI runs authorized inside the container.
+      HOME: /root
+      CLAUDE_CODE_FALLBACK: ${CLAUDE_CODE_FALLBACK:-}
+      CLAUDE_CODE_PRIORITY: ${CLAUDE_CODE_PRIORITY:-}
+      CLAUDE_CODE_MODEL: ${CLAUDE_CODE_MODEL:-}
+      CLAUDE_CODE_BIN: ${CLAUDE_CODE_BIN:-}
     volumes:
       - npc_data:/app/backend_api/data
+      # Host-installed, host-authorized Claude Code CLI, mounted read-only.
+      - ${CLAUDE_HOST_BIN:-/root/.local/bin/claude}:/usr/local/bin/claude:ro
+      - ${CLAUDE_HOST_CREDS:-/root/.claude}:/root/.claude
+      - ${CLAUDE_HOST_CONFIG:-/root/.claude.json}:/root/.claude.json
     depends_on:
       redis:
         condition: service_healthy

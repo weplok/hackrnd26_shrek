@@ -16,6 +16,7 @@ describe('terminal parser', () => {
     expect(parseCommand('  scan  WIFI ', ctx)).toEqual({ type: 'scan', node: 'wifi' });
     expect(parseCommand('help', ctx)).toEqual({ type: 'help' });
     expect(parseCommand('codex sl-01', ctx)).toEqual({ type: 'codex', vuln: 'SL-01' });
+    expect(parseCommand('bruteforce Router', ctx)).toEqual({ type: 'attack', attack: 'brute', node: 'router' });
   });
 
   it('reports errors without touching the engine', () => {
@@ -35,7 +36,7 @@ describe('terminal completion', () => {
   });
 
   it('lists options when ambiguous', () => {
-    expect(complete('s', ctx)).toEqual({ value: 's', options: ['scan', 'speaker'] });
+    expect(complete('s', ctx)).toEqual({ value: 's', options: ['scan', 'social', 'speaker'] });
     expect(complete('router SL-0', ctx)).toEqual({ value: 'router SL-0', options: ['SL-01', 'SL-02'] });
   });
 

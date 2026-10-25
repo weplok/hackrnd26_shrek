@@ -280,6 +280,13 @@
   stroke-width: 1;
   transition: fill 0.2s;
 }
+.ddos-storm__count {
+  fill: var(--color-text);
+  font: 700 4px var(--font-mono);
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
 .ddos-storm__core--1 { fill: #3a2a08; }
 .ddos-storm__core--2 { fill: #5a3008; }
 .ddos-storm__core--3 { fill: #7a1e10; }

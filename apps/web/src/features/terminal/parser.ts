@@ -1,5 +1,8 @@
+import type { AttackId } from '../attack-log';
+
 export type TerminalCommand =
   | { type: 'help' }
+  | { type: 'attack'; attack: AttackId; node: string }
   | { type: 'scan'; node: string }
   | { type: 'codex'; vuln: string }
   | { type: 'hypothesis'; node: string; vuln: string };
@@ -18,7 +21,14 @@ export interface Completion {
   options: string[];
 }
 
-const KEYWORDS = ['help', 'scan', 'codex'] as const;
+export const ATTACK_COMMANDS: Record<AttackId, string> = {
+  brute: 'bruteforce',
+  virus: 'virus',
+  ddos: 'ddos',
+  injection: 'inject',
+  social: 'social',
+};
+const KEYWORDS = ['help', 'scan', 'codex', ...Object.values(ATTACK_COMMANDS)];
 const VULN_RE = /^(sl|сл)-?(\d{1,2})$/iu;
 const CYRILLIC_PREFIX_RE = /^с/iu;
 
@@ -56,6 +66,12 @@ export function parseCommand(input: string, ctx: TerminalContext): ParseResult {
     if (!arg) return { type: 'error', code: 'usage' };
     const node = findNode(ctx, arg);
     return node ? { type: 'scan', node } : { type: 'error', code: 'unknown-node', token: arg };
+  }
+  const attack = (Object.keys(ATTACK_COMMANDS) as AttackId[]).find((id) => ATTACK_COMMANDS[id] === keyword);
+  if (attack) {
+    if (!arg) return { type: 'error', code: 'usage' };
+    const node = findNode(ctx, arg);
+    return node ? { type: 'attack', attack, node } : { type: 'error', code: 'unknown-node', token: arg };
   }
   if (keyword === 'codex') {
     const vuln = parseVuln(ctx, arg);
@@ -99,7 +115,7 @@ export function complete(input: string, ctx: TerminalContext): Completion {
     candidates = [...KEYWORDS, ...ctx.nodes].filter((word) => word.toLowerCase().startsWith(lower));
   } else if (done.length === 1) {
     const head = done[0]?.toLowerCase() ?? '';
-    if (head === 'scan') {
+    if (head === 'scan' || Object.values(ATTACK_COMMANDS).includes(head)) {
       candidates = ctx.nodes.filter((node) => node.toLowerCase().startsWith(current.toLowerCase()));
     } else if (head === 'codex' || findNode(ctx, head)) {
       candidates = vulnCandidates(ctx, current);

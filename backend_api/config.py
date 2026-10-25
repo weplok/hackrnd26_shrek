@@ -44,16 +44,27 @@ class Settings:
     dialogue_timeout_seconds: int = 80
     telemetry_retention_days: int = 30
     redis_url: str = ""
+    llm_timeout_seconds: int = 90
+    llm_max_retries: int = 1
+    claude_code_fallback: bool = False
+    claude_code_priority: bool = False
+    claude_code_bin: str = "claude"
+    claude_code_model: str = "sonnet"
 
-    def require_llm(self) -> None:
-        values = {
+    def _llm_values(self) -> dict[str, str]:
+        return {
             "OPENAI_BASE_URL": self.base_url,
             "OPENAI_API_KEY": self.api_key,
             "NPC_MODEL": self.npc_model,
             "INJECTION_JUDGE_MODEL": self.injection_judge_model,
             "ALARM_JUDGE_MODEL": self.alarm_judge_model,
         }
-        missing = [name for name, value in values.items() if not value]
+
+    def openai_configured(self) -> bool:
+        return all(self._llm_values().values())
+
+    def require_llm(self) -> None:
+        missing = [name for name, value in self._llm_values().items() if not value]
         if missing:
             raise ConfigurationError("Missing required environment variables: " + ", ".join(missing))
 
@@ -86,6 +97,10 @@ class Settings:
             dialogue_timeout_seconds=_positive_int("DIALOGUE_TIMEOUT_SECONDS", 80),
             telemetry_retention_days=_positive_int("TELEMETRY_RETENTION_DAYS", 30),
             redis_url=os.getenv("REDIS_URL", "").strip(),
+            claude_code_fallback=os.getenv("CLAUDE_CODE_FALLBACK", "").strip().lower() in {"1", "true", "yes", "on"},
+            claude_code_priority=os.getenv("CLAUDE_CODE_PRIORITY", "").strip().lower() in {"1", "true", "yes", "on"},
+            claude_code_bin=os.getenv("CLAUDE_CODE_BIN", "").strip() or "claude",
+            claude_code_model=os.getenv("CLAUDE_CODE_MODEL", "").strip() or "sonnet",
         )
         if require_llm:
             settings.require_llm()

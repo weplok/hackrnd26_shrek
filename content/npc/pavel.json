@@ -1,0 +1,68 @@
+{
+  "npc": "pavel",
+  "role": "Главный хранитель фондов",
+  "archetype": "vain_cautious",
+  "holds": [
+    "pavel_vouch"
+  ],
+  "suspicion": {
+    "start": 35,
+    "fail_at": 100
+  },
+  "requires": {
+    "legend": [
+      "legend_city"
+    ],
+    "clues": [
+      "vera_tip"
+    ]
+  },
+  "tones": [
+    "friendly",
+    "business",
+    "urgent",
+    "flattery"
+  ],
+  "replies": {
+    "greeting": "Хранитель фондов. Слушаю, только коротко.",
+    "soft": "Канцелярия предупреждала о проверке. Хорошо, подтверждаю вас как подрядчика — работайте аккуратно.",
+    "nervous": "Мне никто не говорил о проверке. Пришлите письмо через канцелярию.",
+    "closed": "Разговор окончен. Я сообщу в администрацию."
+  },
+  "rules": [
+    {
+      "if": {
+        "tone": "flattery",
+        "has_key": "legend_city",
+        "has_clue": "vera_tip"
+      },
+      "then": {
+        "suspicion": -10,
+        "reply": "soft",
+        "grant": [
+          "pavel_vouch"
+        ]
+      }
+    },
+    {
+      "if": {
+        "tone": "friendly"
+      },
+      "then": {
+        "suspicion": 10,
+        "reply": "nervous"
+      }
+    },
+    {
+      "if": {
+        "tone": "urgent"
+      },
+      "then": {
+        "suspicion": 45,
+        "reply": "closed",
+        "flipper": "growl"
+      }
+    }
+  ],
+  "codex": "SL-09"
+}

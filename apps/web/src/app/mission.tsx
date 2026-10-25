@@ -4,11 +4,12 @@ import { Button, Panel } from '@zero-day/ui';
 import { answerReport, closeChat, noiseSources, openChat, present, profileStyle, wait } from '@zero-day/engine';
 import type { Case, Command, Content, GameState } from '@zero-day/engine';
 import { useCaseStore } from '../features/game-session';
-import { HudBar, ObjectiveTracker, Flipper, hasFlipperJoined } from '../features/hud';
+import { HudBar, ObjectiveTracker, Flipper, hasFlipperJoined, startAchievements } from '../features/hud';
 import { AttackNotice, AttackTable } from '../features/attack-log';
 import { NetworkMap } from '../features/network-map/NetworkMap';
 import { startAutosave, withCaseRun, type SaveRepository } from '../features/persistence';
 import { PuzzleHost } from '../features/puzzle-host';
+import { socialKey, useSocial } from '../features/social';
 import { NodeContextMenu, Terminal } from '../features/terminal';
 import { ru } from '../shared/ui/strings';
 import { caseOrder } from './pages';
@@ -43,23 +44,36 @@ export function MissionPage({
   const start = useCaseStore((state) => state.start);
   const resume = useCaseStore((state) => state.resume);
   const dispatch = useCaseStore((state) => state.dispatch);
+  const hasStory = (caseData?.story?.length ?? 0) > 0;
   const [briefing, setBriefing] = useState(() => unfinishedRun(repository, caseId) === null);
+  const [storyDone, setStoryDone] = useState(() => !(hasStory && unfinishedRun(repository, caseId) === null));
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
   function begin(): void {
     if (!level) return;
+    useSocial.getState().reset();
     start({ caseId, content, difficulty: level.difficulty });
     setSelectedNodeId(null);
+    setStoryDone(!hasStory);
     setBriefing(true);
   }
 
   useEffect(() => {
     const unfinished = unfinishedRun(repository, caseId);
     if (unfinished) resume(content, unfinished);
-    else if (level) start({ caseId, content, difficulty: level.difficulty });
+    else if (level) {
+      useSocial.getState().reset();
+      start({ caseId, content, difficulty: level.difficulty });
+    }
   }, [caseId, content, level, repository, resume, start]);
 
+  // A lost level resets every social-engineering session.
+  useEffect(() => {
+    if (caseRun?.phase === 'caught') useSocial.getState().reset();
+  }, [caseRun?.phase]);
+
   useEffect(() => startAutosave(repository, () => useCaseStore.getState().caseRun), [repository]);
+  useEffect(() => startAchievements(repository), [repository]);
 
   // Chat, wait and report steps are engine calls outside the command pipeline, so autosave never sees the win.
   useEffect(() => {
@@ -129,7 +143,6 @@ export function MissionPage({
             onSelectNode={setSelectedNodeId}
             selectedNodeId={selectedNodeId}
           />
-          {levelIndex === 0 && <AttackTable caseData={caseData} caseRun={caseRun} />}
         </div>
         <div className="mission__side">
           <NodeInspector
@@ -138,6 +151,7 @@ export function MissionPage({
             caseData={caseData}
             caseRun={caseRun}
             nodeId={selectedNodeId}
+            terminalOnly={levelIndex >= 2}
             dispatch={dispatch}
             run={run}
             onClose={() => {
@@ -151,17 +165,31 @@ export function MissionPage({
         </div>
       </div>
 
+      <AttackTable caseData={caseData} caseRun={caseRun} />
+
       <div className="mission__bottom">
         <EvidenceBoard caseData={caseData} caseRun={caseRun} dispatch={dispatch} />
         <Journal caseRun={caseRun} />
       </div>
       <div className="mission__terminal">
-        <Terminal vulns={Object.values(content.vulnerabilities)} />
+        <Terminal vulns={Object.values(content.vulnerabilities)} caseData={caseData} />
       </div>
 
       <PuzzleHost />
       <AttackNotice />
-      {briefing && (
+      {briefing && hasStory && !storyDone && (
+        <StoryOverlay
+          title={caseData.title}
+          slides={caseData.story ?? []}
+          onContinue={() => {
+            setStoryDone(true);
+          }}
+          onExit={() => {
+            navigate('/campaign');
+          }}
+        />
+      )}
+      {briefing && (storyDone || !hasStory) && (
         <BriefOverlay
           caseData={caseData}
           caseId={caseId}
@@ -173,6 +201,7 @@ export function MissionPage({
           }}
         />
       )}
+      <SocialOverlay content={content} caseData={caseData} caseRun={caseRun} />
       {caseRun.activeChat && <ChatOverlay content={content} caseData={caseData} caseRun={caseRun} run={run} />}
       {caseRun.pendingScope && (
         <ScopeOverlay content={content} caseData={caseData} nodeId={caseRun.pendingScope} dispatch={dispatch} />
@@ -217,6 +246,7 @@ function NodeInspector({
   caseData,
   caseRun,
   nodeId,
+  terminalOnly,
   dispatch,
   run,
   onClose,
@@ -225,6 +255,8 @@ function NodeInspector({
   caseData: Case;
   caseRun: GameState;
   nodeId: string | null;
+  /** From level 3 on, attacks are typed in the terminal. */
+  terminalOnly: boolean;
   dispatch: Dispatch;
   run: (fn: EngineFn) => void;
   onClose: () => void;
@@ -287,12 +319,25 @@ function NodeInspector({
         >
           {t.talk}
         </Button>
+      ) : node.kind === 'person' ? (
+        <NodeContextMenu
+          node={node.id}
+          label={node.label}
+          vulns={[]}
+          person
+          terminalOnly={terminalOnly}
+          onScan={() => undefined}
+          onHypothesis={() => undefined}
+          onSocial={(id) => void useSocial.getState().open(caseRun.caseId, id)}
+          onClose={onClose}
+        />
       ) : (
         <NodeContextMenu
           node={node.id}
           label={node.label}
           vulns={Object.values(content.vulnerabilities)}
           nodeVulns={node.exploits?.map((exploit) => exploit.vuln)}
+          terminalOnly={terminalOnly}
           onScan={(id) => dispatch({ type: 'ScanNode', node: id })}
           onHypothesis={(id, vuln) => dispatch({ type: 'ProposeHypothesis', node: id, vuln })}
           onClose={onClose}
@@ -404,6 +449,58 @@ function Overlay({ title, tone, children }: { title: string; tone?: 'danger' | '
         {children}
       </Panel>
     </div>
+  );
+}
+
+function StoryOverlay({
+  title,
+  slides,
+  onContinue,
+  onExit,
+}: {
+  title: string;
+  slides: string[];
+  onContinue: () => void;
+  onExit: () => void;
+}): ReactNode {
+  const [shown, setShown] = useState(1);
+  const atEnd = shown >= slides.length;
+  return (
+    <Overlay title={title}>
+      <p className="overlay__tag">{t.storyTag}</p>
+      <div className="intro-brief__lines" aria-live="polite">
+        {slides.slice(0, shown).map((line) => (
+          <p key={line} className="intro-brief__line intro-brief__line--main">
+            {line}
+          </p>
+        ))}
+      </div>
+      <div className="form-actions">
+        <Button
+          type="button"
+          variant="primary"
+          onClick={() => {
+            if (atEnd) onContinue();
+            else setShown((count) => count + 1);
+          }}
+        >
+          {atEnd ? t.storyToBrief : t.storyNext}
+        </Button>
+        {!atEnd && (
+          <Button
+            type="button"
+            onClick={() => {
+              setShown(slides.length);
+            }}
+          >
+            {t.storySkip}
+          </Button>
+        )}
+        <Button type="button" onClick={onExit}>
+          {ru.back}
+        </Button>
+      </div>
+    </Overlay>
   );
 }
 
@@ -526,6 +623,97 @@ function ChatOverlay({
           type="button"
           onClick={() => {
             run(closeChat);
+          }}
+        >
+          {t.close}
+        </Button>
+      </div>
+    </Overlay>
+  );
+}
+
+function SocialOverlay({
+  content,
+  caseData,
+  caseRun,
+}: {
+  content: Content;
+  caseData: Case;
+  caseRun: GameState;
+}): ReactNode {
+  const openKey = useSocial((state) => state.openKey);
+  const chat = useSocial((state) => (openKey ? state.chats[openKey] : undefined));
+  const [draft, setDraft] = useState('');
+  const historyRef = useRef<HTMLDivElement | null>(null);
+  const messageCount = chat?.messages.length ?? 0;
+  useEffect(() => {
+    if (historyRef.current) historyRef.current.scrollTop = historyRef.current.scrollHeight;
+  }, [messageCount, chat?.pending]);
+
+  const node = caseData.nodes.find((item) => openKey === socialKey(caseRun.caseId, item.id));
+  if (!openKey || !node) return null;
+  const st = ru.social;
+  const nodeId = node.id;
+  const closed = !chat?.npcId || chat.verdict !== 'continue' || caseRun.phase !== 'playing';
+
+  function submit(): void {
+    if (!draft.trim()) return;
+    void useSocial.getState().send(content, caseRun.caseId, nodeId, draft);
+    setDraft('');
+  }
+
+  return (
+    <Overlay title={st.title(node.label)} {...(chat?.verdict === 'noticed' ? { tone: 'danger' as const } : {})}>
+      <p className="fine-print">{st.trust(chat?.trust ?? null)}</p>
+      <div className="chat__history" ref={historyRef} role="log">
+        {!chat && <p className="fine-print">{st.connecting}</p>}
+        {chat && chat.messages.length === 0 && <p className="fine-print">{st.empty}</p>}
+        {chat?.messages.map((message, index) => (
+          <p key={index} className={`chat__bubble chat__bubble--${message.from}`}>
+            {message.text}
+          </p>
+        ))}
+        {chat?.pending && <p className="fine-print">{st.typing}</p>}
+      </div>
+      {chat && chat.verdict !== 'continue' && (
+        <p className={chat.verdict === 'complete' ? 'inspector__ok' : 'inspector__warning'}>
+          {st.verdict[chat.verdict]}
+        </p>
+      )}
+      {!closed && (
+        <form
+          className="chat__form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            submit();
+          }}
+        >
+          <textarea
+            className="chat__input"
+            aria-label={st.placeholder}
+            placeholder={st.placeholder}
+            value={draft}
+            rows={2}
+            onChange={(event) => {
+              setDraft(event.target.value);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                submit();
+              }
+            }}
+          />
+          <Button type="submit" variant="primary" disabled={!draft.trim() || chat?.pending}>
+            {st.send}
+          </Button>
+        </form>
+      )}
+      <div className="form-actions">
+        <Button
+          type="button"
+          onClick={() => {
+            useSocial.getState().close();
           }}
         >
           {t.close}

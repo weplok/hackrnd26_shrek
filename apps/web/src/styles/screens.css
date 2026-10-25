@@ -326,6 +326,33 @@
   background: var(--color-panel-raised);
   font-size: 0.875rem;
 }
+.chat__bubble--me {
+  margin-left: 2rem;
+  border-color: var(--color-green);
+}
+.chat__bubble--npc {
+  margin-right: 2rem;
+}
+.chat__bubble--sys {
+  color: var(--color-muted);
+  font-style: italic;
+}
+.chat__form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.5rem;
+  align-items: end;
+}
+.chat__input {
+  min-width: 0;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--color-line);
+  background: var(--color-panel-raised);
+  color: inherit;
+  font: inherit;
+  font-size: 0.875rem;
+  resize: vertical;
+}
 .result__rank {
   font-size: 0.9375rem;
 }
