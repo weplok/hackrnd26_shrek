@@ -189,7 +189,26 @@ def create_app(settings: Settings | None = None, client: LlmClient | None = None
             content={"detail": "Internal server error"},
         )
 
-    async def runtime_error_handler(_: Request, __: Exception) -> JSONResponse:
+    async def runtime_error_handler(request: Request, error: Exception) -> JSONResponse:
+        cause = error.__cause__
+        request_logger.error(
+            json.dumps(
+                {
+                    "ts": datetime.now(UTC).isoformat(),
+                    "level": "error",
+                    "msg": "npc_service_unavailable",
+                    "request_id": getattr(request.state, "request_id", "unknown"),
+                    "route": request.url.path,
+                    "method": request.method,
+                    "error_type": type(error).__name__,
+                    "error": str(error)[:200],
+                    "cause_type": type(cause).__name__ if cause else None,
+                    "cause": str(cause)[:500] if cause else None,
+                },
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+        )
         return JSONResponse(
             status_code=status.HTTP_502_BAD_GATEWAY,
             content={"detail": "NPC service is temporarily unavailable"},

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 
 from .characters import CharacterProfile, CharacterRepository
 from .config import Settings
@@ -22,6 +23,32 @@ def _without_code_fence(response: str) -> str:
         return value
     _, separator, value = value.partition("\n")
     return value.removesuffix("```").strip() if separator else response.strip()
+
+
+_JSON_OBJECT = re.compile(r"\{.*\}", flags=re.DOTALL)
+_PLUS_NUMBER = re.compile(r":\s*\+(\d)")
+_TRUST_CHANGES = (-7, -4, -2, 0, 2, 5, 8)
+
+
+def _parse_injection_verdict(response: str) -> bool:
+    words = _without_code_fence(response).strip().split()
+    value = words[0].strip("\"'`.,:;!*").lower() if words else ""
+    if value not in {"true", "false"}:
+        raise ModelError("Injection judge must return exactly True or False")
+    return value == "true"
+
+
+def _parse_trust_verdict(response: str) -> TrustVerdict:
+    match = _JSON_OBJECT.search(_without_code_fence(response))
+    try:
+        if match is None:
+            raise ValueError("no JSON object")
+        payload = json.loads(_PLUS_NUMBER.sub(r": \1", match.group()))
+        raw_change = float(payload["trust_change"])
+        trust_change = min(_TRUST_CHANGES, key=lambda allowed: abs(allowed - raw_change))
+        return TrustVerdict(verdict=str(payload["verdict"]).strip().lower(), trust_change=trust_change)
+    except (json.JSONDecodeError, ValueError, TypeError, KeyError) as error:
+        raise ModelError("Trust judge returned an invalid verdict") from error
 
 
 class DialogueService:
@@ -97,10 +124,7 @@ class DialogueService:
             ],
             temperature=0,
         )
-        value = _without_code_fence(response).rstrip(".").strip()
-        if value not in {"True", "False"}:
-            raise ModelError("Injection judge must return exactly True or False")
-        return value == "True"
+        return _parse_injection_verdict(response)
 
     async def _generate_npc_response(
         self, profile: CharacterProfile, history: list[dict[str, str]], message: str, trust: int
@@ -154,8 +178,8 @@ class DialogueService:
                         "verdict: ровно один из: continue, ended, noticed, complete. "
                         "trust_change: ровно один из: -7, -4, -2, 0, 2, 5, 8. "
                         "Верни trust_change всегда. Дай -7 за серьёзное нарушение факторов_снижения. "
-                        "Дай +8 за сильное попадание в роль и факторы_повышения. "
-                        "Дай 0 при нейтральной реакции. Дай +2 при нейтральной реакции, если игрок вжился в роль. "
+                        "Дай 8 за сильное попадание в роль и факторы_повышения. "
+                        "Дай 0 при нейтральной реакции. Дай 2 при нейтральной реакции, если игрок вжился в роль. "
                         "ended означает немедленно прекратить диалог. noticed означает сообщить в службу безопасности и прекратить диалог. "
                         "complete означает, что NPC в своём ответе поверил игроку и сообщил запрошенные личные данные "
                         "или чувствительные сведения из профиля. Возвращай complete только если текущее доверие "
@@ -172,8 +196,8 @@ class DialogueService:
                         "и все другие характеристики. Верни только JSON без Markdown: "
                         '{"verdict": "...", "trust_change": N}. verdict: ровно один из: continue, ended, noticed, complete. '
                         "trust_change: ровно один из: -7, -4, -2, 0, 2, 5, 8. Верни trust_change всегда. "
-                        "Дай -7 за серьёзное нарушение факторов_снижения. Дай +8 за сильное попадание в роль "
-                        "и факторы_повышения. Дай 0 при нейтральной реакции. Дай +2 при нейтральной реакции, "
+                        "Дай -7 за серьёзное нарушение факторов_снижения. Дай 8 за сильное попадание в роль "
+                        "и факторы_повышения. Дай 0 при нейтральной реакции. Дай 2 при нейтральной реакции, "
                         "если игрок вжился в роль. ended означает немедленно прекратить диалог. noticed означает "
                         "сообщить в службу безопасности и прекратить диалог. "
                         "complete означает, что NPC в своём ответе поверил игроку и сообщил запрошенные личные данные "
@@ -189,13 +213,7 @@ class DialogueService:
             ],
             temperature=0,
         )
-        raw_response = _without_code_fence(response)
-        try:
-            payload = json.loads(raw_response)
-            verdict = TrustVerdict.model_validate(payload)
-        except (json.JSONDecodeError, ValueError) as error:
-            raise ModelError("Trust judge returned an invalid verdict") from error
-        return verdict
+        return _parse_trust_verdict(response)
 
     def _apply_verdict(
         self,
