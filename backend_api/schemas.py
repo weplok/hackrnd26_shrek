@@ -48,7 +48,14 @@ class TrustVerdict(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     verdict: JudgeVerdict
-    trust_change: Literal[-7, -4, -2, 0, 2, 5, 8]
+    trust_change: StrictInt
+
+    @field_validator("trust_change")
+    @classmethod
+    def require_allowed_trust_change(cls, value: int) -> int:
+        if -15 <= value <= 0 or 5 <= value <= 30:
+            return value
+        raise ValueError("must be from -15 to 0 or from 5 to 30")
 
 
 TelemetryEventName = Literal[
