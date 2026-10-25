@@ -100,7 +100,7 @@ export const ru = {
   screenErrorTitle: 'ЭКРАН НЕДОСТУПЕН',
   screenErrorCopy: 'Вернись в главное меню. Состояние профиля сохранено локально.',
   terminal: {
-    label: 'Терминал',
+    label: 'ТЕРМИНАЛ',
     inputLabel: 'Команда',
     placeholder: 'help — список команд',
     help: [

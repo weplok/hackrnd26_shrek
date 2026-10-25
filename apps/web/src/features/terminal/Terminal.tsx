@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { Panel } from '@zero-day/ui';
 import type { Case, GameEvent, Vulnerability } from '@zero-day/engine';
 import { attackVuln } from '../attack-log';
 import { subscribeToGameEvents, useCaseStore } from '../game-session';
@@ -69,6 +70,7 @@ export function Terminal({ vulns, caseData, onCodex }: TerminalProps): ReactNode
   const nextId = useRef(0);
   const seenLog = useRef(0);
   const seenCase = useRef<string | undefined>(undefined);
+  const screenRef = useRef<HTMLDivElement | null>(null);
 
   const ctx = useMemo<TerminalContext>(
     () => ({
@@ -103,6 +105,11 @@ export function Terminal({ vulns, caseData, onCodex }: TerminalProps): ReactNode
       setLines((prev) => [...prev, ...fresh].slice(-200));
     }
   }, [log, caseId]);
+
+  // Keep the newest line and the prompt in view, like the journal does.
+  useEffect(() => {
+    if (screenRef.current) screenRef.current.scrollTop = screenRef.current.scrollHeight;
+  }, [lines.length]);
 
   // Events with no log line of their own (rejections, reveals) are echoed here.
   useEffect(
@@ -182,37 +189,37 @@ export function Terminal({ vulns, caseData, onCodex }: TerminalProps): ReactNode
   }
 
   return (
-    <section className="terminal" aria-label={t.label}>
-      <div className="terminal__log" role="log" aria-live="polite" hidden={lines.length === 0}>
+    <Panel className="terminal" title={t.label}>
+      <div className="terminal__screen" role="log" aria-live="polite" ref={screenRef}>
         {lines.map((line) => (
           <p key={line.id} className={`terminal__line terminal__line--${line.kind}`}>
             {line.text}
           </p>
         ))}
-      </div>
-      <div className="terminal-input">
-        <label className="terminal-input__prompt" htmlFor={inputId}>
-          <span aria-hidden="true">&gt;</span>
-          <span className="visually-hidden">{t.inputLabel}</span>
-        </label>
-        <input
-          id={inputId}
-          value={value}
-          autoComplete="off"
-          autoCapitalize="off"
-          spellCheck={false}
-          placeholder={t.placeholder}
-          aria-describedby={`${inputId}-hint`}
-          onChange={(event) => {
-            setValue(event.target.value);
-            setHint('');
-          }}
-          onKeyDown={onKeyDown}
-        />
+        <div className="terminal__prompt">
+          <label className="terminal__prompt-sign" htmlFor={inputId}>
+            <span aria-hidden="true">&gt;</span>
+            <span className="visually-hidden">{t.inputLabel}</span>
+          </label>
+          <input
+            id={inputId}
+            value={value}
+            autoComplete="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            placeholder={t.placeholder}
+            aria-describedby={`${inputId}-hint`}
+            onChange={(event) => {
+              setValue(event.target.value);
+              setHint('');
+            }}
+            onKeyDown={onKeyDown}
+          />
+        </div>
       </div>
       <p id={`${inputId}-hint`} className="terminal__hint">
         {hint}
       </p>
-    </section>
+    </Panel>
   );
 }

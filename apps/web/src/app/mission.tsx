@@ -182,9 +182,6 @@ export function MissionPage({
 
       <div className="mission__bottom">
         <EvidenceBoard caseData={caseData} caseRun={caseRun} dispatch={dispatch} />
-        <Journal caseRun={caseRun} />
-      </div>
-      <div className="mission__terminal">
         <Terminal vulns={Object.values(content.vulnerabilities)} caseData={caseData} />
       </div>
 
@@ -434,25 +431,6 @@ function EvidenceBoard({
           </Button>
         </>
       )}
-    </Panel>
-  );
-}
-
-function Journal({ caseRun }: { caseRun: GameState }): ReactNode {
-  const ref = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    if (ref.current) ref.current.scrollTop = ref.current.scrollHeight;
-  }, [caseRun.log.length]);
-
-  return (
-    <Panel className="journal" title={t.log}>
-      <div className="journal__log" ref={ref} role="log">
-        {caseRun.log.slice(-80).map((line, index) => (
-          <div key={index} className={`journal__line journal__line--${line.kind}`}>
-            {line.t}
-          </div>
-        ))}
-      </div>
     </Panel>
   );
 }
