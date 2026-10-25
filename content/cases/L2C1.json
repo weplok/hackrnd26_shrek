@@ -62,6 +62,10 @@
             "attempts": 4,
             "decoys": 3
           }
+        },
+        {
+          "vuln": "SL-03",
+          "puzzleParams": {}
         }
       ],
       "failHints": {
@@ -98,6 +102,10 @@
             "attempts": 4,
             "decoys": 2
           }
+        },
+        {
+          "vuln": "SL-02",
+          "puzzleParams": {}
         }
       ],
       "failHints": {
@@ -145,6 +153,14 @@
             "attempts": 4,
             "decoys": 3
           }
+        },
+        {
+          "vuln": "SL-12",
+          "puzzleParams": {}
+        },
+        {
+          "vuln": "SL-04",
+          "puzzleParams": {}
         }
       ],
       "failHints": {
@@ -232,6 +248,10 @@
               }
             }
           ]
+        },
+        {
+          "vuln": "SL-02",
+          "puzzleParams": {}
         }
       ],
       "failHints": {
@@ -340,6 +360,13 @@
               }
             }
           ]
+        },
+        {
+          "vuln": "SL-04",
+          "puzzleParams": {},
+          "requires": {
+            "hasClue": "gateway_gap"
+          }
         }
       ],
       "failHints": {
@@ -414,6 +441,13 @@
           "knobs": {
             "attempts": 4,
             "decoys": 2
+          }
+        },
+        {
+          "vuln": "SL-12",
+          "puzzleParams": {},
+          "requires": {
+            "hasClue": "anton_vouch"
           }
         }
       ],

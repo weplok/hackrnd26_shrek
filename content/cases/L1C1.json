@@ -56,6 +56,10 @@
             "attempts": 6,
             "decoys": 3
           }
+        },
+        {
+          "vuln": "SL-03",
+          "puzzleParams": {}
         }
       ],
       "failHints": {
@@ -94,6 +98,13 @@
           "knobs": {
             "attempts": 4,
             "decoys": 1
+          }
+        },
+        {
+          "vuln": "SL-02",
+          "puzzleParams": {},
+          "requires": {
+            "hasClue": "router_sticker"
           }
         }
       ],
@@ -195,10 +206,20 @@
       "id": "obj_recon",
       "title": "Осмотреть домашнюю сеть",
       "doneWhen": {
-        "nodeState": {
-          "node": "wifi",
-          "state": "scanned"
-        }
+        "any": [
+          {
+            "nodeState": {
+              "node": "wifi",
+              "state": "scanned"
+            }
+          },
+          {
+            "nodeState": {
+              "node": "wifi",
+              "state": "compromised"
+            }
+          }
+        ]
       },
       "checkpoint": true
     },

@@ -143,7 +143,7 @@ export function MissionPage({
             onSelectNode={setSelectedNodeId}
             selectedNodeId={selectedNodeId}
           />
-          {levelIndex === 0 && <AttackTable caseData={caseData} caseRun={caseRun} />}
+          <AttackTable caseData={caseData} caseRun={caseRun} />
         </div>
         <div className="mission__side">
           <NodeInspector
