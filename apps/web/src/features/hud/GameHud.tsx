@@ -20,7 +20,7 @@ export function GameHud({ caseData, caseRun, flipper, level }: GameHudProps): Re
   return (
     <>
       <HudBar caseTitle={caseData.title} tracks={caseData.tracks} values={caseRun.tracks} />
-      <ObjectiveTracker completed={caseRun.objectives} objectives={caseData.objectives} />
+      <ObjectiveTracker completed={caseRun.objectives} objectives={caseData.objectives} ticks={caseRun.tick} scans={caseRun.scans} />
       {flipperJoined ? <Flipper caseId={caseRun.caseId} level={level} lines={flipper.lines} tracks={caseRun.tracks} /> : null}
     </>
   );

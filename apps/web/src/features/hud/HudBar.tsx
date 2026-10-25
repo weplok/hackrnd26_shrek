@@ -9,12 +9,13 @@ type HudBarProps = {
   caseTitle: string;
   tracks: Case['tracks'];
   values: GameState['tracks'];
+  showCaseTitle?: boolean;
 };
 
-export function HudBar({ caseTitle, tracks, values }: HudBarProps): ReactNode {
+export function HudBar({ caseTitle, tracks, values, showCaseTitle = true }: HudBarProps): ReactNode {
   return (
     <header aria-label={caseTitle} className="hud-bar">
-      <strong className="hud-bar__case">{caseTitle}</strong>
+      {showCaseTitle ? <strong className="hud-bar__case">{caseTitle}</strong> : null}
       <div className="hud-bar__tracks">
         {tracks.map((track) => {
           const value = values[track.id] ?? track.start;

@@ -26,6 +26,15 @@ void test('alarm levels follow the 30/60/85 thresholds', () => {
   ]);
 });
 
+void test('cleaning logs changes alarm by either +5 or -10', () => {
+  const before = start();
+  before.tracks.alarm = 50;
+  const after = E.cleanLogs(content, before);
+  assert.ok([40, 55].includes(after.tracks.alarm ?? -1));
+  assert.equal(after.tick, before.tick + 1);
+  assert.notEqual(after.rng, before.rng);
+});
+
 void test('case start is the first checkpoint', () => {
   const s = start();
   assert.ok(s.checkpoint);

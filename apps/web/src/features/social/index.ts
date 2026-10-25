@@ -150,8 +150,8 @@ export const useSocial = create<SocialStore>((set, get) => {
         if (!response.ok) throw new Error(String(response.status));
         const payload = (await response.json()) as { answer: string; verdict: SocialVerdict; trust_points: number };
         reply = { from: 'npc', text: payload.answer };
-        verdict = payload.verdict;
         trust = payload.trust_points;
+        verdict = trust >= 80 ? 'complete' : payload.verdict;
       } catch (error) {
         const timedOut = error instanceof DOMException && error.name === 'TimeoutError';
         reply = { from: 'sys', text: timedOut ? t.unavailable : t.error };

@@ -7,12 +7,23 @@ import './hud.css';
 type ObjectiveTrackerProps = {
   objectives: Case['objectives'];
   completed: GameState['objectives'];
+  ticks: number;
+  scans: number;
 };
 
-export function ObjectiveTracker({ completed, objectives }: ObjectiveTrackerProps): ReactNode {
+export function ObjectiveTracker({ completed, objectives, ticks, scans }: ObjectiveTrackerProps): ReactNode {
+  const goalsDone = objectives.filter((objective) => completed[objective.id]).length;
+
   return (
     <section aria-labelledby="objective-tracker-title" className="objective-tracker">
-      <h2 id="objective-tracker-title">{ru.hud.objectives}</h2>
+      <header className="objective-tracker__header">
+        <h2 id="objective-tracker-title">{ru.hud.objectives}</h2>
+        <span className="objective-tracker__metrics">
+          <span>{ru.mission.goals} {String(goalsDone)}/{String(objectives.length)}</span>
+          <span>{ru.mission.ticks} {String(ticks)}</span>
+          <span>{ru.mission.scans} {String(scans)}</span>
+        </span>
+      </header>
       <ol>
         {objectives.map((objective) => {
           const done = completed[objective.id] ?? false;

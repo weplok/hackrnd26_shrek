@@ -165,7 +165,7 @@ export const ru = {
   },
   social: {
     title: (label: string) => `СОЦ. ИНЖЕНЕРИЯ · ${label}`,
-    trust: (value: number | null) => `ДОВЕРИЕ: ${value === null ? '?' : String(value)}`,
+    trust: (value: number | null) => `ДОВЕРИЕ: ${value === null ? '?' : String(value)} (достигните 80 для прохождения)`,
     placeholder: 'Сообщение собеседнику',
     send: 'ОТПРАВИТЬ',
     replay: 'ПЕРЕИГРАТЬ',
@@ -176,6 +176,7 @@ export const ru = {
     error: 'Сообщение не доставлено. Попробуй ещё раз.',
     unavailable: 'ИИ Социальная инженерия сейчас недоступна.',
     verdict: {
+      complete: 'Доверие получено. Узел взломан.',
       ended: 'Собеседник прервал диалог.',
       noticed: 'Собеседник сообщил в службу безопасности. Тревога +30.',
       complete: 'Собеседник поверил и передал данные. Узел взломан.',
@@ -260,7 +261,7 @@ export const ru = {
     bruteRules: 'Крути барабаны и проверяй код. Верная цифра горит зелёным, у остальных подсказка. Попытки не ограничены.',
     bruteUp: (dial: number) => `Барабан ${String(dial)}: больше`,
     bruteDown: (dial: number) => `Барабан ${String(dial)}: меньше`,
-    bruteHint: { eq: '=', up: 'мало', down: 'много' },
+    bruteHint: { eq: '=', up: 'нужно больше', down: 'нужно меньше' },
     bruteTries: (count: number) => `Проверок: ${String(count)}.`,
     bruteOpen: 'Код подобран. Замок открыт.',
     bruteCheck: 'Проверить',
@@ -339,7 +340,8 @@ export const ru = {
   mission: {
     tasks: '■ ЗАДАНИЯ',
     codex: 'КОДЕКС',
-    wait: 'ПЕРЕЖДАТЬ',
+    cleanLogs: 'Почистить логи',
+    cleanLogsHint: 'мне повезёт!',
     restart: '↻ ЗАНОВО',
     ticks: 'ХОДЫ',
     scans: 'СКАНЫ',

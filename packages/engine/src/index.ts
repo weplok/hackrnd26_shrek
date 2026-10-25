@@ -16,7 +16,7 @@ export {
   present,
   socialOutcome,
   confirmScope,
-  wait,
+  cleanLogs,
   answerReport,
   reportFindings,
   buildCaseReport,

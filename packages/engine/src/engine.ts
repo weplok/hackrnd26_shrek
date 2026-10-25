@@ -4,6 +4,7 @@ import { evalCondition } from './conditions.ts';
 import { applyEffects, clamp } from './effects.ts';
 import { generatePuzzle, checkPuzzle, puzzleLogic, DEFAULT_FAIL_HINT } from './puzzles/index.ts';
 import { resolveNpcTurn } from './npc.ts';
+import { nextInt } from './rng.ts';
 
 const NOISE: Record<string, number> = { quiet: 4, moderate: 9, loud: 16 };
 export { DEFAULT_FAIL_HINT };
@@ -526,12 +527,16 @@ export function confirmScope(content: Content, state: GameState, go: boolean): G
   return s;
 }
 
-export function wait(content: Content, state: GameState): GameState {
+export function cleanLogs(content: Content, state: GameState): GameState {
   const s = clone(state);
   if (s.phase !== 'playing') return s;
-  s.tracks.alarm = clamp((s.tracks.alarm ?? 0) - 14 - s.difficulty.alarmDecayPerTick);
+  let roll: number;
+  [s.rng, roll] = nextInt(s.rng);
+  const alarmDelta = roll % 2 === 0 ? 5 : -10;
+  s.tracks.alarm = clamp((s.tracks.alarm ?? 0) + alarmDelta);
   s.tick += 1;
-  s.log.push({ t: '[жду] вслушиваюсь в эфир, тревога спадает.', kind: 'sys' });
+  s.log.push({ t: `[логи] ${alarmDelta > 0 ? 'очистка замечена, тревога +5.' : 'следы стёрты, тревога -10.'}`, kind: 'sys' });
+  caughtCheck(s);
   return s;
 }
 

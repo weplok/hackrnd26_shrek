@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button, Panel } from '@zero-day/ui';
-import { answerReport, closeChat, noiseSources, openChat, present, profileStyle, wait } from '@zero-day/engine';
+import { answerReport, cleanLogs, closeChat, noiseSources, openChat, present, profileStyle } from '@zero-day/engine';
 import type { Case, Command, Content, GameState } from '@zero-day/engine';
 import { useCaseStore } from '../features/game-session';
 import { HudBar, ObjectiveTracker, Flipper, hasFlipperJoined, startAchievements } from '../features/hud';
@@ -88,7 +88,7 @@ export function MissionPage({
   useEffect(() => startAutosave(repository, () => useCaseStore.getState().caseRun), [repository]);
   useEffect(() => startAchievements(repository), [repository]);
 
-  // Chat, wait and report steps are engine calls outside the command pipeline, so autosave never sees the win.
+  // Chat, log cleaning and report steps are engine calls outside the command pipeline, so autosave never sees the win.
   useEffect(() => {
     if (caseRun?.phase === 'won') repository.update((save) => withCaseRun(save, caseRun));
   }, [caseRun, repository]);
@@ -104,7 +104,6 @@ export function MissionPage({
   };
   const order = caseOrder(content);
   const nextCase = order[order.indexOf(caseId) + 1];
-  const goalsDone = caseData.objectives.filter((objective) => caseRun.objectives[objective.id]).length;
   const levelNumber = levelIndex + 1;
   const playing = caseRun.phase === 'playing';
 
@@ -123,26 +122,7 @@ export function MissionPage({
           <Link className="zd-button button-link" to="/campaign">
             {t.tasks}
           </Link>
-        </div>
-      </div>
-
-      <HudBar caseTitle={caseData.title} tracks={caseData.tracks} values={caseRun.tracks} />
-
-      <div className="mission__metrics">
-        <Metric label={t.ticks} value={String(caseRun.tick)} />
-        <Metric label={t.scans} value={String(caseRun.scans)} />
-        <Metric label={t.goals} value={`${String(goalsDone)}/${String(caseData.objectives.length)}`} />
-        <div className="mission__buttons">
-          <Button
-            type="button"
-            disabled={!playing}
-            onClick={() => {
-              run(wait);
-            }}
-          >
-            {t.wait}
-          </Button>
-          <Button type="button" onClick={begin}>
+          <Button className="topbar__restart" type="button" onClick={begin}>
             {t.restart}
           </Button>
         </div>
@@ -156,6 +136,20 @@ export function MissionPage({
             onSelectNode={setSelectedNodeId}
             selectedNodeId={selectedNodeId}
           />
+          <div className="mission__map-tools">
+            <HudBar caseTitle={caseData.title} tracks={caseData.tracks} values={caseRun.tracks} showCaseTitle={false} />
+            <Button
+              className="mission__clean-logs"
+              type="button"
+              disabled={!playing}
+              onClick={() => {
+                run(cleanLogs);
+              }}
+            >
+              <span>{t.cleanLogs}</span>
+              <small>{t.cleanLogsHint}</small>
+            </Button>
+          </div>
         </div>
         <div className="mission__side">
           <NodeInspector
@@ -171,7 +165,12 @@ export function MissionPage({
               setSelectedNodeId(null);
             }}
           />
-          <ObjectiveTracker completed={caseRun.objectives} objectives={caseData.objectives} />
+          <ObjectiveTracker
+            completed={caseRun.objectives}
+            objectives={caseData.objectives}
+            ticks={caseRun.tick}
+            scans={caseRun.scans}
+          />
           {hasFlipperJoined(caseRun.flags, levelNumber) && (
             <Flipper caseId={caseId} level={levelNumber} lines={content.flipper.lines} tracks={caseRun.tracks} />
           )}
@@ -247,15 +246,6 @@ export function MissionPage({
         />
       )}
     </section>
-  );
-}
-
-function Metric({ label, value, tone }: { label: string; value: string; tone?: 'ok' | 'muted' }): ReactNode {
-  return (
-    <div className={`mission-metric${tone ? ` mission-metric--${tone}` : ''}`}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
   );
 }
 
