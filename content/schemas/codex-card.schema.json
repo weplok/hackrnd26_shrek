@@ -6,6 +6,8 @@
   "properties": {
     "schemaVersion": { "$ref": "common.schema.json#/definitions/SchemaVersion" },
     "id": { "$ref": "common.schema.json#/definitions/VulnId" },
+    "method": { "$ref": "common.schema.json#/definitions/Text" },
+    "summary": { "$ref": "common.schema.json#/definitions/Text" },
     "realTerm": { "$ref": "common.schema.json#/definitions/Text" },
     "whyItWorks": { "$ref": "common.schema.json#/definitions/Text" },
     "defense": { "$ref": "common.schema.json#/definitions/Text" },
@@ -25,6 +27,6 @@
       }
     }
   },
-  "required": ["schemaVersion", "id", "realTerm", "whyItWorks", "defense", "realCase", "law", "learnMore"],
+  "required": ["schemaVersion", "id", "method", "summary", "realTerm", "whyItWorks", "defense", "realCase", "law", "learnMore"],
   "additionalProperties": false
 }

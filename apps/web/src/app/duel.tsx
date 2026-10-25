@@ -45,6 +45,7 @@ const NODES = caseDef.nodes.map((n) => ({
 }));
 type Node = (typeof NODES)[number];
 const nodeOf = (id: string): Node | undefined => NODES.find((n) => n.id === id);
+const vulnName = (v: string): string => content.vulnerabilities[v]?.title ?? v;
 
 function wsUrl(): string {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -180,7 +181,7 @@ export function DuelPage(): ReactNode {
           {rt?.scanned &&
             n.vulns.map((v) => (
               <Button key={v} disabled={secured} onClick={() => send({ t: 'red_cmd', cmd: { type: 'ProposeHypothesis', node: n.id, vuln: v } })}>
-                Атака {v}
+                Атака: {vulnName(v)}
               </Button>
             ))}
           {secured && <span> · узел защищён, атака отбита</span>}
@@ -192,7 +193,7 @@ export function DuelPage(): ReactNode {
         {n.vulns.length === 0 && <span>нет уязвимостей для патча</span>}
         {n.vulns.map((v) => (
           <Button key={v} onClick={() => send({ t: 'blue_patch', node: n.id, vuln: v })}>
-            Патч {v}
+            Патч: {vulnName(v)}
           </Button>
         ))}
       </>

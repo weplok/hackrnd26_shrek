@@ -200,15 +200,21 @@ export function CodexPage({ content, opened }: { content: Content; opened: reado
                 setSelected(id);
               }}
             >
-              {id} {opened.includes(id) ? '' : '🔒'}
+              {content.codex[id]?.method ?? id} {opened.includes(id) ? '' : '🔒'}
             </button>
           ))}
         </nav>
         <article className="codex__card">
           {card && known ? (
             <>
-              <p className="codex__id">{card.id}</p>
-              <h2>{card.realTerm}</h2>
+              <h2 className="codex__method">{card.method}</h2>
+              <p className="codex__summary">{card.summary}</p>
+              <p className="codex__weakness">
+                {t.weakness}: {content.vulnerabilities[card.id]?.title ?? card.id}
+                <span className="codex__id"> · {card.id}</span>
+              </p>
+              <h3>{t.term}</h3>
+              <p className="copy">{card.realTerm}</p>
               <h3>{t.why}</h3>
               <p className="copy">{card.whyItWorks}</p>
               <h3>{t.defense}</h3>

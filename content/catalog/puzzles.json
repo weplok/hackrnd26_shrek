@@ -1,18 +1,65 @@
 {
   "schemaVersion": 1,
   "items": [
-    { "archetype": "exploit", "vuln": "SL-01", "title": "Стыковка" },
-    { "archetype": "brute", "vuln": "SL-02", "title": "Словолаз" },
-    { "archetype": "scan", "vuln": "SL-03", "title": "Радар-эхо" },
-    { "archetype": "exploit", "vuln": "SL-04", "title": "Стыковка" },
-    { "archetype": "phish", "vuln": "SL-05", "title": "Собери письмо" },
-    { "archetype": "evasion", "vuln": "SL-06", "title": "Между лучей" },
-    { "archetype": "rootkit", "vuln": "SL-07", "title": "Подгони профиль" },
-    { "archetype": "wipe", "vuln": "SL-08", "title": "Затри след" },
-    { "archetype": "phish", "vuln": "SL-09", "title": "Собери письмо" },
-    { "archetype": "scan", "vuln": "SL-10", "title": "Радар-эхо" },
-    { "archetype": "wipe", "vuln": "SL-11", "title": "Затри след" },
-    { "archetype": "crypto", "vuln": "SL-12", "title": "Роторы" },
-    { "archetype": "rootkit", "vuln": "SL-13", "title": "Подгони профиль" }
+    {
+      "archetype": "exploit",
+      "vuln": "SL-01",
+      "title": "Стыковка"
+    },
+    {
+      "archetype": "brute",
+      "vuln": "SL-02",
+      "title": "Словолаз"
+    },
+    {
+      "archetype": "scan",
+      "vuln": "SL-03",
+      "title": "Радар-эхо"
+    },
+    {
+      "archetype": "exploit",
+      "vuln": "SL-04",
+      "title": "Стыковка"
+    },
+    {
+      "archetype": "phish",
+      "vuln": "SL-05",
+      "title": "Собери письмо"
+    },
+    {
+      "archetype": "evasion",
+      "vuln": "SL-06",
+      "title": "Между лучей"
+    },
+    {
+      "archetype": "rootkit",
+      "vuln": "SL-07",
+      "title": "Подгони профиль"
+    },
+    {
+      "archetype": "wipe",
+      "vuln": "SL-08",
+      "title": "Затри след"
+    },
+    {
+      "archetype": "phish",
+      "vuln": "SL-09",
+      "title": "Собери письмо"
+    },
+    {
+      "archetype": "scan",
+      "vuln": "SL-10",
+      "title": "Радар-эхо"
+    },
+    {
+      "archetype": "wipe",
+      "vuln": "SL-11",
+      "title": "Затри след"
+    },
+    {
+      "archetype": "crypto",
+      "vuln": "SL-12",
+      "title": "Роторы"
+    }
   ]
 }

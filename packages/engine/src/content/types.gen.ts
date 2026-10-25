@@ -409,6 +409,8 @@ export interface Checkpoint {
 export interface CodexCard {
   schemaVersion: 1;
   id: string;
+  method: string;
+  summary: string;
   realTerm: string;
   whyItWorks: string;
   defense: string;
