@@ -142,6 +142,7 @@ export const ru = {
   attackLog: {
     title: 'ПРИМЕНЁННЫЕ АТАКИ',
     node: 'Узел',
+    hidden: '??? (не обнаружен)',
     ok: 'УСПЕШНО',
     fail: 'НЕУСПЕШНО',
     notice: (attack: string, node: string, ok: boolean) =>

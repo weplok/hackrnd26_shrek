@@ -113,6 +113,8 @@ export function AttackNotice(): ReactNode {
 export function AttackTable({ caseData, caseRun }: { caseData: Case; caseRun: GameState }): ReactNode {
   const results = useAttackLog((state) => state.results);
   const rows = caseData.nodes.filter((node) => node.inScope && node.kind !== 'person' && !node.lock);
+  const isGateway = (node: Case['nodes'][number]): boolean =>
+    node.onCompromise.some((effect) => 'openSegment' in effect && effect.openSegment === node.segment);
 
   return (
     <Panel className="attack-table" title={t.title}>
@@ -131,9 +133,11 @@ export function AttackTable({ caseData, caseRun }: { caseData: Case; caseRun: Ga
           <tbody>
             {rows.map((node) => {
               const row = results[rowKey(caseRun.caseId, node.id)] ?? {};
+              const revealed = Boolean(caseRun.nodes[node.id]?.revealed);
+              const locked = !revealed || (!caseRun.segmentsOpen[node.segment] && !isGateway(node));
               return (
-                <tr key={node.id}>
-                  <th scope="row">{node.label}</th>
+                <tr key={node.id} className={locked ? 'attack-table__row--locked' : undefined}>
+                  <th scope="row">{revealed ? node.label : t.hidden}</th>
                   {COLUMNS.map((column) => {
                     const outcome = row[column.id];
                     return (

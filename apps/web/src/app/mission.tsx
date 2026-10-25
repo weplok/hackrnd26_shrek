@@ -143,7 +143,6 @@ export function MissionPage({
             onSelectNode={setSelectedNodeId}
             selectedNodeId={selectedNodeId}
           />
-          <AttackTable caseData={caseData} caseRun={caseRun} />
         </div>
         <div className="mission__side">
           <NodeInspector
@@ -165,6 +164,8 @@ export function MissionPage({
           )}
         </div>
       </div>
+
+      <AttackTable caseData={caseData} caseRun={caseRun} />
 
       <div className="mission__bottom">
         <EvidenceBoard caseData={caseData} caseRun={caseRun} dispatch={dispatch} />
