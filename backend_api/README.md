@@ -49,7 +49,7 @@ Successful response:
 
 Unknown fields, missing fields, non-string values, and empty strings return `400`.
 
-The injection judge runs before NPC generation. It must return exactly `True` or `False`.
+The injection judge runs before NPC generation. It accepts `True` or `False`, with optional code fences or a final period.
 
 Each active `(npc_id, uuid)` pair uses one SQLite-backed session. Its history and trust level survive restart. A verdict of `ended` or `noticed` clears the session.
 
@@ -60,6 +60,8 @@ The trust judge must return JSON with this form:
 ```
 
 `trust_change` is one of `-7`, `-4`, `-2`, `0`, `2`, `5`, or `8`. Trust stays within `0..100`. Trust below `порог_эскалации_инцидента` returns `noticed` and clears the session.
+
+`LLM_REQUEST_TIMEOUT_SECONDS` limits one provider call. `DIALOGUE_TIMEOUT_SECONDS` limits all three calls in one dialogue request. Defaults are 25 and 80 seconds.
 
 ## Rate limit and request IDs
 

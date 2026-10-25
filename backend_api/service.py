@@ -14,6 +14,14 @@ CLOSED_MESSAGE = "Диалог прерван."
 SECURITY_CLOSED_MESSAGE = "Диалог прерван. Об инциденте сообщено службе безопасности."
 
 
+def _without_code_fence(response: str) -> str:
+    value = response.strip()
+    if not value.startswith("```") or not value.endswith("```"):
+        return value
+    _, separator, value = value.partition("\n")
+    return value.removesuffix("```").strip() if separator else response.strip()
+
+
 class DialogueService:
     def __init__(
         self,
@@ -29,21 +37,27 @@ class DialogueService:
         self._locks: dict[tuple[str, str], asyncio.Lock] = {}
 
     async def reply(self, npc_id: str, user_uuid: str, message: str) -> DialogueResponse:
-        permitted = await self._check_injection(message)
-        if not permitted:
-            return DialogueResponse(
-                answer=INJECTION_BLOCK_MESSAGE,
-                verdict="continue",
-            )
+        try:
+            async with asyncio.timeout(self.settings.dialogue_timeout_seconds):
+                permitted = await self._check_injection(message)
+                if not permitted:
+                    return DialogueResponse(
+                        answer=INJECTION_BLOCK_MESSAGE,
+                        verdict="continue",
+                    )
 
-        profile = self.characters.get(npc_id)
-        initial_trust = self._trust_value(profile, "начальный_уровень")
-        lock = self._locks.setdefault((npc_id, user_uuid), asyncio.Lock())
-        async with lock:
-            session = self.sessions.get_or_create(npc_id, user_uuid, initial_trust)
-            npc_response = await self._generate_npc_response(profile, session.history, message)
-            verdict = await self._judge_trust(profile, session.trust_level, message, npc_response)
-            return self._apply_verdict(session, verdict.verdict, verdict.trust_change, message, npc_response, profile)
+                profile = self.characters.get(npc_id)
+                initial_trust = self._trust_value(profile, "начальный_уровень")
+                lock = self._locks.setdefault((npc_id, user_uuid), asyncio.Lock())
+                async with lock:
+                    session = self.sessions.get_or_create(npc_id, user_uuid, initial_trust)
+                    npc_response = await self._generate_npc_response(profile, session.history, message)
+                    verdict = await self._judge_trust(profile, session.trust_level, message, npc_response)
+                    return self._apply_verdict(
+                        session, verdict.verdict, verdict.trust_change, message, npc_response, profile
+                    )
+        except TimeoutError as error:
+            raise ModelError("Dialogue deadline exceeded") from error
 
     async def reset_session(self, npc_id: str, user_uuid: str) -> bool:
         lock = self._locks.setdefault((npc_id, user_uuid), asyncio.Lock())
@@ -79,10 +93,10 @@ class DialogueService:
             ],
             temperature=0,
         )
-        values = [line.strip() for line in response.splitlines() if line.strip()]
-        if not values or any(value not in {"True", "False"} for value in values) or len(set(values)) != 1:
+        value = _without_code_fence(response).rstrip(".").strip()
+        if value not in {"True", "False"}:
             raise ModelError("Injection judge must return exactly True or False")
-        return values[0] == "True"
+        return value == "True"
 
     async def _generate_npc_response(
         self, profile: CharacterProfile, history: list[dict[str, str]], message: str
@@ -156,8 +170,9 @@ class DialogueService:
             ],
             temperature=0,
         )
+        raw_response = _without_code_fence(response)
         try:
-            payload = json.loads(response)
+            payload = json.loads(raw_response)
             verdict = TrustVerdict.model_validate(payload)
         except (json.JSONDecodeError, ValueError) as error:
             raise ModelError("Trust judge returned an invalid verdict") from error

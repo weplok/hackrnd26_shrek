@@ -22,7 +22,12 @@ class OpenAICompatibleLlm:
     def __init__(self, settings: Settings) -> None:
         from openai import AsyncOpenAI
 
-        self.client = AsyncOpenAI(base_url=settings.base_url, api_key=settings.api_key)
+        self.client = AsyncOpenAI(
+            base_url=settings.base_url,
+            api_key=settings.api_key,
+            timeout=settings.llm_request_timeout_seconds,
+            max_retries=0,
+        )
 
     async def complete(self, model: str, messages: list[dict[str, str]], temperature: float) -> str:
         try:

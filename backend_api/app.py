@@ -174,6 +174,7 @@ def create_app(settings: Settings | None = None, client: LlmClient | None = None
                     "route": request.url.path,
                     "method": request.method,
                     "error_type": type(error).__name__,
+                    "error": str(error)[:200],
                 },
                 separators=(",", ":"),
             )

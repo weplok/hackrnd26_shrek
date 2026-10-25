@@ -105,6 +105,17 @@ class AppContractTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"answer": "Здравствуйте.", "verdict": "continue"})
 
+    def test_dialogue_accepts_common_judge_formatting(self) -> None:
+        fake_client = FakeChatClient(["True.", "Здравствуйте.", '```json\n{"verdict":"continue","trust_change":0}\n```'])
+        with TestClient(create_app(self.settings(), client=fake_client)) as client:
+            response = client.post(
+                "/dialogue",
+                json={"npc_id": "emp1", "uuid": "session", "message": "Здравствуйте"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"answer": "Здравствуйте.", "verdict": "continue"})
+
     def test_dialogue_rate_limit(self) -> None:
         fake_client = FakeChatClient(["True", "Здравствуйте.", '{"verdict":"continue","trust_change":0}'])
         with TestClient(create_app(self.settings(dialogue_rate_limit=1), client=fake_client)) as client:

@@ -25,7 +25,12 @@ def test_openai_compatible_adapter_strips_think_blocks() -> None:
         )
 
     assert result == "Ответ NPC"
-    openai_client.assert_called_once_with(base_url=settings.base_url, api_key=settings.api_key)
+    openai_client.assert_called_once_with(
+        base_url=settings.base_url,
+        api_key=settings.api_key,
+        timeout=settings.llm_request_timeout_seconds,
+        max_retries=0,
+    )
     completion.assert_awaited_once_with(
         model="npc", messages=[{"role": "user", "content": "Привет"}], temperature=0.7
     )
