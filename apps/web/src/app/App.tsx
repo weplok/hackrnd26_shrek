@@ -15,6 +15,8 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { CodexPage, ContractsPage, DEMO_CASE, IntroPage, caseUnlocked } from './pages';
 import { MissionPage } from './mission';
 import { DuelPage } from './duel';
+import { SettingsPage } from './settings';
+import { audio } from '../shared/audio/audio';
 import { content } from '../content';
 import { SaveRepository } from '../features/persistence';
 import { ToolLab } from '../features/puzzle-host';
@@ -71,6 +73,17 @@ export function App(): ReactNode {
       disposed = true;
       stopTelemetry?.();
     };
+  }, []);
+
+  // Start audio on the first user gesture (autoplay policy) and play a click SFX
+  // whenever a button is pressed anywhere in the app.
+  useEffect(() => {
+    const onDown = (event: PointerEvent): void => {
+      audio.ensureStarted();
+      if ((event.target as HTMLElement | null)?.closest('button')) audio.playClick();
+    };
+    document.addEventListener('pointerdown', onDown);
+    return () => document.removeEventListener('pointerdown', onDown);
   }, []);
 
   return (
@@ -162,7 +175,7 @@ function ApplicationRoutes({ bootstrap }: { bootstrap: BootstrapState }): ReactN
         path="/settings"
         element={
           <Screen>
-            <PlaceholderPage title={ru.settings} copy={ru.settingsCopy} />
+            <SettingsPage />
           </Screen>
         }
       />

@@ -1,11 +1,12 @@
 // Duel screen: both sides play on the same node graph. Red scans and attacks
 // nodes (engine puzzles) to reach the target; Blue hardens nodes by solving the
 // same puzzle archetype as a defence. Both use the shared PuzzlePanel.
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Button, Modal, Panel } from '@zero-day/ui';
 import type { GameState, PuzzleInstance } from '@zero-day/engine';
 import { PuzzlePanel } from '../features/puzzle-host';
 import { content } from '../content';
+import { audio } from '../shared/audio/audio';
 import { ru } from '../shared/ui/strings';
 
 const DUEL_CASE = 'L3C1';
@@ -61,6 +62,9 @@ export function DuelPage(): ReactNode {
   const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => () => wsRef.current?.close(), []);
+  useEffect(() => {
+    if (result) (result.winner === role ? audio.playSuccess() : audio.playError());
+  }, [result, role]);
 
   function join(pick: Role): void {
     setRole(pick);
@@ -83,6 +87,23 @@ export function DuelPage(): ReactNode {
   }
 
   const send = (payload: unknown): void => wsRef.current?.send(JSON.stringify(payload));
+
+  // The duel re-renders on every WS tick (10 Hz). Puzzle mini-games drive phase
+  // timers from effects keyed on the puzzle object and their submit handler, so a
+  // fresh identity each tick would reset those timers forever ("Проверка..." hangs).
+  // Keep both stable: freeze the puzzle object until it actually changes, and give
+  // the games one constant submit/cancel handler per role.
+  const puzzleHold = useRef<PuzzleInstance | null>(null);
+  const puzzleKeyRef = useRef<string | null>(null);
+  const submitPuzzle = useCallback(
+    (answer: string[]) =>
+      wsRef.current?.send(JSON.stringify(role === 'red' ? { t: 'red_cmd', cmd: { type: 'SubmitPuzzle', answer } } : { t: 'blue_submit', answer })),
+    [role],
+  );
+  const cancelPuzzle = useCallback(
+    () => wsRef.current?.send(JSON.stringify(role === 'red' ? { t: 'red_cmd', cmd: { type: 'CancelPuzzle' } } : { t: 'blue_cancel' })),
+    [role],
+  );
 
   if (status === 'lobby' || status === 'connecting') {
     return (
@@ -125,7 +146,13 @@ export function DuelPage(): ReactNode {
   const redView = view.role === 'red' ? view : null;
   const blueView = view.role === 'blue' ? view : null;
   const sel = selected ? nodeOf(selected) : null;
-  const activePuzzle = redView?.red.activePuzzle ?? blueView?.puzzle ?? null;
+  const rawPuzzle = redView?.red.activePuzzle ?? blueView?.puzzle ?? null;
+  const puzzleKey = rawPuzzle ? `${rawPuzzle.nodeId}:${rawPuzzle.vuln}:${rawPuzzle.attemptsLeft}:${rawPuzzle.archetype}` : null;
+  if (puzzleKey !== puzzleKeyRef.current) {
+    puzzleKeyRef.current = puzzleKey;
+    puzzleHold.current = rawPuzzle;
+  }
+  const activePuzzle = puzzleHold.current;
 
   function nodeState(n: Node): { color: string; hint: string } {
     const secured = view!.secured.includes(n.id);
@@ -189,13 +216,9 @@ export function DuelPage(): ReactNode {
           isOpen
           closeLabel={ru.puzzle.close}
           title={role === 'red' ? ru.puzzle.running(activePuzzle.title) : `Защита: ${activePuzzle.title}`}
-          onClose={() => send(role === 'red' ? { t: 'red_cmd', cmd: { type: 'CancelPuzzle' } } : { t: 'blue_cancel' })}
+          onClose={cancelPuzzle}
         >
-          <PuzzlePanel
-            puzzle={activePuzzle}
-            onCancel={() => send(role === 'red' ? { t: 'red_cmd', cmd: { type: 'CancelPuzzle' } } : { t: 'blue_cancel' })}
-            onSubmit={(answer) => send(role === 'red' ? { t: 'red_cmd', cmd: { type: 'SubmitPuzzle', answer } } : { t: 'blue_submit', answer })}
-          />
+          <PuzzlePanel puzzle={activePuzzle} onCancel={cancelPuzzle} onSubmit={submitPuzzle} />
         </Modal>
       )}
     </Panel>
