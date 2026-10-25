@@ -16,9 +16,13 @@ export interface TerminalProps {
   onCodex?: (vuln: string) => void;
 }
 
+// Terminal rows carry either a terminal-native kind or an engine log kind,
+// so the mirrored journal keeps its colour coding.
+type LineKind = 'input' | 'output' | 'error' | 'bad' | 'ok' | 'cmd' | 'clue' | 'sys' | 'key' | 'flipper';
+
 interface Line {
   id: number;
-  kind: 'input' | 'output' | 'error';
+  kind: LineKind;
   text: string;
 }
 
@@ -34,22 +38,18 @@ function errorText(result: Extract<ParseResult, { type: 'error' }>): string {
   }
 }
 
+// Only events that never reach the game log are echoed here; everything else
+// arrives through the mirrored journal so nothing prints twice.
 export function eventText(event: GameEvent): string | null {
   switch (event.type) {
     case 'CommandRejected':
       return t.rejected[event.reason];
-    case 'NodeScanned':
-      return event.repeat ? t.rescanned(event.node) : t.scanned(event.node);
     case 'ScanOpened':
       return t.scanOpened(event.node);
     case 'NodesRevealed':
       return t.revealed(event.nodes.join(', '));
-    case 'CluesFound':
-      return t.clues(event.clues.length);
     case 'ScopeWarning':
       return t.scope(event.node);
-    case 'PuzzleOpened':
-      return t.puzzle(event.node, event.vuln);
     default:
       return null;
   }
@@ -59,6 +59,7 @@ export function Terminal({ vulns, caseData, onCodex }: TerminalProps): ReactNode
   const inputId = useId();
   const nodes = useCaseStore((state) => state.caseRun?.nodes);
   const caseId = useCaseStore((state) => state.caseRun?.caseId);
+  const log = useCaseStore((state) => state.caseRun?.log);
   const dispatch = useCaseStore((state) => state.dispatch);
   const [value, setValue] = useState('');
   const [lines, setLines] = useState<Line[]>([]);
@@ -66,6 +67,8 @@ export function Terminal({ vulns, caseData, onCodex }: TerminalProps): ReactNode
   const history = useRef<string[]>([]);
   const historyIndex = useRef(0);
   const nextId = useRef(0);
+  const seenLog = useRef(0);
+  const seenCase = useRef<string | undefined>(undefined);
 
   const ctx = useMemo<TerminalContext>(
     () => ({
@@ -77,11 +80,31 @@ export function Terminal({ vulns, caseData, onCodex }: TerminalProps): ReactNode
     [nodes, vulns],
   );
 
-  function print(kind: Line['kind'], texts: string[]): void {
+  function print(kind: LineKind, texts: string[]): void {
     setLines((prev) => [...prev, ...texts.map((text) => ({ id: nextId.current++, kind, text }))].slice(-200));
   }
 
-  // Map actions dispatch outside the terminal; the log mirrors every engine event.
+  // The terminal doubles as the mission journal: every engine log entry is
+  // streamed in, so typed commands and game events share one scrollback.
+  useEffect(() => {
+    const toLines = (entries: typeof log): Line[] =>
+      (entries ?? []).map((entry) => ({ id: nextId.current++, kind: entry.kind as LineKind, text: entry.t }));
+    // A new case, a restart, or a checkpoint rollback shrinks the log: rebuild the
+    // scrollback from the current log instead of appending to stale rows.
+    if (caseId !== seenCase.current || (log?.length ?? 0) < seenLog.current) {
+      seenCase.current = caseId;
+      seenLog.current = log?.length ?? 0;
+      setLines(toLines(log).slice(-200));
+      return;
+    }
+    if (log && log.length > seenLog.current) {
+      const fresh = toLines(log.slice(seenLog.current));
+      seenLog.current = log.length;
+      setLines((prev) => [...prev, ...fresh].slice(-200));
+    }
+  }, [log, caseId]);
+
+  // Events with no log line of their own (rejections, reveals) are echoed here.
   useEffect(
     () =>
       subscribeToGameEvents(({ event }) => {

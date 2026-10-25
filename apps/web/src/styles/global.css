@@ -384,11 +384,27 @@ a {
   margin: 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  color: var(--color-green);
 }
-.terminal__line--input {
+.terminal__line--input,
+.terminal__line--sys {
   color: var(--color-muted);
 }
 .terminal__line--error {
+  color: var(--color-amber);
+}
+.terminal__line--bad {
+  color: var(--color-magenta);
+}
+.terminal__line--ok,
+.terminal__line--key {
+  color: var(--color-green-bright);
+}
+.terminal__line--cmd {
+  color: var(--color-text);
+}
+.terminal__line--clue,
+.terminal__line--flipper {
   color: var(--color-amber);
 }
 .terminal__hint {
