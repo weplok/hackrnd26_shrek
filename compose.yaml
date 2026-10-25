@@ -40,6 +40,15 @@ services:
       retries: 5
       start_period: 10s
 
+  match:
+    profiles: [online]
+    build:
+      context: .
+      dockerfile: services/match/Dockerfile
+    environment:
+      MATCH_PORT: '8090'
+    restart: unless-stopped
+
   redis:
     profiles: [online]
     image: redis:7.4-alpine
