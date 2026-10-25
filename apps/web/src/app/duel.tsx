@@ -1,36 +1,30 @@
-// Duel screen: lobby + live Red/Blue view over the match WebSocket.
-// Red reuses the campaign engine (scan to start); Blue is an arcade patrol on a
-// canvas of the same node graph. Full Red puzzle UI is a follow-up.
+// Duel screen: both sides play on the same node graph. Red scans and attacks
+// nodes (engine puzzles) to reach the target; Blue hardens nodes by solving the
+// same puzzle archetype as a defence. Both use the shared PuzzlePanel.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Button, Panel } from '@zero-day/ui';
+import { Button, Modal, Panel } from '@zero-day/ui';
+import type { GameState, PuzzleInstance } from '@zero-day/engine';
+import { PuzzlePanel } from '../features/puzzle-host';
 import { content } from '../content';
+import { ru } from '../shared/ui/strings';
 
 const DUEL_CASE = 'L3C1';
-
 type Role = 'red' | 'blue';
-interface Vec2 {
-  x: number;
-  y: number;
-}
-interface BluePatrol {
-  at: Vec2;
-  from: string;
-  to: string;
-  isolateCooldown: number;
+
+interface RedView {
+  role: 'red';
+  red: GameState;
+  secured: string[];
+  detection: number;
 }
 interface BlueView {
   role: 'blue';
-  blue: BluePatrol;
-  footprints: Record<string, number>;
+  puzzle: PuzzleInstance | null;
+  puzzleNode: string | null;
+  compromised: string[];
+  underAttack: string | null;
+  secured: string[];
   detection: number;
-  activeExploit: string | null;
-  isolated: string[];
-}
-interface RedView {
-  role: 'red';
-  red: { nodes: Record<string, { revealed: boolean; scanned: boolean; compromised: boolean }>; activePuzzle: { nodeId: string } | null };
-  detection: number;
-  bluePresence: string | null;
 }
 type View = RedView | BlueView;
 type ServerMsg =
@@ -40,13 +34,16 @@ type ServerMsg =
   | { t: 'error'; msg: string };
 
 const caseDef = content.cases[DUEL_CASE]!;
-const NODES = caseDef.nodes.map((n) => ({ id: n.id, label: n.label, kind: n.kind, x: n.position.x, y: n.position.y }));
-const ADJ: Record<string, string[]> = {};
-for (const n of NODES) ADJ[n.id] = [];
-for (const e of caseDef.edges ?? []) {
-  ADJ[e.from]?.push(e.to);
-  ADJ[e.to]?.push(e.from);
-}
+const NODES = caseDef.nodes.map((n) => ({
+  id: n.id,
+  label: n.label,
+  kind: n.kind,
+  x: n.position.x,
+  y: n.position.y,
+  vulns: (n.exploits ?? []).map((e) => e.vuln),
+}));
+type Node = (typeof NODES)[number];
+const nodeOf = (id: string): Node | undefined => NODES.find((n) => n.id === id);
 
 function wsUrl(): string {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -60,6 +57,7 @@ export function DuelPage(): ReactNode {
   const [view, setView] = useState<View | null>(null);
   const [result, setResult] = useState<{ winner: Role; reason: string } | null>(null);
   const [opponent, setOpponent] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => () => wsRef.current?.close(), []);
@@ -84,25 +82,22 @@ export function DuelPage(): ReactNode {
     ws.onclose = () => setStatus((s) => (s === 'over' ? s : 'lobby'));
   }
 
-  function send(payload: unknown): void {
-    wsRef.current?.send(JSON.stringify(payload));
-  }
+  const send = (payload: unknown): void => wsRef.current?.send(JSON.stringify(payload));
 
   if (status === 'lobby' || status === 'connecting') {
     return (
       <Panel>
         <h1>Дуэль · Red vs Blue</h1>
-        <p>Карта: {DUEL_CASE}. Red ломает узел-цель, Blue патрулирует и ловит по следам.</p>
+        <p>Карта {DUEL_CASE}. Red ломает узлы до цели, Blue патчит узлы — защита решается тем же пазлом, что и атака.</p>
         <label>
-          Комната{' '}
-          <input value={room} maxLength={16} onChange={(e) => setRoom(e.target.value)} placeholder="demo" />
+          Комната <input value={room} maxLength={16} onChange={(e) => setRoom(e.target.value)} placeholder="demo" />
         </label>
         <div className="actions" style={{ marginTop: 16 }}>
           <Button variant="primary" disabled={status === 'connecting'} onClick={() => join('red')}>
-            Играть за Red (атака)
+            Red · атака
           </Button>
           <Button disabled={status === 'connecting'} onClick={() => join('blue')}>
-            Играть за Blue (защита)
+            Blue · защита
           </Button>
         </div>
         {status === 'connecting' && <p>Подключение…</p>}
@@ -112,12 +107,12 @@ export function DuelPage(): ReactNode {
 
   if (status === 'over' && result) {
     const win = result.winner === role;
+    const reason =
+      result.reason === 'target-reached' ? 'Red дошёл до цели' : result.reason === 'caught' ? 'Red вычислен (тревога 100%)' : 'Blue удержал оборону до конца раунда';
     return (
       <Panel>
         <h1>{win ? 'Победа' : 'Поражение'}</h1>
-        <p>
-          Победил {result.winner === 'red' ? 'Red (атака)' : 'Blue (защита)'} — {result.reason}
-        </p>
+        <p>Победил {result.winner === 'red' ? 'Red (атака)' : 'Blue (защита)'} — {reason}</p>
         <Button variant="primary" onClick={() => location.reload()}>
           В лобби
         </Button>
@@ -125,27 +120,96 @@ export function DuelPage(): ReactNode {
     );
   }
 
-  const detection = view?.detection ?? 0;
+  if (!view) return <Panel><p>Ожидание состояния…</p></Panel>;
+
+  const redView = view.role === 'red' ? view : null;
+  const blueView = view.role === 'blue' ? view : null;
+  const sel = selected ? nodeOf(selected) : null;
+  const activePuzzle = redView?.red.activePuzzle ?? blueView?.puzzle ?? null;
+
+  function nodeState(n: Node): { color: string; hint: string } {
+    const secured = view!.secured.includes(n.id);
+    if (redView) {
+      const rt = redView.red.nodes[n.id];
+      if (rt?.compromised) return { color: '#e44', hint: 'взят' };
+      if (secured) return { color: '#48f', hint: 'защищён' };
+      if (!rt?.revealed) return { color: '#334', hint: 'скрыт' };
+      if (rt.scanned) return { color: '#dd4', hint: 'скан' };
+      return { color: '#2a6', hint: 'открыт' };
+    }
+    if (blueView!.compromised.includes(n.id)) return { color: '#e44', hint: 'взят Red' };
+    if (secured) return { color: '#48f', hint: 'защищён' };
+    if (blueView!.underAttack === n.id) return { color: '#f82', hint: 'атакуется!' };
+    return { color: '#2a6', hint: '' };
+  }
+
+  function menu(n: Node): ReactNode {
+    if (redView) {
+      const rt = redView.red.nodes[n.id];
+      const secured = redView.secured.includes(n.id);
+      return (
+        <>
+          <Button onClick={() => send({ t: 'red_cmd', cmd: { type: 'ScanNode', node: n.id } })}>Скан</Button>
+          {rt?.scanned &&
+            n.vulns.map((v) => (
+              <Button key={v} disabled={secured} onClick={() => send({ t: 'red_cmd', cmd: { type: 'ProposeHypothesis', node: n.id, vuln: v } })}>
+                Атака {v}
+              </Button>
+            ))}
+          {secured && <span> · узел защищён, атака отбита</span>}
+        </>
+      );
+    }
+    return (
+      <>
+        {n.vulns.length === 0 && <span>нет уязвимостей для патча</span>}
+        {n.vulns.map((v) => (
+          <Button key={v} onClick={() => send({ t: 'blue_patch', node: n.id, vuln: v })}>
+            Патч {v}
+          </Button>
+        ))}
+      </>
+    );
+  }
+
   return (
     <Panel>
-      <h1>Дуэль — ты {role === 'red' ? 'Red (атака)' : 'Blue (защита)'}</h1>
-      <p>Соперник: {opponent === 'human' ? 'человек' : opponent === 'ai' ? 'ИИ' : 'ждём…'}</p>
-      <DetectionBar value={detection} />
-      {role === 'blue' && view?.role === 'blue' ? (
-        <BlueBoard view={view} onMove={(node) => send({ t: 'blue_move', node })} onIsolate={(node) => send({ t: 'blue_isolate', node })} />
-      ) : view?.role === 'red' ? (
-        <RedBoard view={view} onScan={(node) => send({ t: 'red_cmd', cmd: { type: 'ScanNode', node } })} />
-      ) : (
-        <p>Ожидание состояния…</p>
+      <h1>Дуэль — {role === 'red' ? 'Red · атака' : 'Blue · защита'}</h1>
+      <p>Соперник: {opponent === 'human' ? 'человек' : opponent === 'ai' ? 'ИИ' : 'ждём второго игрока…'} · Цель: {nodeOf(caseDefTarget())?.label}</p>
+      <DetectionBar value={view.detection} role={role!} />
+      <GraphBoard selected={selected} onSelect={setSelected} stateOf={nodeState} />
+      {sel && (
+        <div style={{ marginTop: 12 }}>
+          <strong>{sel.label}</strong> — {nodeState(sel).hint}
+          <div className="actions" style={{ marginTop: 6, flexWrap: 'wrap' }}>{menu(sel)}</div>
+        </div>
+      )}
+      {activePuzzle && (
+        <Modal
+          isOpen
+          closeLabel={ru.puzzle.close}
+          title={role === 'red' ? ru.puzzle.running(activePuzzle.title) : `Защита: ${activePuzzle.title}`}
+          onClose={() => send(role === 'red' ? { t: 'red_cmd', cmd: { type: 'CancelPuzzle' } } : { t: 'blue_cancel' })}
+        >
+          <PuzzlePanel
+            puzzle={activePuzzle}
+            onCancel={() => send(role === 'red' ? { t: 'red_cmd', cmd: { type: 'CancelPuzzle' } } : { t: 'blue_cancel' })}
+            onSubmit={(answer) => send(role === 'red' ? { t: 'red_cmd', cmd: { type: 'SubmitPuzzle', answer } } : { t: 'blue_submit', answer })}
+          />
+        </Modal>
       )}
     </Panel>
   );
 }
 
-function DetectionBar({ value }: { value: number }): ReactNode {
+function caseDefTarget(): string {
+  return caseDef.nodes.find((n) => n.kind === 'target')?.id ?? caseDef.nodes.at(-1)!.id;
+}
+
+function DetectionBar({ value, role }: { value: number; role: Role }): ReactNode {
   return (
     <div style={{ margin: '12px 0' }}>
-      <div>Обнаружение: {Math.round(value)}%</div>
+      <div>Тревога: {Math.round(value)}% {role === 'blue' ? '(100 = Red пойман, победа Blue)' : '(не доводи до 100)'}</div>
       <div style={{ height: 10, background: '#222', borderRadius: 5, overflow: 'hidden' }}>
         <div style={{ width: `${value}%`, height: '100%', background: value > 60 ? '#e44' : '#4ad' }} />
       </div>
@@ -158,7 +222,15 @@ const H = 420;
 const px = (x: number): number => (x / 100) * W;
 const py = (y: number): number => (y / 100) * H;
 
-function BlueBoard({ view, onMove, onIsolate }: { view: BlueView; onMove: (n: string) => void; onIsolate: (n: string) => void }): ReactNode {
+function GraphBoard({
+  selected,
+  onSelect,
+  stateOf,
+}: {
+  selected: string | null;
+  onSelect: (id: string) => void;
+  stateOf: (n: Node) => { color: string; hint: string };
+}): ReactNode {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   useEffect(() => {
     const ctx = canvasRef.current?.getContext('2d');
@@ -166,66 +238,38 @@ function BlueBoard({ view, onMove, onIsolate }: { view: BlueView; onMove: (n: st
     ctx.clearRect(0, 0, W, H);
     ctx.strokeStyle = '#345';
     for (const e of caseDef.edges ?? []) {
-      const a = NODES.find((n) => n.id === e.from)!;
-      const b = NODES.find((n) => n.id === e.to)!;
+      const a = nodeOf(e.from)!;
+      const b = nodeOf(e.to)!;
       ctx.beginPath();
       ctx.moveTo(px(a.x), py(a.y));
       ctx.lineTo(px(b.x), py(b.y));
       ctx.stroke();
     }
     for (const n of NODES) {
-      const fp = view.footprints[n.id] ?? 0;
-      const isolated = view.isolated.includes(n.id);
+      const { color } = stateOf(n);
       ctx.beginPath();
-      ctx.arc(px(n.x), py(n.y), 10 + Math.min(fp, 20) * 0.6, 0, Math.PI * 2);
-      ctx.fillStyle = n.id === view.activeExploit ? '#e44' : isolated ? '#555' : fp > 0 ? '#dd4' : '#2a6';
+      ctx.arc(px(n.x), py(n.y), n.id === selected ? 13 : 10, 0, Math.PI * 2);
+      ctx.fillStyle = color;
       ctx.fill();
+      if (n.id === selected) {
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.strokeStyle = '#345';
+        ctx.lineWidth = 1;
+      }
       ctx.fillStyle = '#cde';
       ctx.font = '10px monospace';
-      ctx.fillText(n.label, px(n.x) + 12, py(n.y) + 3);
+      ctx.fillText(n.label, px(n.x) + 13, py(n.y) + 3);
     }
-    ctx.beginPath();
-    ctx.arc(px(view.blue.at.x), py(view.blue.at.y), 8, 0, Math.PI * 2);
-    ctx.fillStyle = '#fff';
-    ctx.fill();
-  }, [view]);
+  });
 
-  const reachable = new Set(ADJ[view.blue.to] ?? []);
   function click(ev: React.MouseEvent<HTMLCanvasElement>): void {
     const rect = ev.currentTarget.getBoundingClientRect();
     const mx = ((ev.clientX - rect.left) / rect.width) * W;
     const my = ((ev.clientY - rect.top) / rect.height) * H;
     const hit = NODES.find((n) => Math.hypot(px(n.x) - mx, py(n.y) - my) < 16);
-    if (hit && reachable.has(hit.id)) onMove(hit.id);
+    if (hit) onSelect(hit.id);
   }
-  return (
-    <div>
-      <canvas ref={canvasRef} width={W} height={H} style={{ width: '100%', maxWidth: W, border: '1px solid #345', cursor: 'pointer' }} onClick={click} />
-      <p>Клик по соседнему узлу — ехать туда. Ешь жёлтые следы, лови красный узел (активный эксплойт).</p>
-      <Button disabled={view.blue.isolateCooldown > 0} onClick={() => onIsolate(view.blue.to)}>
-        Изолировать текущий узел {view.blue.isolateCooldown > 0 ? `(${Math.ceil(view.blue.isolateCooldown / 1000)}с)` : ''}
-      </Button>
-    </div>
-  );
-}
-
-function RedBoard({ view, onScan }: { view: RedView; onScan: (n: string) => void }): ReactNode {
-  return (
-    <div>
-      <p>Сканируй узлы, ищи путь к цели. (Полный UI пазлов — следующим шагом.)</p>
-      <ul style={{ listStyle: 'none', padding: 0 }}>
-        {NODES.map((n) => {
-          const rt = view.red.nodes[n.id];
-          if (!rt?.revealed) return null;
-          return (
-            <li key={n.id} style={{ margin: '4px 0' }}>
-              <Button onClick={() => onScan(n.id)}>Скан: {n.label}</Button>{' '}
-              {rt.compromised ? '✓ взят' : rt.scanned ? 'просканирован' : ''}
-              {view.red.activePuzzle?.nodeId === n.id ? ' · пазл активен' : ''}
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
+  return <canvas ref={canvasRef} width={W} height={H} style={{ width: '100%', maxWidth: W, border: '1px solid #345', cursor: 'pointer' }} onClick={click} />;
 }

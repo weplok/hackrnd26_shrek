@@ -1,31 +1,22 @@
-// Authoritative duel: one shared DuelState, real-time tick loop. Red drives the
-// campaign engine; Blue is an arcade patrol that eats Red's footprints to raise
-// detection and can interrupt an active exploit by reaching its node.
-import { apply, createGame, startCase } from '@zero-day/engine';
-import type { Case, Command, GameEvent } from '@zero-day/engine';
+// Authoritative duel. Both sides act on the same node graph. Red drives the
+// campaign engine (scan + attack puzzles) to compromise the target. Blue hardens
+// nodes by solving the same puzzle archetype as a defence: a secured node blocks
+// Red's attack there for a while. Red wins by taking the target; Blue wins by
+// running the clock out or getting Red caught (alarm 100).
+import { apply, createGame, generatePuzzle, startCase, verifyPuzzle } from '@zero-day/engine';
+import type { Case, Command, GameEvent, PuzzleInstance } from '@zero-day/engine';
 import { content } from './content.ts';
-import type { BlueView, DuelMap, DuelState, RedView, Role, Vec2 } from './types.ts';
+import type { BlueView, DuelMap, DuelState, RedView, Role } from './types.ts';
 
-// Duel balance. Final numbers belong in content/duel/rules.json.
 const RULES = {
   roundMs: 6 * 60_000,
-  patrolSpeed: 22, // map units per second
-  arriveEps: 2.5, // distance at which the patrol "arrives" at a node
-  detectionDecayPerSec: 1.2, // Red staying quiet cools the bar
-  isolateMs: 8_000, // a node stays isolated this long
-  isolateCooldownMs: 24_000, // one isolate per this window
-  layLowBurn: 18, // footprints removed near the target per lay_low
-  footprintWeight: { ScanOpened: 3, NodeScanned: 4, PuzzleOpened: 2, ExploitSucceeded: 9, NodeCompromised: 6 } as Record<string, number>,
+  secureMs: 22_000, // how long a Blue patch holds before it lapses
 };
-
-function dist(a: Vec2, b: Vec2): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
-}
 
 function buildMap(caseId: string): DuelMap {
   const c = content.cases[caseId] as Case | undefined;
   if (!c) throw new Error(`unknown case ${caseId}`);
-  const pos: Record<string, Vec2> = {};
+  const pos: Record<string, { x: number; y: number }> = {};
   const adj: Record<string, string[]> = {};
   for (const n of c.nodes) {
     pos[n.id] = { x: n.position.x, y: n.position.y };
@@ -52,10 +43,11 @@ export function createDuel(caseId = 'L3C1', seed = Date.now() & 0xffff): DuelSta
   return {
     map,
     red,
-    blue: { at: { ...map.pos[map.entry]! }, from: map.entry, to: map.entry, speed: RULES.patrolSpeed, isolateCooldown: 0 },
-    footprints: {},
+    bluePuzzle: null,
+    bluePuzzleNode: null,
+    blueRng: (seed * 2654435761) >>> 0,
+    securedUntil: {},
     detection: 0,
-    isolatedUntil: {},
     phase: 'playing',
     winner: null,
     reason: null,
@@ -64,82 +56,74 @@ export function createDuel(caseId = 'L3C1', seed = Date.now() & 0xffff): DuelSta
   };
 }
 
-function clamp(v: number): number {
-  return Math.max(0, Math.min(100, v));
+function isSecured(d: DuelState, node: string): boolean {
+  return (d.securedUntil[node] ?? 0) > Date.now();
 }
 
-/** Red action. Returns the engine events (for the Red client) or a rejection. */
+// ---- Red ----
+
 export function redCommand(d: DuelState, cmd: Command): GameEvent[] {
   if (d.phase !== 'playing') return [];
-  const node = 'node' in cmd ? (cmd.node as string) : null;
-  if (node && (d.isolatedUntil[node] ?? 0) > Date.now())
-    return [{ type: 'CommandRejected', reason: 'node-dim' }];
+  // A hardened node repels a fresh attack attempt.
+  if (cmd.type === 'ProposeHypothesis' && isSecured(d, cmd.node))
+    return [{ type: 'CommandRejected', reason: 'not-exploitable' }];
   const { state, events } = apply(content, d.red, cmd);
   d.red = state;
-  for (const ev of events) {
-    const n = 'node' in ev ? (ev.node as string) : null;
-    const w = RULES.footprintWeight[ev.type];
-    if (n && w) d.footprints[n] = (d.footprints[n] ?? 0) + w;
-  }
+  d.detection = Math.max(0, Math.min(100, d.red.tracks.alarm ?? 0));
   return events;
 }
 
-export function redLayLow(d: DuelState): void {
-  if (d.phase !== 'playing') return;
-  const t = d.map.target;
-  for (const n of [t, ...(d.map.adj[t] ?? [])]) {
-    if (d.footprints[n]) d.footprints[n] = Math.max(0, d.footprints[n] - RULES.layLowBurn);
+// ---- Blue ----
+
+export function bluePatch(d: DuelState, node: string, vuln: string): void {
+  if (d.phase !== 'playing' || d.bluePuzzle) return;
+  const c = content.cases[d.map.caseId] as Case;
+  const n = c.nodes.find((x) => x.id === node);
+  const ex = n?.exploits.find((e) => e.vuln === vuln);
+  if (!n || !ex) return;
+  const arch = content.puzzles[vuln]?.archetype ?? 'default';
+  const title = content.puzzles[vuln]?.title ?? vuln;
+  const knobs = { ...d.red.difficulty.puzzleKnobs[arch], ...ex.knobs };
+  const [rng, inst] = generatePuzzle(d.blueRng, arch, title, ex.puzzleParams ?? {}, knobs, node, vuln, {
+    genuine: true,
+    label: (id: string) => c.nodes.find((x) => x.id === id)?.label ?? id,
+  });
+  d.blueRng = rng;
+  d.bluePuzzle = inst;
+  d.bluePuzzleNode = node;
+}
+
+/** Returns true when the patch landed (node hardened). */
+export function blueSubmit(d: DuelState, answer: string[]): boolean {
+  if (d.phase !== 'playing' || !d.bluePuzzle || !d.bluePuzzleNode) return false;
+  if (verifyPuzzle(d.bluePuzzle, answer)) {
+    d.securedUntil[d.bluePuzzleNode] = Date.now() + RULES.secureMs;
+    d.bluePuzzle = null;
+    d.bluePuzzleNode = null;
+    return true;
   }
-}
-
-/** Blue heads toward an adjacent node. */
-export function blueMove(d: DuelState, node: string): void {
-  if (d.phase !== 'playing') return;
-  if (!(d.map.adj[d.blue.to] ?? []).includes(node)) return; // only to a neighbour
-  d.blue.from = d.blue.to;
-  d.blue.to = node;
-}
-
-export function blueIsolate(d: DuelState, node: string): void {
-  if (d.phase !== 'playing' || d.blue.isolateCooldown > 0) return;
-  if (!d.map.pos[node]) return;
-  d.isolatedUntil[node] = Date.now() + RULES.isolateMs;
-  d.blue.isolateCooldown = RULES.isolateCooldownMs;
-}
-
-/** Advance the world by dtMs. Returns true when the match just ended. */
-export function tick(d: DuelState, dtMs: number): boolean {
-  if (d.phase !== 'playing') return false;
-  const dt = dtMs / 1000;
-
-  // Blue patrol moves toward its target node.
-  const dest = d.map.pos[d.blue.to]!;
-  const gap = dist(d.blue.at, dest);
-  if (gap > RULES.arriveEps) {
-    const step = Math.min(gap, d.blue.speed * dt);
-    d.blue.at.x += ((dest.x - d.blue.at.x) / gap) * step;
-    d.blue.at.y += ((dest.y - d.blue.at.y) / gap) * step;
+  const left = (d.bluePuzzle.attemptsLeft ?? 1) - 1;
+  if (left <= 0) {
+    d.bluePuzzle = null;
+    d.bluePuzzleNode = null;
   } else {
-    d.blue.at = { ...dest };
-    // Arrived: eat footprints -> detection; interrupt an active exploit here.
-    const eaten = d.footprints[d.blue.to] ?? 0;
-    if (eaten > 0) {
-      d.detection = clamp(d.detection + eaten);
-      d.footprints[d.blue.to] = 0;
-    }
-    if (d.red.activePuzzle?.nodeId === d.blue.to) {
-      d.red = apply(content, d.red, { type: 'CancelPuzzle' }).state;
-      d.detection = clamp(d.detection + 6);
-    }
+    d.bluePuzzle = { ...d.bluePuzzle, attemptsLeft: left } as PuzzleInstance;
   }
+  return false;
+}
 
-  d.detection = clamp(d.detection - RULES.detectionDecayPerSec * dt);
-  d.blue.isolateCooldown = Math.max(0, d.blue.isolateCooldown - dtMs);
+export function blueCancel(d: DuelState): void {
+  d.bluePuzzle = null;
+  d.bluePuzzleNode = null;
+}
 
-  // Win checks.
+// ---- Clock & win ----
+
+export function tick(d: DuelState): boolean {
+  if (d.phase !== 'playing') return false;
   if (d.red.nodes[d.map.target]?.compromised) return end(d, 'red', 'target-reached');
-  if (d.detection >= 100) return end(d, 'blue', 'detected');
-  if (Date.now() >= d.deadline) return end(d, 'blue', 'timeout');
+  if (d.red.phase === 'caught' || d.detection >= 100) return end(d, 'blue', 'caught');
+  if (Date.now() >= d.deadline) return end(d, 'blue', 'held-the-line');
   return false;
 }
 
@@ -150,22 +134,23 @@ function end(d: DuelState, winner: Role, reason: string): boolean {
   return true;
 }
 
-// ---- Role projections (fog of war) ----
+// ---- Projections (fog of war) ----
+
+function securedList(d: DuelState): string[] {
+  const now = Date.now();
+  return Object.keys(d.securedUntil).filter((n) => d.securedUntil[n]! > now);
+}
 
 export function project(d: DuelState, role: Role): RedView | BlueView {
-  if (role === 'red') {
-    // Red learns Blue's position only once the patrol sits on a node Red revealed.
-    const onNode = d.blue.to;
-    const revealed = d.red.nodes[onNode]?.revealed && dist(d.blue.at, d.map.pos[onNode]!) <= RULES.arriveEps;
-    return { role: 'red', red: d.red, detection: d.detection, bluePresence: revealed ? onNode : null };
-  }
-  const now = Date.now();
+  if (role === 'red') return { role: 'red', red: d.red, secured: securedList(d), detection: d.detection };
+  const compromised = Object.keys(d.red.nodes).filter((id) => d.red.nodes[id]?.compromised);
   return {
     role: 'blue',
-    blue: d.blue,
-    footprints: d.footprints,
+    puzzle: d.bluePuzzle,
+    puzzleNode: d.bluePuzzleNode,
+    compromised,
+    underAttack: d.red.activePuzzle?.nodeId ?? null,
+    secured: securedList(d),
     detection: d.detection,
-    activeExploit: d.red.activePuzzle?.nodeId ?? null,
-    isolated: Object.keys(d.isolatedUntil).filter((n) => d.isolatedUntil[n]! > now),
   };
 }

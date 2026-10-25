@@ -1,15 +1,7 @@
-// Real-time duel WebSocket server. One authoritative DuelState per room, a
-// 10 Hz tick loop broadcasting each side its own projection (fog of war).
+// Real-time duel WebSocket server. One authoritative DuelState per room, a tick
+// loop for the clock + win checks, each side gets its own projection.
 import { WebSocketServer, type WebSocket } from 'ws';
-import {
-  blueIsolate,
-  blueMove,
-  createDuel,
-  project,
-  redCommand,
-  redLayLow,
-  tick,
-} from './match.ts';
+import { blueCancel, bluePatch, blueSubmit, createDuel, project, redCommand, tick } from './match.ts';
 import type { ClientMsg, DuelState, Role, ServerMsg } from './types.ts';
 
 const PORT = Number(process.env.MATCH_PORT ?? 8090);
@@ -19,7 +11,6 @@ interface Room {
   state: DuelState;
   sockets: Partial<Record<Role, WebSocket>>;
   timer: ReturnType<typeof setInterval> | null;
-  last: number;
 }
 
 const rooms = new Map<string, Room>();
@@ -28,12 +19,13 @@ function send(ws: WebSocket | undefined, msg: ServerMsg): void {
   if (ws && ws.readyState === ws.OPEN) ws.send(JSON.stringify(msg));
 }
 
-function loop(id: string, room: Room): void {
-  const now = Date.now();
-  const dt = now - room.last;
-  room.last = now;
-  const ended = tick(room.state, dt);
+function broadcast(room: Room): void {
   for (const role of ['red', 'blue'] as Role[]) send(room.sockets[role], { t: 'tick', view: project(room.state, role) });
+}
+
+function loop(id: string, room: Room): void {
+  const ended = tick(room.state);
+  broadcast(room);
   if (ended) {
     const { winner, reason } = room.state;
     for (const role of ['red', 'blue'] as Role[]) send(room.sockets[role], { t: 'over', winner: winner!, reason: reason! });
@@ -45,7 +37,7 @@ function loop(id: string, room: Room): void {
 function getRoom(id: string): Room {
   let room = rooms.get(id);
   if (!room) {
-    room = { state: createDuel(), sockets: {}, timer: null, last: Date.now() };
+    room = { state: createDuel(), sockets: {}, timer: null };
     room.timer = setInterval(() => loop(id, room!), TICK_MS);
     rooms.set(id, room);
   }
@@ -73,6 +65,7 @@ wss.on('connection', (ws) => {
       room.sockets[role] = ws;
       const opponent: Role = role === 'red' ? 'blue' : 'red';
       send(ws, { t: 'joined', role, caseId: room.state.map.caseId, opponentKind: room.sockets[opponent] ? 'human' : null });
+      send(ws, { t: 'tick', view: project(room.state, role) });
       return;
     }
 
@@ -80,17 +73,17 @@ wss.on('connection', (ws) => {
 
     switch (msg.t) {
       case 'red_cmd':
-        if (role !== 'red') return;
-        return send(ws, { t: 'events', events: redCommand(room.state, msg.cmd) });
-      case 'red_lay_low':
-        if (role === 'red') redLayLow(room.state);
+        if (role === 'red') send(ws, { t: 'events', events: redCommand(room.state, msg.cmd) });
         return;
-      case 'blue_move':
-        if (role === 'blue') blueMove(room.state, msg.node);
-        return;
-      case 'blue_isolate':
-        if (role === 'blue') blueIsolate(room.state, msg.node);
-        return;
+      case 'blue_patch':
+        if (role === 'blue') bluePatch(room.state, msg.node, msg.vuln);
+        return broadcast(room);
+      case 'blue_submit':
+        if (role === 'blue') blueSubmit(room.state, msg.answer);
+        return broadcast(room);
+      case 'blue_cancel':
+        if (role === 'blue') blueCancel(room.state);
+        return broadcast(room);
     }
   });
 

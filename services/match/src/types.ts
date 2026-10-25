@@ -1,7 +1,7 @@
-// Duel domain types: authoritative real-time Red-vs-Blue match state and the
-// WebSocket protocol. Red reuses the campaign engine as-is; Blue is an arcade
-// patrol overlaid on the same node graph.
-import type { Command, GameEvent, GameState } from '@zero-day/engine';
+// Duel domain types. Both sides play on the same node graph and both solve
+// puzzles: Red runs the campaign engine to attack; Blue solves the same puzzle
+// archetype as a defence, which hardens (secures) the node against that attack.
+import type { Command, GameEvent, GameState, PuzzleInstance } from '@zero-day/engine';
 
 export type Role = 'red' | 'blue';
 
@@ -10,49 +10,37 @@ export interface Vec2 {
   y: number;
 }
 
-/** Static graph pulled from the case content: node positions + adjacency. */
 export interface DuelMap {
   caseId: string;
-  pos: Record<string, Vec2>; // nodeId -> map coords (0..100)
-  adj: Record<string, string[]>; // nodeId -> neighbour nodeIds
+  pos: Record<string, Vec2>;
+  adj: Record<string, string[]>;
   entry: string;
   target: string;
 }
 
-/** Blue's arcade avatar — a Pac-Man-style patrol moving across the graph. */
-export interface BluePatrol {
-  at: Vec2; // current sprite position
-  from: string; // node last left
-  to: string; // node heading toward
-  speed: number; // units per second
-  isolateCooldown: number; // ms until isolate ability ready again
-}
-
-/** Footprints Red drops on nodes; Blue eats them to raise detection. */
-export type Footprints = Record<string, number>; // nodeId -> remaining amount
-
 export interface DuelState {
   map: DuelMap;
-  red: GameState; // engine state = Red's hacking progress
-  blue: BluePatrol;
-  footprints: Footprints;
-  detection: number; // 0..100; 100 => Blue wins (Red caught)
-  isolatedUntil: Record<string, number>; // nodeId -> timestamp until isolation lifts
+  red: GameState; // attacker engine state
+  bluePuzzle: PuzzleInstance | null; // Blue's active defence puzzle
+  bluePuzzleNode: string | null;
+  blueRng: number;
+  securedUntil: Record<string, number>; // nodeId -> timestamp the hardening lasts to
+  detection: number; // mirror of engine alarm (0..100); 100 => Red caught => Blue wins
   phase: 'playing' | 'over';
   winner: Role | null;
   reason: string | null;
   startedAt: number;
-  deadline: number; // round time limit
+  deadline: number;
 }
 
-// ---- WebSocket protocol (real-time) ----
+// ---- WebSocket protocol ----
 
 export type ClientMsg =
   | { t: 'join'; room: string; role: Role; nick?: string }
-  | { t: 'red_cmd'; cmd: Command } // Red hacking action (engine Command)
-  | { t: 'red_lay_low' } // Red lies low: burns down footprints near the target
-  | { t: 'blue_move'; node: string } // Blue picks an adjacent node to head to
-  | { t: 'blue_isolate'; node: string }; // Blue power-pellet: isolate a node
+  | { t: 'red_cmd'; cmd: Command } // engine Command: ScanNode / ProposeHypothesis / SubmitPuzzle / CancelPuzzle
+  | { t: 'blue_patch'; node: string; vuln: string } // open a defence puzzle on a node
+  | { t: 'blue_submit'; answer: string[] }
+  | { t: 'blue_cancel' };
 
 export type ServerMsg =
   | { t: 'joined'; role: Role; caseId: string; opponentKind: 'human' | 'ai' | null }
@@ -61,20 +49,19 @@ export type ServerMsg =
   | { t: 'over'; winner: Role; reason: string }
   | { t: 'error'; msg: string };
 
-/** Red sees its own engine projection + the detection bar (fog of war). */
 export interface RedView {
   role: 'red';
-  red: GameState;
+  red: GameState; // carries activePuzzle for the shared PuzzlePanel
+  secured: string[]; // nodes Red cannot attack right now (Blue hardened them)
   detection: number;
-  bluePresence: string | null; // node where Blue patrol currently is, if revealed
 }
 
-/** Blue sees the whole map, footprints and where Red is actively exploiting. */
 export interface BlueView {
   role: 'blue';
-  blue: BluePatrol;
-  footprints: Footprints;
+  puzzle: PuzzleInstance | null; // Blue's defence puzzle for the PuzzlePanel
+  puzzleNode: string | null;
+  compromised: string[]; // nodes Red has taken
+  underAttack: string | null; // node Red is solving a puzzle on
+  secured: string[];
   detection: number;
-  activeExploit: string | null; // node Red is solving a puzzle on, if any
-  isolated: string[];
 }
