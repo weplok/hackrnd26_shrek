@@ -9,7 +9,7 @@ import { AttackNotice, AttackTable } from '../features/attack-log';
 import { NetworkMap } from '../features/network-map/NetworkMap';
 import { startAutosave, withCaseRun, type SaveRepository } from '../features/persistence';
 import { PuzzleHost } from '../features/puzzle-host';
-import { socialKey, useSocial } from '../features/social';
+import { socialKey, useSocial, type SocialMode } from '../features/social';
 import { NodeContextMenu, Terminal } from '../features/terminal';
 import { ru } from '../shared/ui/strings';
 import { caseOrder } from './pages';
@@ -71,6 +71,18 @@ export function MissionPage({
   useEffect(() => {
     if (caseRun?.phase === 'caught') useSocial.getState().reset();
   }, [caseRun?.phase]);
+
+  // Classic mode swaps an opened AI chat for the scripted dialogue when the person has one.
+  const socialOpenKey = useSocial((state) => state.openKey);
+  const socialMode = useSocial((state) => state.mode);
+  useEffect(() => {
+    if (socialMode !== 'classic' || !socialOpenKey) return;
+    const npc = caseData?.nodes.find((item) => socialOpenKey === socialKey(caseId, item.id))?.npc;
+    const state = useCaseStore.getState().caseRun;
+    if (!npc || !state) return;
+    useSocial.getState().close();
+    useCaseStore.setState({ caseRun: openChat(content, state, npc) });
+  }, [socialMode, socialOpenKey, caseData, caseId, content]);
 
   useEffect(() => startAutosave(repository, () => useCaseStore.getState().caseRun), [repository]);
   useEffect(() => startAchievements(repository), [repository]);
@@ -313,9 +325,7 @@ function NodeInspector({
           type="button"
           variant="primary"
           disabled={!playing}
-          onClick={() => {
-            run((c, s) => openChat(c, s, npc));
-          }}
+          onClick={() => void useSocial.getState().open(caseRun.caseId, node.id)}
         >
           {t.talk}
         </Button>
@@ -438,14 +448,27 @@ function Journal({ caseRun }: { caseRun: GameState }): ReactNode {
   );
 }
 
-function Overlay({ title, tone, children }: { title: string; tone?: 'danger' | 'ok'; children: ReactNode }): ReactNode {
+function Overlay({
+  title,
+  tone,
+  aside,
+  children,
+}: {
+  title: string;
+  tone?: 'danger' | 'ok';
+  aside?: ReactNode;
+  children: ReactNode;
+}): ReactNode {
   const id = useId();
   return (
     <div className="overlay" role="dialog" aria-modal="true" aria-labelledby={id}>
       <Panel className={`overlay__panel${tone ? ` overlay__panel--${tone}` : ''}`}>
-        <h2 id={id} className="overlay__title">
-          {title}
-        </h2>
+        <div className="overlay__head">
+          <h2 id={id} className="overlay__title">
+            {title}
+          </h2>
+          {aside}
+        </div>
         {children}
       </Panel>
     </div>
@@ -542,6 +565,40 @@ function BriefOverlay({
   );
 }
 
+function SocialModeSwitch({
+  mode,
+  classic,
+  onChange,
+}: {
+  mode: SocialMode;
+  classic: boolean;
+  onChange: (mode: SocialMode) => void;
+}): ReactNode {
+  const st = ru.social;
+  const options: [SocialMode, string, boolean][] = [
+    ['ai', st.modeAi, true],
+    ['classic', st.modeClassic, classic],
+  ];
+  return (
+    <div className="chips" role="group" aria-label={st.mode}>
+      {options.map(([value, label, enabled]) => (
+        <button
+          key={value}
+          type="button"
+          className="chip"
+          aria-pressed={mode === value}
+          disabled={!enabled}
+          onClick={() => {
+            if (mode !== value) onChange(value);
+          }}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function ChatOverlay({
   content,
   caseData,
@@ -564,8 +621,21 @@ function ChatOverlay({
   const { clues, keys } = ownedTokens(caseRun);
   const closed = runtime.locked || runtime.yielded || caseRun.phase !== 'playing';
 
+  const nodeId = caseData.nodes.find((item) => item.npc === npcId)?.id;
+  const aside = (
+    <SocialModeSwitch
+      mode="classic"
+      classic
+      onChange={(mode) => {
+        run(closeChat);
+        useSocial.getState().setMode(mode);
+        if (nodeId) void useSocial.getState().open(caseRun.caseId, nodeId);
+      }}
+    />
+  );
+
   return (
-    <Overlay title={t.chat(config.role)}>
+    <Overlay title={t.chat(config.role)} aside={aside}>
       <div className="chat__history">
         {[config.replies.greeting ?? '…', ...history].map((reply, index) => (
           <p key={index} className="chat__bubble">
@@ -662,8 +732,22 @@ function SocialOverlay({
     setDraft('');
   }
 
+  const aside = (
+    <SocialModeSwitch
+      mode="ai"
+      classic={Boolean(node.npc)}
+      onChange={(mode) => {
+        useSocial.getState().setMode(mode);
+      }}
+    />
+  );
+
   return (
-    <Overlay title={st.title(node.label)} {...(chat?.verdict === 'noticed' ? { tone: 'danger' as const } : {})}>
+    <Overlay
+      title={st.title(node.label)}
+      aside={aside}
+      {...(chat?.verdict === 'noticed' ? { tone: 'danger' as const } : {})}
+    >
       <p className="fine-print">{st.trust(chat?.trust ?? null)}</p>
       <div className="chat__history" ref={historyRef} role="log">
         {!chat && <p className="fine-print">{st.connecting}</p>}

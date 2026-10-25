@@ -18,7 +18,7 @@ from redis.asyncio import Redis
 
 from .characters import CharacterNotFoundError, CharacterProfileError, CharacterRepository
 from .config import ConfigurationError, Settings
-from .llm import ClaudeCodeLlm, CircuitBreakingLlm, FallbackLlm, LlmClient, ModelError, OpenAICompatibleLlm
+from .llm import CircuitBreakingLlm, LlmClient, ModelError, OpenAICompatibleLlm
 from .rate_limit import FixedWindowRateLimiter, RateLimitExceeded, RedisFixedWindowRateLimiter
 from .schemas import (
     DialogueRequest,
@@ -45,15 +45,7 @@ request_logger.propagate = False
 
 
 def build_llm_client(settings: Settings) -> LlmClient:
-    if settings.claude_code_priority:
-        claude = ClaudeCodeLlm(settings)
-        if settings.openai_configured():
-            return FallbackLlm(claude, CircuitBreakingLlm(OpenAICompatibleLlm(settings)))
-        return claude
-    primary = CircuitBreakingLlm(OpenAICompatibleLlm(settings))
-    if settings.claude_code_fallback:
-        return FallbackLlm(primary, ClaudeCodeLlm(settings))
-    return primary
+    return CircuitBreakingLlm(OpenAICompatibleLlm(settings))
 
 
 def create_app(settings: Settings | None = None, client: LlmClient | None = None) -> FastAPI:
@@ -74,7 +66,7 @@ def create_app(settings: Settings | None = None, client: LlmClient | None = None
     def get_service() -> DialogueService:
         if app.state.service is None:
             runtime_settings = get_settings()
-            if app.state.client is None and not runtime_settings.claude_code_priority:
+            if app.state.client is None:
                 runtime_settings.require_llm()
             app.state.service = DialogueService(
                 settings=runtime_settings,

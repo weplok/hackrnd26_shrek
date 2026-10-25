@@ -18,12 +18,15 @@ export type SocialChat = {
 };
 
 type Chats = Record<string, SocialChat>;
+export type SocialMode = 'ai' | 'classic';
 
 const REPLY_TIMEOUT_MS = 90_000;
 
 type SocialStore = {
   chats: Chats;
   openKey: string | null;
+  mode: SocialMode;
+  setMode: (mode: SocialMode) => void;
   open: (caseId: string, nodeId: string) => Promise<void>;
   close: () => void;
   send: (content: Content, caseId: string, nodeId: string, text: string) => Promise<void>;
@@ -88,6 +91,10 @@ export const useSocial = create<SocialStore>((set, get) => {
   return {
     chats: load(),
     openKey: null,
+    mode: 'ai',
+    setMode: (mode) => {
+      set({ mode });
+    },
     open: async (caseId, nodeId) => {
       const key = socialKey(caseId, nodeId);
       set({ openKey: key });

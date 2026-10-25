@@ -173,6 +173,9 @@ export const ru = {
       complete: 'Собеседник поверил и передал данные. Узел взломан.',
     },
     unread: 'новое сообщение',
+    mode: 'Режим соц. инженерии',
+    modeAi: 'ИИ',
+    modeClassic: 'Классика',
   },
   nodeMenu: {
     title: 'УЗЕЛ',
