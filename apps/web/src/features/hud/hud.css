@@ -96,36 +96,35 @@
   border-color: var(--color-magenta);
 }
 
-/* The sprite sheet is a 2x2 grid. We paint one cell as a background and oversize it
-   past 200% so each cell slightly overscans the window: the shared seam between rows
-   never reaches the edge, so a neighbour's ears can't bleed in. */
+/* One image per mood (cut from the original sheet, padded to 3:2). Separate files mean
+   no neighbouring pose can bleed into the frame. */
 .flipper__sprite {
   align-self: start;
   aspect-ratio: 3 / 2;
   overflow: hidden;
   background-color: #18120d;
-  background-image: url('/assets/flipper/flipper-states-sketch.png');
   background-repeat: no-repeat;
-  background-size: 212% 212%;
+  background-position: center;
+  background-size: 100% 100%;
 }
 
 .flipper__sprite--sleeping {
-  background-position: 0% 0%;
+  background-image: url('/assets/flipper/flipper-sleeping.png');
 }
 
 .flipper__sprite--alert {
-  background-position: 100% 0%;
+  background-image: url('/assets/flipper/flipper-alert.png');
 }
 
 .flipper__sprite--growling {
-  background-position: 100% 100%;
+  background-image: url('/assets/flipper/flipper-growling.png');
 }
 
 .flipper__sprite--barking {
-  background-position: 0% 100%;
+  background-image: url('/assets/flipper/flipper-barking.png');
 }
 
-/* Gentle breathing while Flipper dozes; only the zoom changes, corner stays anchored. */
+/* Gentle breathing while Flipper dozes; a small centred zoom. */
 @media (prefers-reduced-motion: no-preference) {
   .flipper__sprite--sleeping {
     animation: flipper-breathe 4.5s ease-in-out infinite;
@@ -135,10 +134,10 @@
 @keyframes flipper-breathe {
   0%,
   100% {
-    background-size: 212% 212%;
+    background-size: 100% 100%;
   }
   50% {
-    background-size: 220% 220%;
+    background-size: 108% 108%;
   }
 }
 
