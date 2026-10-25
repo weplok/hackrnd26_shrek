@@ -96,49 +96,50 @@
   border-color: var(--color-magenta);
 }
 
+/* The sprite sheet is a 2x2 grid. We paint one cell as a background and oversize it
+   past 200% so each cell slightly overscans the window: the shared seam between rows
+   never reaches the edge, so a neighbour's ears can't bleed in. */
 .flipper__sprite {
-  position: relative;
   align-self: start;
   aspect-ratio: 3 / 2;
   overflow: hidden;
-  background: #18120d;
+  background-color: #18120d;
+  background-image: url('/assets/flipper/flipper-states-sketch.png');
+  background-repeat: no-repeat;
+  background-size: 212% 212%;
 }
 
-.flipper__sprite-image {
-  display: block;
-  width: 200%;
-  max-width: none;
-  height: auto;
+.flipper__sprite--sleeping {
+  background-position: 0% 0%;
 }
 
-/* Gentle breathing while Flipper dozes; scale-only so no neighbour sprite bleeds in. */
+.flipper__sprite--alert {
+  background-position: 100% 0%;
+}
+
+.flipper__sprite--growling {
+  background-position: 100% 100%;
+}
+
+.flipper__sprite--barking {
+  background-position: 0% 100%;
+}
+
+/* Gentle breathing while Flipper dozes; only the zoom changes, corner stays anchored. */
 @media (prefers-reduced-motion: no-preference) {
-  .flipper__sprite-image--sleeping {
+  .flipper__sprite--sleeping {
     animation: flipper-breathe 4.5s ease-in-out infinite;
-    transform-origin: 50% 50%;
   }
 }
 
 @keyframes flipper-breathe {
   0%,
   100% {
-    transform: scale(1);
+    background-size: 212% 212%;
   }
   50% {
-    transform: scale(1.018);
+    background-size: 220% 220%;
   }
-}
-
-.flipper__sprite-image--alert {
-  transform: translateX(-50%);
-}
-
-.flipper__sprite-image--growling {
-  transform: translate(-50%, -50%);
-}
-
-.flipper__sprite-image--barking {
-  transform: translateY(-50%);
 }
 
 .flipper__content {
