@@ -9,6 +9,11 @@
         X-Frame-Options "DENY"
     }
 
+    @duel path /ws/duel*
+    handle @duel {
+        reverse_proxy match:8090
+    }
+
     @api path /api/* /healthz /dialogue /telemetry /ws* /mcp*
     handle @api {
         reverse_proxy api:8000

@@ -14,6 +14,7 @@ import { Button, Panel } from '@zero-day/ui';
 import { ErrorBoundary } from './ErrorBoundary';
 import { CodexPage, ContractsPage, DEMO_CASE, IntroPage, caseUnlocked } from './pages';
 import { MissionPage } from './mission';
+import { DuelPage } from './duel';
 import { content } from '../content';
 import { SaveRepository } from '../features/persistence';
 import { ToolLab } from '../features/puzzle-host';
@@ -130,6 +131,14 @@ function ApplicationRoutes({ bootstrap }: { bootstrap: BootstrapState }): ReactN
         element={
           <Screen>
             <PlayPage />
+          </Screen>
+        }
+      />
+      <Route
+        path="/duel"
+        element={
+          <Screen>
+            <DuelPage />
           </Screen>
         }
       />
@@ -257,7 +266,12 @@ function StartPage({ bootstrap }: { bootstrap: BootstrapState }): ReactNode {
           >
             {ru.continueGame} {!hasSave && ru.noSave}
           </Button>
-          <Button type="button" disabled>
+          <Button
+            type="button"
+            onClick={() => {
+              navigate('/duel');
+            }}
+          >
             {ru.duel}
           </Button>
           <Button

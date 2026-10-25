@@ -12,7 +12,7 @@ export const ru = {
   codex: 'КОДЕКС',
   settings: 'НАСТРОЙКИ',
   about: 'ОБ ИГРЕ',
-  duel: 'ДУЭЛЬ · СКОРО',
+  duel: 'ДУЭЛЬ',
   toolLab: 'ТРЕНАЖЁР ИНСТРУМЕНТОВ',
   toolLabCopy: 'Все восемь учебных механик. Результат здесь не меняет кампанию.',
   profileTitle: 'ПРОФИЛЬ ОПЕРАТОРА',
@@ -173,6 +173,9 @@ export const ru = {
       complete: 'Собеседник поверил и передал данные. Узел взломан.',
     },
     unread: 'новое сообщение',
+    mode: 'Режим соц. инженерии',
+    modeAi: 'ИИ',
+    modeClassic: 'Классика',
   },
   nodeMenu: {
     title: 'УЗЕЛ',
@@ -187,6 +190,13 @@ export const ru = {
     },
     close: 'Закрыть',
     terminalHint: (command: string) => `Применить можно только из терминала внизу. Введите: ${command}`,
+  },
+  tutorial: {
+    label: 'Обучение',
+    step: (n: number, total: number) => `ШАГ ${String(n)}/${String(total)}`,
+    skip: 'ПРОПУСТИТЬ',
+    next: 'ДАЛЕЕ →',
+    done: 'ПОНЯТНО',
   },
   hud: {
     objectives: 'ЦЕЛИ',
