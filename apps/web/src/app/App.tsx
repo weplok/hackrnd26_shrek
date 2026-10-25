@@ -167,7 +167,7 @@ function ApplicationRoutes({ bootstrap }: { bootstrap: BootstrapState }): ReactN
         path="/codex"
         element={
           <Screen>
-            <CodexPage content={gameContent} opened={saveRepository.load().save.codex} />
+            <CodexPage />
           </Screen>
         }
       />

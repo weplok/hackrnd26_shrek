@@ -114,49 +114,49 @@
   border-color: var(--color-magenta);
 }
 
+/* One image per mood (cut from the original sheet, padded to 3:2). Separate files mean
+   no neighbouring pose can bleed into the frame. */
 .flipper__sprite {
-  position: relative;
   align-self: start;
   aspect-ratio: 3 / 2;
   overflow: hidden;
-  background: #18120d;
+  background-color: #18120d;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
 }
 
-.flipper__sprite-image {
-  display: block;
-  width: 200%;
-  max-width: none;
-  height: auto;
+.flipper__sprite--sleeping {
+  background-image: url('/assets/flipper/flipper-sleeping.png');
 }
 
-/* Gentle breathing while Flipper dozes; scale-only so no neighbour sprite bleeds in. */
+.flipper__sprite--alert {
+  background-image: url('/assets/flipper/flipper-alert.png');
+}
+
+.flipper__sprite--growling {
+  background-image: url('/assets/flipper/flipper-growling.png');
+}
+
+.flipper__sprite--barking {
+  background-image: url('/assets/flipper/flipper-barking.png');
+}
+
+/* Gentle breathing while Flipper dozes; a small centred zoom. */
 @media (prefers-reduced-motion: no-preference) {
-  .flipper__sprite-image--sleeping {
+  .flipper__sprite--sleeping {
     animation: flipper-breathe 4.5s ease-in-out infinite;
-    transform-origin: 50% 50%;
   }
 }
 
 @keyframes flipper-breathe {
   0%,
   100% {
-    transform: scale(1);
+    background-size: 100% 100%;
   }
   50% {
-    transform: scale(1.018);
+    background-size: 108% 108%;
   }
-}
-
-.flipper__sprite-image--alert {
-  transform: translateX(-50%);
-}
-
-.flipper__sprite-image--growling {
-  transform: translate(-50%, -50%);
-}
-
-.flipper__sprite-image--barking {
-  transform: translateY(-50%);
 }
 
 .flipper__content {

@@ -7,8 +7,6 @@ import { useAchievements, type Achievement } from './achievements';
 
 import './hud.css';
 
-const SPRITE_SOURCE = '/assets/flipper/flipper-states-sketch.png';
-
 // Events that mean the player is struggling vs. making progress. After a few failures
 // in a row with no progress between them, Flipper volunteers an explicit next-step hint.
 const FAIL_EVENTS = new Set(['CommandRejected', 'PuzzleFailed', 'ExploitMismatched', 'CombineFailed']);
@@ -80,13 +78,11 @@ export function Flipper({ caseId, level, lines, tracks }: FlipperProps): ReactNo
 
   return (
     <aside aria-label={ru.hud.flipper} className={`flipper flipper--${mood}`}>
-      <div className="flipper__sprite">
-        <img
-          alt={ru.hud.spriteAlt[mood]}
-          className={`flipper__sprite-image flipper__sprite-image--${mood}`}
-          src={SPRITE_SOURCE}
-        />
-      </div>
+      <div
+        className={`flipper__sprite flipper__sprite--${mood}`}
+        role="img"
+        aria-label={ru.hud.spriteAlt[mood]}
+      />
       <div className="flipper__content">
         <div className="flipper__meta">
           <strong>{ru.hud.flipper}</strong>
