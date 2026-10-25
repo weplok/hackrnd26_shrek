@@ -29,8 +29,19 @@ services:
       DIALOGUE_TIMEOUT_SECONDS: ${DIALOGUE_TIMEOUT_SECONDS:-}
       NPC_MAX_TOKENS: ${NPC_MAX_TOKENS:-}
       JUDGE_MAX_TOKENS: ${JUDGE_MAX_TOKENS:-}
+      # Claude Code LLM (fallback or, with PRIORITY, primary). HOME points at the
+      # mounted credentials so the CLI runs authorized inside the container.
+      HOME: /root
+      CLAUDE_CODE_FALLBACK: ${CLAUDE_CODE_FALLBACK:-}
+      CLAUDE_CODE_PRIORITY: ${CLAUDE_CODE_PRIORITY:-}
+      CLAUDE_CODE_MODEL: ${CLAUDE_CODE_MODEL:-}
+      CLAUDE_CODE_BIN: ${CLAUDE_CODE_BIN:-}
     volumes:
       - npc_data:/app/backend_api/data
+      # Host-installed, host-authorized Claude Code CLI, mounted read-only.
+      - ${CLAUDE_HOST_BIN:-/root/.local/bin/claude}:/usr/local/bin/claude:ro
+      - ${CLAUDE_HOST_CREDS:-/root/.claude}:/root/.claude
+      - ${CLAUDE_HOST_CONFIG:-/root/.claude.json}:/root/.claude.json
     depends_on:
       redis:
         condition: service_healthy

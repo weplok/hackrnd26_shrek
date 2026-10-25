@@ -47,6 +47,10 @@ class Settings:
     telemetry_retention_days: int = 30
     redis_url: str = ""
     llm_max_retries: int = 0
+    claude_code_fallback: bool = False
+    claude_code_priority: bool = False
+    claude_code_bin: str = "claude"
+    claude_code_model: str = "sonnet"
 
     def _llm_values(self) -> dict[str, str]:
         return {
@@ -96,6 +100,10 @@ class Settings:
             judge_max_tokens=_positive_int("JUDGE_MAX_TOKENS", 200),
             telemetry_retention_days=_positive_int("TELEMETRY_RETENTION_DAYS", 30),
             redis_url=os.getenv("REDIS_URL", "").strip(),
+            claude_code_fallback=os.getenv("CLAUDE_CODE_FALLBACK", "").strip().lower() in {"1", "true", "yes", "on"},
+            claude_code_priority=os.getenv("CLAUDE_CODE_PRIORITY", "").strip().lower() in {"1", "true", "yes", "on"},
+            claude_code_bin=os.getenv("CLAUDE_CODE_BIN", "").strip() or "claude",
+            claude_code_model=os.getenv("CLAUDE_CODE_MODEL", "").strip() or "sonnet",
         )
         if require_llm:
             settings.require_llm()

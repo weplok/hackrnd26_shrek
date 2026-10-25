@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import asyncio
+import json
+import logging
 import re
+import tempfile
 from collections.abc import Callable, Iterable
 from time import monotonic
 from typing import Protocol, cast
@@ -8,6 +12,8 @@ from typing import Protocol, cast
 from openai.types.chat import ChatCompletionMessageParam
 
 from .config import Settings
+
+logger = logging.getLogger("backend_api.llm")
 
 _THINK_BLOCK = re.compile(r"<think>.*?</think>", flags=re.DOTALL)
 
@@ -56,6 +62,100 @@ class OpenAICompatibleLlm:
         if not response:
             raise ModelError("OpenAI-compatible API returned an empty response")
         return response
+
+
+# Role labels for rendering history into the single prompt the Claude Code CLI accepts.
+_ROLE_LABELS = {"user": "Пользователь", "assistant": "Ассистент"}
+
+
+class ClaudeCodeLlm:
+    """Backup client that drives the locally installed Claude Code CLI (`claude -p`).
+
+    Used when the primary OpenAI-compatible endpoint is unavailable. The CLI runs
+    non-interactively with a single Claude model (Sonnet by default); the OpenAI
+    `model` argument is ignored because those ids are not valid Claude models, and
+    `temperature`/`max_tokens` are ignored because print mode has no such flags.
+    """
+
+    def __init__(self, settings: Settings) -> None:
+        self.bin = settings.claude_code_bin
+        self.model = settings.claude_code_model
+        self.timeout = settings.llm_request_timeout_seconds
+        # Run from a neutral directory so project CLAUDE.md is never auto-discovered.
+        self.cwd = tempfile.gettempdir()
+
+    @staticmethod
+    def _render(messages: list[dict[str, str]]) -> tuple[str, str]:
+        system = "\n\n".join(m["content"] for m in messages if m["role"] == "system")
+        conversation = [m for m in messages if m["role"] != "system"]
+        if len(conversation) == 1:
+            return system, conversation[0]["content"]
+        prompt = "\n\n".join(f"{_ROLE_LABELS.get(m['role'], m['role'])}: {m['content']}" for m in conversation)
+        return system, prompt
+
+    async def complete(
+        self, model: str, messages: list[dict[str, str]], temperature: float, max_tokens: int | None = None
+    ) -> str:
+        system, prompt = self._render(messages)
+        args = [
+            self.bin,
+            "-p",
+            "--model",
+            self.model,
+            "--output-format",
+            "json",
+            "--strict-mcp-config",
+            "--restricted",
+            "--disable-slash-commands",
+            "--permission-prompts",
+            "none",
+        ]
+        if system:
+            args += ["--system-prompt", system]
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *args,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=self.cwd,
+            )
+        except OSError as error:
+            raise ModelError("Claude Code CLI could not be started") from error
+        try:
+            stdout, _ = await asyncio.wait_for(proc.communicate(prompt.encode()), self.timeout)
+        except TimeoutError as error:
+            proc.kill()
+            raise ModelError("Claude Code CLI timed out") from error
+        if proc.returncode != 0:
+            raise ModelError("Claude Code CLI exited with a non-zero status")
+        try:
+            payload = json.loads(stdout)
+        except (json.JSONDecodeError, ValueError) as error:
+            raise ModelError("Claude Code CLI returned invalid JSON") from error
+        if payload.get("is_error") or payload.get("subtype") != "success":
+            raise ModelError("Claude Code CLI reported an error result")
+        response = _strip_think(str(payload.get("result", "")))
+        if not response:
+            raise ModelError("Claude Code CLI returned an empty response")
+        return response
+
+
+class FallbackLlm:
+    """Try the primary client; on a model error fall back to the backup client."""
+
+    def __init__(self, primary: LlmClient, fallback: LlmClient) -> None:
+        self.primary = primary
+        self.fallback = fallback
+
+    async def complete(
+        self, model: str, messages: list[dict[str, str]], temperature: float, max_tokens: int | None = None
+    ) -> str:
+        try:
+            return await self.primary.complete(model, messages, temperature, max_tokens)
+        except ModelError:
+            logger.warning("primary LLM unavailable, falling back to Claude Code CLI")
+            return await self.fallback.complete(model, messages, temperature, max_tokens)
 
 
 class FakeLlm:
