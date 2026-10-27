@@ -174,6 +174,7 @@ export function VirusMaze({ puzzle, onCancel, onSubmit }: GameProps): ReactNode 
   const submit = useRef(onSubmit);
   const [status, setStatus] = useState<Status>('ready');
   const [view, setView] = useState<World>(() => freshWorld(level));
+  const touchStart = useRef<Cell | null>(null);
 
   useEffect(() => {
     submit.current = onSubmit;
@@ -227,7 +228,27 @@ export function VirusMaze({ puzzle, onCancel, onSubmit }: GameProps): ReactNode 
   return (
     <div className="virus-maze">
       <p className="puzzle-host__prompt">{text.virusRules}</p>
-      <svg className="virus-maze__field" viewBox={`0 0 ${String(W)} ${String(H)}`} role="img" aria-label={text.virusField}>
+      <svg
+        className="virus-maze__field"
+        viewBox={`0 0 ${String(W)} ${String(H)}`}
+        role="img"
+        aria-label={text.virusField}
+        onTouchStart={(event) => {
+          const touch = event.touches[0];
+          if (touch) touchStart.current = [touch.clientX, touch.clientY];
+        }}
+        onTouchEnd={(event) => {
+          const begin = touchStart.current;
+          const touch = event.changedTouches[0];
+          touchStart.current = null;
+          if (!begin || !touch || status !== 'run') return;
+          const dx = touch.clientX - begin[0];
+          const dy = touch.clientY - begin[1];
+          if (Math.abs(dx) < 16 && Math.abs(dy) < 16) return;
+          world.current.next =
+            Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? [1, 0] : [-1, 0]) : dy > 0 ? [0, 1] : [0, -1];
+        }}
+      >
         {level.walls.map(([x, y]) => (
           <rect className="virus-maze__wall" height="1" key={`${String(x)}:${String(y)}`} width="1" x={x} y={y} />
         ))}

@@ -427,6 +427,31 @@ a {
   color: var(--color-muted);
   font-size: 0.875rem;
 }
+.terminal__toggle {
+  display: block;
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--color-line);
+  background: var(--color-panel);
+  color: var(--color-green-bright);
+  font: 0.75rem var(--font-mono);
+  letter-spacing: 0.12em;
+  text-align: center;
+  cursor: pointer;
+}
+.terminal--collapsed .terminal__screen,
+.terminal--collapsed .terminal__hint {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .terminal__toggle {
+    display: none;
+  }
+  .terminal--collapsed .terminal__screen,
+  .terminal--collapsed .terminal__hint {
+    display: block;
+  }
+}
 
 .node-menu {
   min-width: 12rem;

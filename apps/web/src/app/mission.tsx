@@ -177,12 +177,9 @@ export function MissionPage({
         </div>
       </div>
 
+      <Terminal vulns={Object.values(content.vulnerabilities)} caseData={caseData} />
       <AttackTable caseData={caseData} caseRun={caseRun} />
-
-      <div className="mission__bottom">
-        <EvidenceBoard caseData={caseData} caseRun={caseRun} dispatch={dispatch} />
-        <Terminal vulns={Object.values(content.vulnerabilities)} caseData={caseData} />
-      </div>
+      <EvidenceBoard caseData={caseData} caseRun={caseRun} dispatch={dispatch} />
 
       {!briefing && (storyDone || !hasStory) && (
         <TutorialCoach

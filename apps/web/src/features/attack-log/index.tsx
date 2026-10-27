@@ -16,7 +16,7 @@ export const ATTACKS = [
 
 export type AttackId = (typeof ATTACKS)[number]['id'];
 
-/** Weakness an attack tries on a node: the node's own one if the attack fits it, else any of the archetype. */
+/** Weakness an attack tries on a node: only the node's own weakness that fits the method, if any. */
 export function attackVuln(
   vulns: readonly { id: string; archetype: string }[],
   attack: AttackId,
@@ -24,7 +24,7 @@ export function attackVuln(
 ): string | undefined {
   const archetypes: readonly string[] = ATTACKS.find((item) => item.id === attack)?.archetypes ?? [];
   const matching = vulns.filter((vuln) => archetypes.includes(vuln.archetype));
-  return (matching.find((vuln) => nodeVulns.includes(vuln.id)) ?? matching[0])?.id;
+  return matching.find((vuln) => nodeVulns.includes(vuln.id))?.id;
 }
 type ColumnId = 'scan' | AttackId;
 type Outcome = 'ok' | 'fail';

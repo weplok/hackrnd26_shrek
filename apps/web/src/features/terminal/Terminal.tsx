@@ -65,6 +65,7 @@ export function Terminal({ vulns, caseData, onCodex }: TerminalProps): ReactNode
   const [value, setValue] = useState('');
   const [lines, setLines] = useState<Line[]>([]);
   const [hint, setHint] = useState('');
+  const [open, setOpen] = useState(true);
   const history = useRef<string[]>([]);
   const historyIndex = useRef(0);
   const nextId = useRef(0);
@@ -138,9 +139,8 @@ export function Terminal({ vulns, caseData, onCodex }: TerminalProps): ReactNode
       case 'attack': {
         const node = caseData?.nodes.find((item) => item.id === result.node);
         const person = node?.kind === 'person';
-        if (result.attack === 'social') {
-          if (person && caseId) void useSocial.getState().open(caseId, result.node);
-          else print('error', [t.notPerson(result.node)]);
+        if (result.attack === 'social' && person) {
+          if (caseId) void useSocial.getState().open(caseId, result.node);
           return;
         }
         const vuln = node && !person ? attackVuln(vulns, result.attack, node.exploits.map((e) => e.vuln)) : undefined;
@@ -189,7 +189,17 @@ export function Terminal({ vulns, caseData, onCodex }: TerminalProps): ReactNode
   }
 
   return (
-    <Panel className="terminal" title={t.label}>
+    <Panel className={`terminal${open ? '' : ' terminal--collapsed'}`} title={t.label}>
+      <button
+        type="button"
+        className="terminal__toggle"
+        aria-expanded={open}
+        onClick={() => {
+          setOpen((current) => !current);
+        }}
+      >
+        {open ? t.collapse : t.expand}
+      </button>
       <div className="terminal__screen" role="log" aria-live="polite" ref={screenRef}>
         {lines.map((line) => (
           <p key={line.id} className={`terminal__line terminal__line--${line.kind}`}>

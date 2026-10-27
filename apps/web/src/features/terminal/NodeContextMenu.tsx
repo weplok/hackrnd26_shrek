@@ -72,7 +72,7 @@ export function NodeContextMenu({
                 {t.scan}
               </button>
             </li>
-            {ATTACKS.filter((attack) => attack.id !== 'social').map((attack) => {
+            {ATTACKS.map((attack) => {
               const vuln = attackVuln(vulns, attack.id, nodeVulns);
               return (
                 <li key={attack.id}>

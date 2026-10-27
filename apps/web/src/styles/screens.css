@@ -151,8 +151,7 @@
   align-items: center;
   margin-left: auto;
 }
-.mission__top,
-.mission__bottom {
+.mission__top {
   display: grid;
   gap: var(--space-3);
 }
@@ -196,11 +195,27 @@
   }
 }
 @media (min-width: 1024px) {
+  .mission {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .mission > .topbar,
+  .mission > .hud-bar,
+  .mission__metrics,
+  .mission__top,
+  .mission > .attack-table {
+    grid-column: 1 / -1;
+  }
+  .mission > .attack-table {
+    order: 1;
+  }
+  .mission > .board {
+    order: 2;
+  }
+  .mission > .terminal {
+    order: 3;
+  }
   .mission__top {
     grid-template-columns: minmax(0, 1.55fr) minmax(18rem, 1fr);
-  }
-  .mission__bottom {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 }
 
